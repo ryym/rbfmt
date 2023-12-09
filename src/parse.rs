@@ -32,95 +32,121 @@ struct FmtNodeBuilder {
 
 impl FmtNodeBuilder {
     fn build_fmt_node(&mut self, node: Node) -> fmt::Node {
-        let mut root = fmt::Statements { nodes: vec![] };
-        self.visit(node, &mut root);
-        self.consume_trivia_until(self.src.len(), &mut root);
-        fmt::Node::Statements(root)
+        let node = self.visit(node);
+        let mut stmts = vec![node];
+        if let Some(trivia) = self.consume_trivia_until(self.src.len()) {
+            let eof = fmt::Node::None(trivia);
+            stmts.push(eof);
+        }
+        fmt::Node::Statements(fmt::Statements { nodes: stmts })
     }
 
-    fn visit<G: fmt::GroupNodeEntity>(&mut self, node: Node, group: &mut G) {
+    fn visit(&mut self, node: Node) -> fmt::Node {
         let loc_end = node.expression().end;
         let fmt_node = match node {
             Node::Int(node) => {
-                self.consume_trivia_until(node.expression_l.begin, group);
-                fmt::Node::Number(fmt::Number { value: node.value })
+                let trivia = self.consume_trivia_until(node.expression_l.begin);
+                fmt::Node::Number(trivia, fmt::Number { value: node.value })
             }
             Node::Float(node) => {
-                self.consume_trivia_until(node.expression_l.begin, group);
-                fmt::Node::Number(fmt::Number { value: node.value })
+                let trivia = self.consume_trivia_until(node.expression_l.begin);
+                fmt::Node::Number(trivia, fmt::Number { value: node.value })
             }
             Node::Rational(node) => {
-                self.consume_trivia_until(node.expression_l.begin, group);
-                fmt::Node::Number(fmt::Number { value: node.value })
+                let trivia = self.consume_trivia_until(node.expression_l.begin);
+                fmt::Node::Number(trivia, fmt::Number { value: node.value })
             }
             Node::Complex(node) => {
-                self.consume_trivia_until(node.expression_l.begin, group);
-                fmt::Node::Number(fmt::Number { value: node.value })
+                let trivia = self.consume_trivia_until(node.expression_l.begin);
+                fmt::Node::Number(trivia, fmt::Number { value: node.value })
             }
             Node::Ivar(node) => {
-                self.consume_trivia_until(node.expression_l.begin, group);
-                fmt::Node::Identifier(fmt::Identifier { name: node.name })
+                let trivia = self.consume_trivia_until(node.expression_l.begin);
+                fmt::Node::Identifier(trivia, fmt::Identifier { name: node.name })
             }
             Node::Cvar(node) => {
-                self.consume_trivia_until(node.expression_l.begin, group);
-                fmt::Node::Identifier(fmt::Identifier { name: node.name })
+                let trivia = self.consume_trivia_until(node.expression_l.begin);
+                fmt::Node::Identifier(trivia, fmt::Identifier { name: node.name })
             }
             Node::Gvar(node) => {
-                self.consume_trivia_until(node.expression_l.begin, group);
-                fmt::Node::Identifier(fmt::Identifier { name: node.name })
+                let trivia = self.consume_trivia_until(node.expression_l.begin);
+                fmt::Node::Identifier(trivia, fmt::Identifier { name: node.name })
             }
             Node::Begin(node) => {
-                let mut stmts = fmt::Statements { nodes: vec![] };
-                for n in node.statements {
-                    self.visit(n, &mut stmts);
-                }
-                fmt::Node::Statements(stmts)
+                let nodes = node.statements.into_iter().map(|n| self.visit(n)).collect();
+                fmt::Node::Statements(fmt::Statements { nodes })
             }
             _ => {
                 todo!("{}", format!("convert node {:?}", node));
             }
         };
-        group.append_node(fmt_node);
         self.last_loc_end = loc_end;
+        fmt_node
     }
 
-    fn consume_trivia_until<G: fmt::GroupNodeEntity>(&mut self, end: usize, group: &mut G) {
-        // Find comments and empty lines between the last parsed location and the given end.
-        loop {
-            let (comment_begin, comment_end) = {
-                match self.comments.last() {
-                    Some(comment) if comment.location.begin <= end => {
-                        (comment.location.begin, comment.location.end)
-                    }
-                    _ => {
-                        self.consume_empty_lines_until(end, group);
-                        break;
-                    }
+    fn consume_trivia_until(&mut self, end: usize) -> Option<fmt::Trivia> {
+        let mut trivia = fmt::Trivia::new();
+
+        // Find the first comment. It may be a trailing comment of the last node.
+        let first_comment_found = match self.comments.last() {
+            Some(comment) if comment.location.begin <= end => {
+                let (comment_begin, comment_end) = (comment.location.begin, comment.location.end);
+                let fmt_comment = self.get_comment_content(comment);
+                if self.is_at_line_start(comment_begin) {
+                    self.consume_empty_lines_until(comment_begin, &mut trivia);
+                    trivia
+                        .leading_trivia
+                        .push(fmt::TriviaNode::LineComment(fmt_comment));
+                } else {
+                    trivia.last_trailing_comment = Some(fmt_comment);
                 }
-            };
-            self.consume_empty_lines_until(comment_begin, group);
-
-            // Ignore non-UTF8 source code for now.
-            let comment_bytes = &self.src[comment_begin..comment_end];
-            let comment_str = String::from_utf8_lossy(comment_bytes).to_string();
-            let comment_node = fmt::Comment { value: comment_str };
-
-            if self.is_at_line_start(comment_begin) {
-                group.append_node(fmt::Node::LineComment(comment_node))
-            } else {
-                group.append_node(fmt::Node::TrailingComment(comment_node))
+                self.last_loc_end = comment_end - 1;
+                self.comments.pop();
+                true
             }
+            _ => false,
+        };
 
-            // Set the location of newline like other actual syntax nodes.
-            self.last_loc_end = comment_end - 1;
-            self.comments.pop();
+        if first_comment_found {
+            // Then find the other comments. They must not be a trailing comment.
+            loop {
+                let comment = match self.comments.last() {
+                    Some(comment) if comment.location.begin <= end => comment,
+                    _ => break,
+                };
+                let fmt_comment = self.get_comment_content(comment);
+                let comment_end = comment.location.end;
+                self.consume_empty_lines_until(comment.location.begin, &mut trivia);
+                trivia
+                    .leading_trivia
+                    .push(fmt::TriviaNode::LineComment(fmt_comment));
+                self.last_loc_end = comment_end - 1;
+                self.comments.pop();
+            }
+        }
+
+        // Finally consume the remaining empty lines.
+        self.consume_empty_lines_until(end, &mut trivia);
+        if trivia.is_empty() {
+            None
+        } else {
+            Some(trivia)
         }
     }
 
-    fn consume_empty_lines_until<G: fmt::GroupNodeEntity>(&mut self, end: usize, group: &mut G) {
+    fn get_comment_content(&self, comment: &Comment) -> fmt::Comment {
+        let comment_bytes = &self.src[comment.location.begin..comment.location.end];
+        // Ignore non-UTF8 source code for now.
+        let comment_str = String::from_utf8_lossy(comment_bytes)
+            .trim_end()
+            .to_string();
+        fmt::Comment { value: comment_str }
+    }
+
+    fn consume_empty_lines_until(&mut self, end: usize, trivia: &mut fmt::Trivia) {
         let line_loc = self.last_empty_line_loc_within(self.last_loc_end, end);
         if let Some(line_loc) = line_loc {
-            group.append_node(fmt::Node::EmptyLine);
+            trivia.leading_trivia.push(fmt::TriviaNode::EmptyLine);
             self.last_loc_end = line_loc.end;
         }
     }

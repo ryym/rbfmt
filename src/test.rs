@@ -27,8 +27,8 @@ fn compare_files(dir_path: PathBuf) {
     let mut output_path = dir_path;
     output_path.push("out.rb");
 
-    let input = fs::read(input_path).unwrap();
-    let want = fs::read_to_string(output_path).unwrap();
+    let input = fs::read(&input_path).unwrap();
+    let want = fs::read_to_string(&output_path).unwrap();
     let got = crate::format(input);
-    assert_eq!(want, got);
+    assert_eq!(want, got, "{:?}", &input_path);
 }

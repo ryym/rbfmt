@@ -3,27 +3,56 @@ pub(crate) fn format(node: Node) -> String {
         buffer: String::new(),
     };
     formatter.format(node);
-    if !formatter.buffer.ends_with('\n') {
-        formatter.buffer.push('\n');
+    formatter.buffer.push('\n');
+    formatter.buffer.trim_start().to_string()
+}
+
+#[derive(Debug)]
+pub(crate) struct Trivia {
+    pub last_trailing_comment: Option<Comment>,
+    pub leading_trivia: Vec<TriviaNode>,
+}
+
+impl Trivia {
+    pub(crate) fn new() -> Self {
+        Self {
+            last_trailing_comment: None,
+            leading_trivia: vec![],
+        }
     }
-    formatter.buffer
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.last_trailing_comment.is_none() && self.leading_trivia.is_empty()
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum TriviaNode {
+    EmptyLine,
+    LineComment(Comment),
 }
 
 #[derive(Debug)]
 pub(crate) enum Node {
-    EmptyLine,
-    LineComment(Comment),
-    TrailingComment(Comment),
-    Number(Number),
-    Identifier(Identifier),
+    Number(Option<Trivia>, Number),
+    Identifier(Option<Trivia>, Identifier),
     Statements(Statements),
+    None(Trivia),
 }
 
 impl Node {
-    fn is_trivia(&self) -> bool {
+    fn is_none(&self) -> bool {
         match self {
-            Self::EmptyLine | Self::LineComment(_) | Self::TrailingComment(_) => true,
+            Self::None(_) => true,
             _ => false,
+        }
+    }
+
+    fn trivia(&self) -> Option<&Trivia> {
+        match self {
+            Self::Number(t, _) | Self::Identifier(t, _) => t.as_ref(),
+            Self::None(t) => Some(t),
+            Self::Statements(_) => None,
         }
     }
 }
@@ -66,35 +95,47 @@ struct Formatter {
 impl Formatter {
     fn format(&mut self, node: Node) {
         match node {
-            Node::EmptyLine => {
-                self.buffer.push('\n');
-            }
-            Node::LineComment(node) => {
+            Node::Number(_, node) => {
                 self.buffer.push_str(&node.value);
             }
-            Node::TrailingComment(node) => {
-                if self.buffer.ends_with('\n') {
-                    self.buffer.pop();
-                }
-                self.buffer.push(' ');
-                self.buffer.push_str(&node.value);
-            }
-            Node::Number(node) => {
-                self.buffer.push_str(&node.value);
-            }
-            Node::Identifier(node) => {
+            Node::Identifier(_, node) => {
                 self.buffer.push_str(&node.name);
             }
             Node::Statements(node) => {
-                let mut was_trivia = false;
                 for (i, n) in node.nodes.into_iter().enumerate() {
-                    if i > 0 && !was_trivia {
-                        self.buffer.push('\n');
+                    match n.trivia() {
+                        Some(t) => {
+                            self.write_trivia(t);
+                            if !n.is_none() {
+                                self.buffer.push('\n');
+                            }
+                        }
+                        None => {
+                            if i > 0 {
+                                self.buffer.push('\n');
+                            }
+                        }
                     }
-                    was_trivia = n.is_trivia();
                     self.format(n);
                 }
             }
-        };
+            Node::None(_) => {}
+        }
+    }
+
+    fn write_trivia(&mut self, trivia: &Trivia) {
+        if let Some(comment) = &trivia.last_trailing_comment {
+            self.buffer.push(' ');
+            self.buffer.push_str(&comment.value);
+        }
+        for node in &trivia.leading_trivia {
+            match node {
+                TriviaNode::EmptyLine => self.buffer.push('\n'),
+                TriviaNode::LineComment(comment) => {
+                    self.buffer.push('\n');
+                    self.buffer.push_str(&comment.value);
+                }
+            }
+        }
     }
 }
