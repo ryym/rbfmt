@@ -103,12 +103,12 @@ impl FmtNodeBuilder {
             // Ignore non-UTF8 source code for now.
             let comment_bytes = &self.src[comment_begin..comment_end];
             let comment_str = String::from_utf8_lossy(comment_bytes).to_string();
+            let comment_node = fmt::Comment { value: comment_str };
 
             if self.is_at_line_start(comment_begin) {
-                let comment_node = fmt::LineComment { value: comment_str };
                 group.append_node(fmt::Node::LineComment(comment_node))
             } else {
-                todo!("trailing comment: {}", comment_str);
+                group.append_node(fmt::Node::TrailingComment(comment_node))
             }
 
             // Set the location of newline like other actual syntax nodes.

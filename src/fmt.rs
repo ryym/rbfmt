@@ -12,7 +12,8 @@ pub(crate) fn format(node: Node) -> String {
 #[derive(Debug)]
 pub(crate) enum Node {
     EmptyLine,
-    LineComment(LineComment),
+    LineComment(Comment),
+    TrailingComment(Comment),
     Number(Number),
     Identifier(Identifier),
     Statements(Statements),
@@ -21,7 +22,7 @@ pub(crate) enum Node {
 impl Node {
     fn is_trivia(&self) -> bool {
         match self {
-            Self::EmptyLine | Self::LineComment(_) => true,
+            Self::EmptyLine | Self::LineComment(_) | Self::TrailingComment(_) => true,
             _ => false,
         }
     }
@@ -32,7 +33,7 @@ pub(crate) trait GroupNodeEntity {
 }
 
 #[derive(Debug)]
-pub(crate) struct LineComment {
+pub(crate) struct Comment {
     pub value: String,
 }
 
@@ -69,6 +70,13 @@ impl Formatter {
                 self.buffer.push('\n');
             }
             Node::LineComment(node) => {
+                self.buffer.push_str(&node.value);
+            }
+            Node::TrailingComment(node) => {
+                if self.buffer.ends_with('\n') {
+                    self.buffer.pop();
+                }
+                self.buffer.push(' ');
                 self.buffer.push_str(&node.value);
             }
             Node::Number(node) => {
