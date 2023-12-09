@@ -25,10 +25,12 @@ struct FmtNodeBuilder {
 
 impl FmtNodeBuilder {
     fn build_fmt_node(&mut self, node: Node) -> fmt::Node {
-        self.visit(node)
+        let mut root = fmt::Statements { nodes: vec![] };
+        self.visit(node, &mut root);
+        fmt::Node::Statements(root)
     }
 
-    fn visit(&mut self, node: Node) -> fmt::Node {
+    fn visit<G: fmt::GroupNodeEntity>(&mut self, node: Node, group: &mut G) {
         let loc_end = node.expression().end;
         let fmt_node = match node {
             Node::Ivar(node) => {
@@ -44,15 +46,18 @@ impl FmtNodeBuilder {
                 fmt::Node::Identifier(fmt::Identifier { name: node.name })
             }
             Node::Begin(node) => {
-                let nodes = node.statements.into_iter().map(|n| self.visit(n)).collect();
-                fmt::Node::Statements(fmt::Statements { nodes })
+                let mut stmts = fmt::Statements { nodes: vec![] };
+                for n in node.statements {
+                    self.visit(n, &mut stmts);
+                }
+                fmt::Node::Statements(stmts)
             }
             _ => {
                 todo!("{}", format!("convert node {:?}", node));
             }
         };
+        group.append_node(fmt_node);
         self.last_loc_end = loc_end;
-        fmt_node
     }
 
     fn consume_trivia_until(&mut self, end: usize) {
