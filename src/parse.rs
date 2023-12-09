@@ -33,6 +33,22 @@ impl FmtNodeBuilder {
     fn visit<G: fmt::GroupNodeEntity>(&mut self, node: Node, group: &mut G) {
         let loc_end = node.expression().end;
         let fmt_node = match node {
+            Node::Int(node) => {
+                self.consume_trivia_until(node.expression_l.begin, group);
+                fmt::Node::Number(fmt::Number { value: node.value })
+            }
+            Node::Float(node) => {
+                self.consume_trivia_until(node.expression_l.begin, group);
+                fmt::Node::Number(fmt::Number { value: node.value })
+            }
+            Node::Rational(node) => {
+                self.consume_trivia_until(node.expression_l.begin, group);
+                fmt::Node::Number(fmt::Number { value: node.value })
+            }
+            Node::Complex(node) => {
+                self.consume_trivia_until(node.expression_l.begin, group);
+                fmt::Node::Number(fmt::Number { value: node.value })
+            }
             Node::Ivar(node) => {
                 self.consume_trivia_until(node.expression_l.begin, group);
                 fmt::Node::Identifier(fmt::Identifier { name: node.name })
