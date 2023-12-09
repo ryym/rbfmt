@@ -3,7 +3,9 @@ pub(crate) fn format(node: Node) -> String {
         buffer: String::new(),
     };
     formatter.format(node);
-    formatter.buffer.push('\n');
+    if !formatter.buffer.ends_with('\n') {
+        formatter.buffer.push('\n');
+    }
     formatter.buffer
 }
 
@@ -14,6 +16,15 @@ pub(crate) enum Node {
     Number(Number),
     Identifier(Identifier),
     Statements(Statements),
+}
+
+impl Node {
+    fn is_trivia(&self) -> bool {
+        match self {
+            Self::EmptyLine | Self::LineComment(_) => true,
+            _ => false,
+        }
+    }
 }
 
 pub(crate) trait GroupNodeEntity {
@@ -55,7 +66,7 @@ impl Formatter {
     fn format(&mut self, node: Node) {
         match node {
             Node::EmptyLine => {
-                // Do nothing here because the parent group node breaks a line.
+                self.buffer.push('\n');
             }
             Node::LineComment(node) => {
                 self.buffer.push_str(&node.value);
@@ -67,10 +78,12 @@ impl Formatter {
                 self.buffer.push_str(&node.name);
             }
             Node::Statements(node) => {
+                let mut was_trivia = false;
                 for (i, n) in node.nodes.into_iter().enumerate() {
-                    if i > 0 {
+                    if i > 0 && !was_trivia {
                         self.buffer.push('\n');
                     }
+                    was_trivia = n.is_trivia();
                     self.format(n);
                 }
             }

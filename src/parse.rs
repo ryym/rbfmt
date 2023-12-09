@@ -101,8 +101,8 @@ impl FmtNodeBuilder {
             self.consume_empty_lines_until(comment_begin, group);
 
             // Ignore non-UTF8 source code for now.
-            let comment_str = String::from_utf8_lossy(&self.src[comment_begin..comment_end]);
-            let comment_str = comment_str.trim_end().to_string();
+            let comment_bytes = &self.src[comment_begin..comment_end];
+            let comment_str = String::from_utf8_lossy(comment_bytes).to_string();
 
             if self.is_at_line_start(comment_begin) {
                 let comment_node = fmt::LineComment { value: comment_str };
