@@ -10,6 +10,7 @@ pub(crate) fn format(node: Node) -> String {
 #[derive(Debug)]
 pub(crate) enum Node {
     EmptyLine,
+    LineComment(LineComment),
     Number(Number),
     Identifier(Identifier),
     Statements(Statements),
@@ -17,6 +18,11 @@ pub(crate) enum Node {
 
 pub(crate) trait GroupNodeEntity {
     fn append_node(&mut self, node: Node);
+}
+
+#[derive(Debug)]
+pub(crate) struct LineComment {
+    pub value: String,
 }
 
 #[derive(Debug)]
@@ -50,6 +56,9 @@ impl Formatter {
         match node {
             Node::EmptyLine => {
                 // Do nothing here because the parent group node breaks a line.
+            }
+            Node::LineComment(node) => {
+                self.buffer.push_str(&node.value);
             }
             Node::Number(node) => {
                 self.buffer.push_str(&node.value);
