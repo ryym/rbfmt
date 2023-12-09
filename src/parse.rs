@@ -24,6 +24,8 @@ impl FmtNodeBuilder {
     fn visit(&mut self, node: Node) -> fmt::Node {
         match node {
             Node::Ivar(node) => fmt::Node::Identifier(fmt::Identifier { name: node.name }),
+            Node::Cvar(node) => fmt::Node::Identifier(fmt::Identifier { name: node.name }),
+            Node::Gvar(node) => fmt::Node::Identifier(fmt::Identifier { name: node.name }),
             Node::Begin(node) => {
                 let nodes = node.statements.into_iter().map(|n| self.visit(n)).collect();
                 fmt::Node::Statements(fmt::Statements { nodes })
