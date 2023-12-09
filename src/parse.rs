@@ -17,6 +17,7 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<fmt::Node> {
     Some(fmt_node)
 }
 
+#[derive(Debug)]
 struct FmtNodeBuilder {
     src: Vec<u8>,
     last_loc_end: usize,

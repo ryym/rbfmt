@@ -7,19 +7,23 @@ pub(crate) fn format(node: Node) -> String {
     formatter.buffer
 }
 
+#[derive(Debug)]
 pub(crate) enum Node {
     Identifier(Identifier),
     Statements(Statements),
 }
 
+#[derive(Debug)]
 pub(crate) struct Identifier {
     pub name: String,
 }
 
+#[derive(Debug)]
 pub(crate) struct Statements {
     pub nodes: Vec<Node>,
 }
 
+#[derive(Debug)]
 struct Formatter {
     buffer: String,
 }
