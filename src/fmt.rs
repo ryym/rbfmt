@@ -9,6 +9,7 @@ pub(crate) fn format(node: Node) -> String {
 
 #[derive(Debug)]
 pub(crate) enum Node {
+    EmptyLine,
     Identifier(Identifier),
     Statements(Statements),
 }
@@ -41,6 +42,9 @@ struct Formatter {
 impl Formatter {
     fn format(&mut self, node: Node) {
         match node {
+            Node::EmptyLine => {
+                // Do nothing here because the parent group node breaks a line.
+            }
             Node::Identifier(node) => {
                 self.buffer.push_str(&node.name);
             }

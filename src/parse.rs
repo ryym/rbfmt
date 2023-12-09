@@ -34,15 +34,15 @@ impl FmtNodeBuilder {
         let loc_end = node.expression().end;
         let fmt_node = match node {
             Node::Ivar(node) => {
-                self.consume_trivia_until(node.expression_l.begin);
+                self.consume_trivia_until(node.expression_l.begin, group);
                 fmt::Node::Identifier(fmt::Identifier { name: node.name })
             }
             Node::Cvar(node) => {
-                self.consume_trivia_until(node.expression_l.begin);
+                self.consume_trivia_until(node.expression_l.begin, group);
                 fmt::Node::Identifier(fmt::Identifier { name: node.name })
             }
             Node::Gvar(node) => {
-                self.consume_trivia_until(node.expression_l.begin);
+                self.consume_trivia_until(node.expression_l.begin, group);
                 fmt::Node::Identifier(fmt::Identifier { name: node.name })
             }
             Node::Begin(node) => {
@@ -60,13 +60,14 @@ impl FmtNodeBuilder {
         self.last_loc_end = loc_end;
     }
 
-    fn consume_trivia_until(&mut self, end: usize) {
-        self.consume_empty_lines_until(end);
+    fn consume_trivia_until<G: fmt::GroupNodeEntity>(&mut self, end: usize, group: &mut G) {
+        self.consume_empty_lines_until(end, group);
     }
 
-    fn consume_empty_lines_until(&mut self, end: usize) {
+    fn consume_empty_lines_until<G: fmt::GroupNodeEntity>(&mut self, end: usize, group: &mut G) {
         let line_loc = self.last_empty_line_loc_within(self.last_loc_end, end);
         if let Some(line_loc) = line_loc {
+            group.append_node(fmt::Node::EmptyLine);
             self.last_loc_end = line_loc.end;
         }
     }
