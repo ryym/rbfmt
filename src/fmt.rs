@@ -57,10 +57,6 @@ impl Node {
     }
 }
 
-pub(crate) trait GroupNodeEntity {
-    fn append_node(&mut self, node: Node);
-}
-
 #[derive(Debug)]
 pub(crate) struct Comment {
     pub value: String,
@@ -79,12 +75,6 @@ pub(crate) struct Identifier {
 #[derive(Debug)]
 pub(crate) struct Statements {
     pub nodes: Vec<Node>,
-}
-
-impl GroupNodeEntity for Statements {
-    fn append_node(&mut self, node: Node) {
-        self.nodes.push(node);
-    }
 }
 
 #[derive(Debug)]
