@@ -87,12 +87,35 @@ impl FmtNodeBuilder {
                 let nodes = node.statements.into_iter().map(|n| self.visit(n)).collect();
                 fmt::Node::Statements(fmt::Statements { nodes })
             }
+            Node::If(node) => {
+                let trivia = self.consume_trivia_until(node.expression_l.begin);
+                let cond = self.visit(*node.cond);
+                let body = self.visit(*node.if_true.unwrap());
+                let body = self.wrap_as_statements(body, node.end_l.unwrap().begin);
+                fmt::Node::IfExpr(
+                    trivia,
+                    fmt::IfExpr {
+                        cond: Box::new(cond),
+                        body,
+                    },
+                )
+            }
             _ => {
                 todo!("{}", format!("convert node {:?}", node));
             }
         };
         self.last_loc_end = loc_end;
         fmt_node
+    }
+
+    fn wrap_as_statements(&mut self, node: fmt::Node, end: usize) -> fmt::Statements {
+        let mut stmts = Vec::with_capacity(2);
+        stmts.push(node);
+        if let Some(trivia) = self.consume_trivia_until(end) {
+            let eof = fmt::Node::None(trivia);
+            stmts.push(eof);
+        }
+        fmt::Statements { nodes: stmts }
     }
 
     fn consume_trivia_until(&mut self, end: usize) -> Option<fmt::Trivia> {

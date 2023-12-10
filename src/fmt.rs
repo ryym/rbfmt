@@ -44,6 +44,7 @@ pub(crate) enum Node {
     Number(Option<Trivia>, Number),
     Identifier(Option<Trivia>, Identifier),
     Statements(Statements),
+    IfExpr(Option<Trivia>, IfExpr),
     None(Trivia),
 }
 
@@ -54,9 +55,11 @@ impl Node {
 
     fn trivia(&self) -> Option<&Trivia> {
         match self {
-            Self::Nil(t) | Self::Boolean(t, _) | Self::Number(t, _) | Self::Identifier(t, _) => {
-                t.as_ref()
-            }
+            Self::Nil(t)
+            | Self::Boolean(t, _)
+            | Self::Number(t, _)
+            | Self::Identifier(t, _)
+            | Self::IfExpr(t, _) => t.as_ref(),
             Self::None(t) => Some(t),
             Self::Statements(_) => None,
         }
@@ -84,6 +87,12 @@ pub(crate) struct Statements {
 }
 
 #[derive(Debug)]
+pub(crate) struct IfExpr {
+    pub cond: Box<Node>,
+    pub body: Statements,
+}
+
+#[derive(Debug)]
 struct Formatter {
     buffer: String,
 }
@@ -105,24 +114,35 @@ impl Formatter {
                 self.buffer.push_str(&node.name);
             }
             Node::Statements(node) => {
-                for (i, n) in node.nodes.into_iter().enumerate() {
-                    match n.trivia() {
-                        Some(t) => {
-                            self.write_trivia(t);
-                            if !n.is_none() {
-                                self.buffer.push('\n');
-                            }
-                        }
-                        None => {
-                            if i > 0 {
-                                self.buffer.push('\n');
-                            }
-                        }
-                    }
-                    self.format(n);
-                }
+                self.format_statements(node);
+            }
+            Node::IfExpr(_, node) => {
+                self.buffer.push_str("if ");
+                self.format(*node.cond);
+                self.buffer.push('\n');
+                self.format_statements(node.body);
+                self.buffer.push_str("\nend");
             }
             Node::None(_) => {}
+        }
+    }
+
+    fn format_statements(&mut self, node: Statements) {
+        for (i, n) in node.nodes.into_iter().enumerate() {
+            match n.trivia() {
+                Some(t) => {
+                    self.write_trivia(t);
+                    if !n.is_none() {
+                        self.buffer.push('\n');
+                    }
+                }
+                None => {
+                    if i > 0 {
+                        self.buffer.push('\n');
+                    }
+                }
+            }
+            self.format(n);
         }
     }
 

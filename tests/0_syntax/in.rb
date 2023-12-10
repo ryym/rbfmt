@@ -15,3 +15,8 @@ false
 @instance_var
 @@class_var
 $global_var
+
+# If expressions
+if true
+  nil
+end
