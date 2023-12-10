@@ -124,12 +124,9 @@ impl Formatter {
                 if let Some(trivia) = node.cond.trivia() {
                     if let Some(comment) = &trivia.last_trailing_comment {
                         self.buffer.push_str(&comment.value);
-                        self.write_leading_trivia(&trivia.leading_trivia);
+                        self.write_leading_trivia(&trivia.leading_trivia, true, false);
                     } else {
-                        if self.buffer.ends_with('\n') {
-                            self.buffer.truncate(self.buffer.len() - 1);
-                        }
-                        self.write_trivia(trivia);
+                        self.write_trivia(trivia, true, false);
                     }
                     self.break_line();
                 }
@@ -146,10 +143,13 @@ impl Formatter {
     }
 
     fn format_statements(&mut self, node: Statements) {
-        for n in node.nodes {
+        if node.nodes.is_empty() {
+            return;
+        }
+        for (i, n) in node.nodes.into_iter().enumerate() {
             match n.trivia() {
                 Some(t) => {
-                    self.write_trivia(t);
+                    self.write_trivia(t, i == 0, n.is_none());
                     if !n.is_none() {
                         self.break_line();
                     }
@@ -162,18 +162,26 @@ impl Formatter {
         }
     }
 
-    fn write_trivia(&mut self, trivia: &Trivia) {
+    fn write_trivia(&mut self, trivia: &Trivia, trim_start: bool, trim_end: bool) {
         if let Some(comment) = &trivia.last_trailing_comment {
             self.buffer.push(' ');
             self.buffer.push_str(&comment.value);
         }
-        self.write_leading_trivia(&trivia.leading_trivia);
+        self.write_leading_trivia(&trivia.leading_trivia, trim_start, trim_end);
     }
 
-    fn write_leading_trivia(&mut self, trivia: &Vec<TriviaNode>) {
-        for node in trivia {
+    fn write_leading_trivia(&mut self, trivia: &Vec<TriviaNode>, trim_start: bool, trim_end: bool) {
+        if trivia.is_empty() {
+            return;
+        }
+        let last_idx = trivia.len() - 1;
+        for (i, node) in trivia.iter().enumerate() {
             match node {
-                TriviaNode::EmptyLine => self.break_line(),
+                TriviaNode::EmptyLine => {
+                    if (!trim_start || 0 < i) && (!trim_end || i < last_idx) {
+                        self.break_line();
+                    }
+                }
                 TriviaNode::LineComment(comment) => {
                     self.break_line();
                     self.buffer.push_str(&comment.value);
