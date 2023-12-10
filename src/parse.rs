@@ -153,7 +153,7 @@ impl FmtNodeBuilder {
     fn last_empty_line_loc_within(&self, begin: usize, end: usize) -> Option<Loc> {
         let mut line_begin: Option<usize> = None;
         let mut line_end: Option<usize> = None;
-        for i in (begin..end).into_iter().rev() {
+        for i in (begin..end).rev() {
             let b = self.src[i];
             if b == b'\n' {
                 if line_end.is_none() {
@@ -178,20 +178,17 @@ impl FmtNodeBuilder {
         }
         let mut idx = begin - 1;
         let mut has_char_between_last_newline = false;
-        loop {
-            match self.src.get(idx) {
-                Some(b) => match b {
-                    b' ' => {
-                        idx -= 1;
-                        continue;
-                    }
-                    b'\n' => break,
-                    _ => {
-                        has_char_between_last_newline = true;
-                        break;
-                    }
-                },
-                None => break,
+        while let Some(b) = self.src.get(idx) {
+            match b {
+                b' ' => {
+                    idx -= 1;
+                    continue;
+                }
+                b'\n' => break,
+                _ => {
+                    has_char_between_last_newline = true;
+                    break;
+                }
             }
         }
         !has_char_between_last_newline

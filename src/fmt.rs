@@ -42,10 +42,7 @@ pub(crate) enum Node {
 
 impl Node {
     fn is_none(&self) -> bool {
-        match self {
-            Self::None(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::None(_))
     }
 
     fn trivia(&self) -> Option<&Trivia> {
