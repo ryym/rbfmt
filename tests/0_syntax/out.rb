@@ -1,3 +1,10 @@
+# Nil
+nil
+
+# Boolean literals
+true
+false
+
 # Number literals
 0
 1.1

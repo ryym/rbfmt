@@ -43,6 +43,18 @@ impl FmtNodeBuilder {
     fn visit(&mut self, node: Node) -> fmt::Node {
         let loc_end = node.expression().end;
         let fmt_node = match node {
+            Node::Nil(node) => {
+                let trivia = self.consume_trivia_until(node.expression_l.begin);
+                fmt::Node::Nil(trivia)
+            }
+            Node::True(node) => {
+                let trivia = self.consume_trivia_until(node.expression_l.begin);
+                fmt::Node::Boolean(trivia, fmt::Boolean { is_true: true })
+            }
+            Node::False(node) => {
+                let trivia = self.consume_trivia_until(node.expression_l.begin);
+                fmt::Node::Boolean(trivia, fmt::Boolean { is_true: false })
+            }
             Node::Int(node) => {
                 let trivia = self.consume_trivia_until(node.expression_l.begin);
                 fmt::Node::Number(trivia, fmt::Number { value: node.value })

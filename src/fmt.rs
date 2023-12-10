@@ -33,7 +33,14 @@ pub(crate) enum TriviaNode {
 }
 
 #[derive(Debug)]
+pub(crate) struct Comment {
+    pub value: String,
+}
+
+#[derive(Debug)]
 pub(crate) enum Node {
+    Nil(Option<Trivia>),
+    Boolean(Option<Trivia>, Boolean),
     Number(Option<Trivia>, Number),
     Identifier(Option<Trivia>, Identifier),
     Statements(Statements),
@@ -47,7 +54,9 @@ impl Node {
 
     fn trivia(&self) -> Option<&Trivia> {
         match self {
-            Self::Number(t, _) | Self::Identifier(t, _) => t.as_ref(),
+            Self::Nil(t) | Self::Boolean(t, _) | Self::Number(t, _) | Self::Identifier(t, _) => {
+                t.as_ref()
+            }
             Self::None(t) => Some(t),
             Self::Statements(_) => None,
         }
@@ -55,8 +64,8 @@ impl Node {
 }
 
 #[derive(Debug)]
-pub(crate) struct Comment {
-    pub value: String,
+pub(crate) struct Boolean {
+    pub is_true: bool,
 }
 
 #[derive(Debug)]
@@ -82,6 +91,13 @@ struct Formatter {
 impl Formatter {
     fn format(&mut self, node: Node) {
         match node {
+            Node::Nil(_) => {
+                self.buffer.push_str("nil");
+            }
+            Node::Boolean(_, node) => {
+                let value = if node.is_true { "true" } else { "false" };
+                self.buffer.push_str(value);
+            }
             Node::Number(_, node) => {
                 self.buffer.push_str(&node.value);
             }
