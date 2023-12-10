@@ -94,13 +94,6 @@ pub(crate) struct IfExpr {
 }
 
 #[derive(Debug)]
-enum Indent {
-    Keep,
-    Incr,
-    Decr,
-}
-
-#[derive(Debug)]
 struct Formatter {
     buffer: String,
     indent: usize,
@@ -126,11 +119,26 @@ impl Formatter {
                 self.format_statements(node);
             }
             Node::IfExpr(_, node) => {
+                // If a condition part has its own trivia, move it to top of the if expression.
+                // e.g. "if #foo\n cond\n..." -> "#foo\nif cond\n..."
+                if let Some(trivia) = node.cond.trivia() {
+                    if let Some(comment) = &trivia.last_trailing_comment {
+                        self.buffer.push_str(&comment.value);
+                        self.write_leading_trivia(&trivia.leading_trivia);
+                    } else {
+                        if self.buffer.ends_with('\n') {
+                            self.buffer.truncate(self.buffer.len() - 1);
+                        }
+                        self.write_trivia(trivia);
+                    }
+                    self.break_line();
+                }
                 self.buffer.push_str("if ");
                 self.format(*node.cond);
-                self.break_line(Indent::Incr);
+                self.indent();
                 self.format_statements(node.body);
-                self.break_line(Indent::Decr);
+                self.dedent();
+                self.break_line();
                 self.buffer.push_str("end");
             }
             Node::None(_) => {}
@@ -138,18 +146,16 @@ impl Formatter {
     }
 
     fn format_statements(&mut self, node: Statements) {
-        for (i, n) in node.nodes.into_iter().enumerate() {
+        for n in node.nodes {
             match n.trivia() {
                 Some(t) => {
                     self.write_trivia(t);
                     if !n.is_none() {
-                        self.break_line(Indent::Keep);
+                        self.break_line();
                     }
                 }
                 None => {
-                    if i > 0 {
-                        self.break_line(Indent::Keep);
-                    }
+                    self.break_line();
                 }
             }
             self.format(n);
@@ -161,24 +167,23 @@ impl Formatter {
             self.buffer.push(' ');
             self.buffer.push_str(&comment.value);
         }
-        for node in &trivia.leading_trivia {
+        self.write_leading_trivia(&trivia.leading_trivia);
+    }
+
+    fn write_leading_trivia(&mut self, trivia: &Vec<TriviaNode>) {
+        for node in trivia {
             match node {
-                TriviaNode::EmptyLine => self.break_line(Indent::Keep),
+                TriviaNode::EmptyLine => self.break_line(),
                 TriviaNode::LineComment(comment) => {
-                    self.break_line(Indent::Keep);
+                    self.break_line();
                     self.buffer.push_str(&comment.value);
                 }
             }
         }
     }
 
-    fn break_line(&mut self, indent: Indent) {
+    fn break_line(&mut self) {
         self.buffer.push('\n');
-        match indent {
-            Indent::Keep => {}
-            Indent::Incr => self.indent(),
-            Indent::Decr => self.dedent(),
-        };
         let spaces = " ".repeat(self.indent);
         self.buffer.push_str(&spaces);
     }
