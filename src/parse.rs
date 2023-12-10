@@ -6,10 +6,6 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<fmt::Node> {
     let parser = Parser::new(source.clone(), Default::default());
 
     let mut result = parser.do_parse();
-    let ast = match result.ast {
-        None => return None,
-        Some(ast) => ast,
-    };
     // Sort the comments by their locations, because they are unordered when there is a heredoc.
     result.comments.sort_by_key(|c| c.location.begin);
     let reversed_comments = result.comments.into_iter().rev().collect();
@@ -19,7 +15,7 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<fmt::Node> {
         comments: reversed_comments,
         last_loc_end: 0,
     };
-    let fmt_node = builder.build_fmt_node(*ast);
+    let fmt_node = builder.build_fmt_node(result.ast);
     Some(fmt_node)
 }
 
@@ -31,9 +27,12 @@ struct FmtNodeBuilder {
 }
 
 impl FmtNodeBuilder {
-    fn build_fmt_node(&mut self, node: Node) -> fmt::Node {
-        let node = self.visit(node);
-        let mut stmts = vec![node];
+    fn build_fmt_node(&mut self, node: Option<Box<Node>>) -> fmt::Node {
+        let mut stmts = Vec::with_capacity(2);
+        if let Some(node) = node {
+            let fmt_node = self.visit(*node);
+            stmts.push(fmt_node);
+        }
         if let Some(trivia) = self.consume_trivia_until(self.src.len()) {
             let eof = fmt::Node::None(trivia);
             stmts.push(eof);
