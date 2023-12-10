@@ -1,6 +1,7 @@
 pub(crate) fn format(node: Node) -> String {
     let mut formatter = Formatter {
         buffer: String::new(),
+        indent: 0,
     };
     formatter.format(node);
     formatter.buffer.push('\n');
@@ -93,8 +94,16 @@ pub(crate) struct IfExpr {
 }
 
 #[derive(Debug)]
+enum Indent {
+    Keep,
+    Incr,
+    Decr,
+}
+
+#[derive(Debug)]
 struct Formatter {
     buffer: String,
+    indent: usize,
 }
 
 impl Formatter {
@@ -119,9 +128,10 @@ impl Formatter {
             Node::IfExpr(_, node) => {
                 self.buffer.push_str("if ");
                 self.format(*node.cond);
-                self.buffer.push('\n');
+                self.break_line(Indent::Incr);
                 self.format_statements(node.body);
-                self.buffer.push_str("\nend");
+                self.break_line(Indent::Decr);
+                self.buffer.push_str("end");
             }
             Node::None(_) => {}
         }
@@ -133,12 +143,12 @@ impl Formatter {
                 Some(t) => {
                     self.write_trivia(t);
                     if !n.is_none() {
-                        self.buffer.push('\n');
+                        self.break_line(Indent::Keep);
                     }
                 }
                 None => {
                     if i > 0 {
-                        self.buffer.push('\n');
+                        self.break_line(Indent::Keep);
                     }
                 }
             }
@@ -153,12 +163,31 @@ impl Formatter {
         }
         for node in &trivia.leading_trivia {
             match node {
-                TriviaNode::EmptyLine => self.buffer.push('\n'),
+                TriviaNode::EmptyLine => self.break_line(Indent::Keep),
                 TriviaNode::LineComment(comment) => {
-                    self.buffer.push('\n');
+                    self.break_line(Indent::Keep);
                     self.buffer.push_str(&comment.value);
                 }
             }
         }
+    }
+
+    fn break_line(&mut self, indent: Indent) {
+        self.buffer.push('\n');
+        match indent {
+            Indent::Keep => {}
+            Indent::Incr => self.indent(),
+            Indent::Decr => self.dedent(),
+        };
+        let spaces = " ".repeat(self.indent);
+        self.buffer.push_str(&spaces);
+    }
+
+    fn indent(&mut self) {
+        self.indent = self.indent.saturating_add(2);
+    }
+
+    fn dedent(&mut self) {
+        self.indent = self.indent.saturating_sub(2);
     }
 }

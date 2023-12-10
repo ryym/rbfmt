@@ -18,5 +18,5 @@ $global_var
 
 # If expressions
 if true
-nil
+  nil
 end
