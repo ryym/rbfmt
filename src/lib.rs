@@ -7,9 +7,9 @@ mod parse;
 mod test;
 
 pub fn format(source: Vec<u8>) -> String {
-    let node = match parse_into_fmt_node(source) {
+    let result = match parse_into_fmt_node(source) {
         None => return String::new(),
-        Some(node) => node,
+        Some(result) => result,
     };
-    fmt::format(node)
+    fmt::format(result.node, result.decor_store)
 }

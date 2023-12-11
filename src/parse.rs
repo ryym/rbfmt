@@ -1,148 +1,177 @@
+use crate::fmt;
 use lib_ruby_parser::{source::Comment, Loc, Node, Parser};
 
-use crate::fmt;
-
-pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<fmt::Node> {
+pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
     let parser = Parser::new(source.clone(), Default::default());
-
     let mut result = parser.do_parse();
+
     // Sort the comments by their locations, because they are unordered when there is a heredoc.
     result.comments.sort_by_key(|c| c.location.begin);
     let reversed_comments = result.comments.into_iter().rev().collect();
 
+    let decor_store = fmt::DecorStore::new();
+
     let mut builder = FmtNodeBuilder {
         src: source,
         comments: reversed_comments,
+        decor_store,
+        node_id_gen: 0,
+        last_node_id: 0,
         last_loc_end: 0,
     };
     let fmt_node = builder.build_fmt_node(result.ast);
-    Some(fmt_node)
+    // dbg!(&fmt_node);
+    // dbg!(&builder.decor_store);
+    Some(ParserResult {
+        node: fmt_node,
+        decor_store: builder.decor_store,
+    })
+}
+
+#[derive(Debug)]
+pub(crate) struct ParserResult {
+    pub node: fmt::Node,
+    pub decor_store: fmt::DecorStore,
 }
 
 #[derive(Debug)]
 struct FmtNodeBuilder {
     src: Vec<u8>,
     comments: Vec<Comment>,
+    decor_store: fmt::DecorStore,
+    node_id_gen: usize,
+    last_node_id: usize,
     last_loc_end: usize,
 }
 
+type MidDecors = (Option<fmt::Comment>, Vec<fmt::LineDecor>);
+
 impl FmtNodeBuilder {
     fn build_fmt_node(&mut self, node: Option<Box<Node>>) -> fmt::Node {
-        let mut stmts = Vec::with_capacity(2);
-        if let Some(node) = node {
-            let fmt_node = self.visit(*node);
-            stmts.push(fmt_node);
-        }
-        if let Some(trivia) = self.consume_trivia_until(self.src.len()) {
-            let eof = fmt::Node::None(trivia);
-            stmts.push(eof);
-        }
-        fmt::Node::Statements(fmt::Statements { nodes: stmts })
+        let fmt_node = node.map(|n| self.visit(*n));
+        self.wrap_as_exprs(fmt_node, self.src.len())
+    }
+
+    fn next_node_id(&mut self) -> usize {
+        self.node_id_gen += 1;
+        self.node_id_gen
     }
 
     fn visit(&mut self, node: Node) -> fmt::Node {
-        let loc_end = node.expression().end;
+        let node_id = self.next_node_id();
+        let node_end = node.expression().end;
         let fmt_node = match node {
-            Node::Nil(node) => {
-                let trivia = self.consume_trivia_until(node.expression_l.begin);
-                fmt::Node::Nil(trivia)
-            }
-            Node::True(node) => {
-                let trivia = self.consume_trivia_until(node.expression_l.begin);
-                fmt::Node::Boolean(trivia, fmt::Boolean { is_true: true })
-            }
-            Node::False(node) => {
-                let trivia = self.consume_trivia_until(node.expression_l.begin);
-                fmt::Node::Boolean(trivia, fmt::Boolean { is_true: false })
-            }
-            Node::Int(node) => {
-                let trivia = self.consume_trivia_until(node.expression_l.begin);
-                fmt::Node::Number(trivia, fmt::Number { value: node.value })
-            }
-            Node::Float(node) => {
-                let trivia = self.consume_trivia_until(node.expression_l.begin);
-                fmt::Node::Number(trivia, fmt::Number { value: node.value })
-            }
-            Node::Rational(node) => {
-                let trivia = self.consume_trivia_until(node.expression_l.begin);
-                fmt::Node::Number(trivia, fmt::Number { value: node.value })
-            }
-            Node::Complex(node) => {
-                let trivia = self.consume_trivia_until(node.expression_l.begin);
-                fmt::Node::Number(trivia, fmt::Number { value: node.value })
-            }
-            Node::Ivar(node) => {
-                let trivia = self.consume_trivia_until(node.expression_l.begin);
-                fmt::Node::Identifier(trivia, fmt::Identifier { name: node.name })
-            }
-            Node::Cvar(node) => {
-                let trivia = self.consume_trivia_until(node.expression_l.begin);
-                fmt::Node::Identifier(trivia, fmt::Identifier { name: node.name })
-            }
-            Node::Gvar(node) => {
-                let trivia = self.consume_trivia_until(node.expression_l.begin);
-                fmt::Node::Identifier(trivia, fmt::Identifier { name: node.name })
-            }
+            Node::Nil(node) => self.parse_atom(&node.expression_l, node_id, "nil".to_string()),
+            Node::True(node) => self.parse_atom(&node.expression_l, node_id, "true".to_string()),
+            Node::False(node) => self.parse_atom(&node.expression_l, node_id, "false".to_string()),
+            Node::Int(node) => self.parse_atom(&node.expression_l, node_id, node.value),
+            Node::Float(node) => self.parse_atom(&node.expression_l, node_id, node.value),
+            Node::Rational(node) => self.parse_atom(&node.expression_l, node_id, node.value),
+            Node::Complex(node) => self.parse_atom(&node.expression_l, node_id, node.value),
+            Node::Ivar(node) => self.parse_atom(&node.expression_l, node_id, node.name),
+            Node::Cvar(node) => self.parse_atom(&node.expression_l, node_id, node.name),
+            Node::Gvar(node) => self.parse_atom(&node.expression_l, node_id, node.name),
             Node::Begin(node) => {
                 let nodes = node.statements.into_iter().map(|n| self.visit(n)).collect();
-                fmt::Node::Statements(fmt::Statements { nodes })
+                fmt::Node::new(node_id, fmt::Kind::Exprs(nodes))
             }
             Node::If(node) => {
-                let trivia = self.consume_trivia_until(node.expression_l.begin);
+                self.consume_and_store_decors_until(node_id, node.expression_l.begin);
+                let decors_in_if_and_cond = self.consume_decors_until(node.cond.expression().begin);
+                if let Some((if_trailing, cond_leading)) = decors_in_if_and_cond {
+                    if let Some(c) = if_trailing {
+                        self.decor_store
+                            .append_leading_decors(node_id, vec![fmt::LineDecor::Comment(c)]);
+                    }
+                    if !cond_leading.is_empty() {
+                        self.decor_store
+                            .append_leading_decors(node_id, cond_leading);
+                    }
+                }
                 let cond = self.visit(*node.cond);
-                let body = self.visit(*node.if_true.unwrap());
-                let body = self.wrap_as_statements(body, node.end_l.unwrap().begin);
-                fmt::Node::IfExpr(
-                    trivia,
-                    fmt::IfExpr {
+                let body = node.if_true.map(|n| self.visit(*n));
+                let body = self.wrap_as_exprs(body, node.end_l.unwrap().begin);
+                fmt::Node::new(
+                    node_id,
+                    fmt::Kind::IfExpr(fmt::IfExpr {
                         cond: Box::new(cond),
-                        body,
-                    },
+                        body: Box::new(body),
+                    }),
                 )
             }
             _ => {
                 todo!("{}", format!("convert node {:?}", node));
             }
         };
-        self.last_loc_end = loc_end;
+        self.last_node_id = node_id;
+        self.last_loc_end = node_end;
         fmt_node
     }
 
-    fn wrap_as_statements(&mut self, node: fmt::Node, end: usize) -> fmt::Statements {
-        let mut stmts = Vec::with_capacity(2);
-        stmts.push(node);
-        if let Some(trivia) = self.consume_trivia_until(end) {
-            let eof = fmt::Node::None(trivia);
-            stmts.push(eof);
-        }
-        fmt::Statements { nodes: stmts }
+    fn parse_atom(&mut self, loc: &Loc, node_id: usize, value: String) -> fmt::Node {
+        self.consume_and_store_decors_until(node_id, loc.begin);
+        fmt::Node::new(node_id, fmt::Kind::Atom(value))
     }
 
-    fn consume_trivia_until(&mut self, end: usize) -> Option<fmt::Trivia> {
-        let mut trivia = fmt::Trivia::new();
+    // Wrap the given node as Exprs to handle decors around it.
+    // If the given node is Exprs, just add the EndDecors to it if necessary.
+    fn wrap_as_exprs(&mut self, orig_node: Option<fmt::Node>, end: usize) -> fmt::Node {
+        let (node_id, mut expr_nodes) = match orig_node {
+            None => (self.next_node_id(), vec![]),
+            Some(node) => match node.kind {
+                fmt::Kind::Exprs(nodes) => (node.id, nodes),
+                _ => (self.next_node_id(), vec![node]),
+            },
+        };
+
+        if let Some(end_decors) = self.consume_decors_until(end) {
+            let end_node = fmt::Node::new(self.next_node_id(), fmt::Kind::EndDecors);
+            self.store_decors_to(self.last_node_id, end_node.id, end_decors);
+            expr_nodes.push(end_node);
+        }
+
+        fmt::Node::new(node_id, fmt::Kind::Exprs(expr_nodes))
+    }
+
+    fn consume_and_store_decors_until(&mut self, node_id: usize, end: usize) {
+        if let Some(decors) = self.consume_decors_until(end) {
+            self.store_decors_to(self.last_node_id, node_id, decors);
+        }
+    }
+
+    fn store_decors_to(&mut self, last_node_id: usize, node_id: usize, decors: MidDecors) {
+        let (trailing_comment, line_decors) = decors;
+        if let Some(comment) = trailing_comment {
+            self.decor_store.set_trailing_comment(last_node_id, comment);
+        }
+        if !line_decors.is_empty() {
+            self.decor_store.append_leading_decors(node_id, line_decors);
+        }
+    }
+
+    fn consume_decors_until(&mut self, end: usize) -> Option<MidDecors> {
+        let mut line_decors = Vec::new();
+        let mut trailing_comment = None;
 
         // Find the first comment. It may be a trailing comment of the last node.
-        let first_comment_found = match self.comments.last() {
+        match self.comments.last() {
             Some(comment) if comment.location.begin <= end => {
                 let (comment_begin, comment_end) = (comment.location.begin, comment.location.end);
                 let fmt_comment = self.get_comment_content(comment);
                 if self.is_at_line_start(comment_begin) {
-                    self.consume_empty_lines_until(comment_begin, &mut trivia);
-                    trivia
-                        .leading_trivia
-                        .push(fmt::TriviaNode::LineComment(fmt_comment));
+                    self.consume_empty_lines_until(comment_begin, &mut line_decors);
+                    line_decors.push(fmt::LineDecor::Comment(fmt_comment));
                 } else {
-                    trivia.last_trailing_comment = Some(fmt_comment);
+                    trailing_comment = Some(fmt_comment);
                 }
                 self.last_loc_end = comment_end - 1;
                 self.comments.pop();
-                true
             }
-            _ => false,
+            _ => {}
         };
 
-        if first_comment_found {
-            // Then find the other comments. They must not be a trailing comment.
+        // Then find the other comments. They must not be a trailing comment.
+        if !line_decors.is_empty() || trailing_comment.is_some() {
             loop {
                 let comment = match self.comments.last() {
                     Some(comment) if comment.location.begin <= end => comment,
@@ -150,21 +179,20 @@ impl FmtNodeBuilder {
                 };
                 let fmt_comment = self.get_comment_content(comment);
                 let comment_end = comment.location.end;
-                self.consume_empty_lines_until(comment.location.begin, &mut trivia);
-                trivia
-                    .leading_trivia
-                    .push(fmt::TriviaNode::LineComment(fmt_comment));
+                self.consume_empty_lines_until(comment.location.begin, &mut line_decors);
+                line_decors.push(fmt::LineDecor::Comment(fmt_comment));
                 self.last_loc_end = comment_end - 1;
                 self.comments.pop();
             }
         }
 
         // Finally consume the remaining empty lines.
-        self.consume_empty_lines_until(end, &mut trivia);
-        if trivia.is_empty() {
+        self.consume_empty_lines_until(end, &mut line_decors);
+
+        if line_decors.is_empty() && trailing_comment.is_none() {
             None
         } else {
-            Some(trivia)
+            Some((trailing_comment, line_decors))
         }
     }
 
@@ -177,10 +205,10 @@ impl FmtNodeBuilder {
         fmt::Comment { value: comment_str }
     }
 
-    fn consume_empty_lines_until(&mut self, end: usize, trivia: &mut fmt::Trivia) {
+    fn consume_empty_lines_until(&mut self, end: usize, line_decors: &mut Vec<fmt::LineDecor>) {
         let line_loc = self.last_empty_line_loc_within(self.last_loc_end, end);
         if let Some(line_loc) = line_loc {
-            trivia.leading_trivia.push(fmt::TriviaNode::EmptyLine);
+            line_decors.push(fmt::LineDecor::EmptyLine);
             self.last_loc_end = line_loc.end;
         }
     }

@@ -1,36 +1,92 @@
-pub(crate) fn format(node: Node) -> String {
-    let mut formatter = Formatter {
-        buffer: String::new(),
-        indent: 0,
-    };
-    formatter.format(node);
-    formatter.buffer.push('\n');
-    formatter.buffer.trim_start().to_string()
+use std::collections::HashMap;
+
+#[derive(Debug)]
+pub(crate) struct Node {
+    pub id: usize,
+    pub kind: Kind,
+}
+
+impl Node {
+    pub(crate) fn new(id: usize, kind: Kind) -> Self {
+        Self { id, kind }
+    }
 }
 
 #[derive(Debug)]
-pub(crate) struct Trivia {
-    pub last_trailing_comment: Option<Comment>,
-    pub leading_trivia: Vec<TriviaNode>,
+pub(crate) enum Kind {
+    Atom(String),
+    Exprs(Vec<Node>),
+    EndDecors,
+    IfExpr(IfExpr),
 }
 
-impl Trivia {
+impl Kind {
+    fn is_end_decors(&self) -> bool {
+        matches!(self, Self::EndDecors)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct IfExpr {
+    pub cond: Box<Node>,
+    pub body: Box<Node>,
+}
+
+#[derive(Debug)]
+pub(crate) struct DecorStore {
+    map: HashMap<usize, DecorSet>,
+}
+
+impl DecorStore {
     pub(crate) fn new() -> Self {
         Self {
-            last_trailing_comment: None,
-            leading_trivia: vec![],
+            map: HashMap::new(),
         }
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
-        self.last_trailing_comment.is_none() && self.leading_trivia.is_empty()
+    pub(crate) fn consume(&mut self, node_id: usize) -> (Vec<LineDecor>, Option<Comment>) {
+        if let Some(decors) = self.map.remove(&node_id) {
+            (decors.leading, decors.trailing)
+        } else {
+            (vec![], None)
+        }
+    }
+
+    pub(crate) fn append_leading_decors(&mut self, node_id: usize, mut decors: Vec<LineDecor>) {
+        match self.map.get_mut(&node_id) {
+            Some(d) => {
+                d.leading.append(&mut decors);
+            }
+            None => {
+                let d = DecorSet {
+                    leading: decors,
+                    trailing: None,
+                };
+                self.map.insert(node_id, d);
+            }
+        }
+    }
+
+    pub(crate) fn set_trailing_comment(&mut self, node_id: usize, comment: Comment) {
+        match self.map.get_mut(&node_id) {
+            Some(d) => {
+                d.trailing = Some(comment);
+            }
+            None => {
+                let d = DecorSet {
+                    leading: vec![],
+                    trailing: Some(comment),
+                };
+                self.map.insert(node_id, d);
+            }
+        }
     }
 }
 
-#[derive(Debug)]
-pub(crate) enum TriviaNode {
-    EmptyLine,
-    LineComment(Comment),
+#[derive(Debug, Default)]
+pub(crate) struct DecorSet {
+    pub leading: Vec<LineDecor>,
+    pub trailing: Option<Comment>,
 }
 
 #[derive(Debug)]
@@ -39,168 +95,111 @@ pub(crate) struct Comment {
 }
 
 #[derive(Debug)]
-pub(crate) enum Node {
-    Nil(Option<Trivia>),
-    Boolean(Option<Trivia>, Boolean),
-    Number(Option<Trivia>, Number),
-    Identifier(Option<Trivia>, Identifier),
-    Statements(Statements),
-    IfExpr(Option<Trivia>, IfExpr),
-    None(Trivia),
+pub(crate) enum LineDecor {
+    EmptyLine,
+    Comment(Comment),
 }
 
-impl Node {
-    fn is_none(&self) -> bool {
-        matches!(self, Self::None(_))
+pub(crate) fn format(node: Node, decor_store: DecorStore) -> String {
+    let mut formatter = Formatter {
+        buffer: String::new(),
+        decor_store,
+        indent: 0,
+    };
+    formatter.format(node);
+    if !formatter.buffer.is_empty() {
+        formatter.buffer.push('\n');
     }
-
-    fn trivia(&self) -> Option<&Trivia> {
-        match self {
-            Self::Nil(t)
-            | Self::Boolean(t, _)
-            | Self::Number(t, _)
-            | Self::Identifier(t, _)
-            | Self::IfExpr(t, _) => t.as_ref(),
-            Self::None(t) => Some(t),
-            Self::Statements(_) => None,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Boolean {
-    pub is_true: bool,
-}
-
-#[derive(Debug)]
-pub(crate) struct Number {
-    pub value: String,
-}
-
-#[derive(Debug)]
-pub(crate) struct Identifier {
-    pub name: String,
-}
-
-#[derive(Debug)]
-pub(crate) struct Statements {
-    pub nodes: Vec<Node>,
-}
-
-#[derive(Debug)]
-pub(crate) struct IfExpr {
-    pub cond: Box<Node>,
-    pub body: Statements,
+    formatter.buffer
 }
 
 #[derive(Debug)]
 struct Formatter {
     buffer: String,
+    decor_store: DecorStore,
     indent: usize,
 }
 
 impl Formatter {
     fn format(&mut self, node: Node) {
-        match node {
-            Node::Nil(_) => {
-                self.buffer.push_str("nil");
+        match node.kind {
+            Kind::Atom(value) => {
+                self.buffer.push_str(&value);
             }
-            Node::Boolean(_, node) => {
-                let value = if node.is_true { "true" } else { "false" };
-                self.buffer.push_str(value);
-            }
-            Node::Number(_, node) => {
-                self.buffer.push_str(&node.value);
-            }
-            Node::Identifier(_, node) => {
-                self.buffer.push_str(&node.name);
-            }
-            Node::Statements(node) => {
-                self.format_statements(node);
-            }
-            Node::IfExpr(_, node) => {
-                // If a condition part has its own trivia, move it to top of the if expression.
-                // e.g. "if #foo\n cond\n..." -> "#foo\nif cond\n..."
-                if let Some(trivia) = node.cond.trivia() {
-                    if let Some(comment) = &trivia.last_trailing_comment {
-                        self.buffer.push_str(&comment.value);
-                        self.write_leading_trivia(&trivia.leading_trivia, true, false);
-                    } else {
-                        self.write_trivia(trivia, true, false);
-                    }
-                    self.break_line();
+            Kind::Exprs(nodes) => {
+                if nodes.is_empty() {
+                    return;
                 }
+                for (i, n) in nodes.into_iter().enumerate() {
+                    if i > 0 {
+                        self.break_line();
+                    }
+                    let (leading_decors, trailing_comment) = self.decor_store.consume(n.id);
+                    self.write_leading_decors(leading_decors, i == 0, n.kind.is_end_decors());
+                    self.format(n);
+                    self.write_trailing_comment(trailing_comment);
+                }
+            }
+            Kind::EndDecors => {
+                let line_len = self.indent + 1; // newline
+                if line_len < self.buffer.len() {
+                    self.buffer.truncate(self.buffer.len() - line_len);
+                }
+            }
+            Kind::IfExpr(node) => {
                 self.buffer.push_str("if ");
+                let (_, cond_trailing) = self.decor_store.consume(node.cond.id);
                 self.format(*node.cond);
+                self.write_trailing_comment(cond_trailing);
                 self.indent();
-                self.format_statements(node.body);
+                self.break_line();
+                self.format(*node.body);
                 self.dedent();
                 self.break_line();
                 self.buffer.push_str("end");
             }
-            Node::None(_) => {}
         }
     }
 
-    fn format_statements(&mut self, node: Statements) {
-        if node.nodes.is_empty() {
+    fn write_leading_decors(&mut self, decors: Vec<LineDecor>, trim_start: bool, trim_end: bool) {
+        if decors.is_empty() {
             return;
         }
-        for (i, n) in node.nodes.into_iter().enumerate() {
-            match n.trivia() {
-                Some(t) => {
-                    self.write_trivia(t, i == 0, n.is_none());
-                    if !n.is_none() {
-                        self.break_line();
-                    }
-                }
-                None => {
-                    self.break_line();
-                }
-            }
-            self.format(n);
-        }
-    }
-
-    fn write_trivia(&mut self, trivia: &Trivia, trim_start: bool, trim_end: bool) {
-        if let Some(comment) = &trivia.last_trailing_comment {
-            self.buffer.push(' ');
-            self.buffer.push_str(&comment.value);
-        }
-        self.write_leading_trivia(&trivia.leading_trivia, trim_start, trim_end);
-    }
-
-    fn write_leading_trivia(&mut self, trivia: &Vec<TriviaNode>, trim_start: bool, trim_end: bool) {
-        if trivia.is_empty() {
-            return;
-        }
-        let last_idx = trivia.len() - 1;
-        for (i, node) in trivia.iter().enumerate() {
-            match node {
-                TriviaNode::EmptyLine => {
+        // NOTE: If decors is not empty, the result ends with a newline.
+        let last_idx = decors.len() - 1;
+        for (i, decor) in decors.into_iter().enumerate() {
+            match decor {
+                LineDecor::EmptyLine => {
                     if (!trim_start || 0 < i) && (!trim_end || i < last_idx) {
                         self.break_line();
                     }
                 }
-                TriviaNode::LineComment(comment) => {
-                    self.break_line();
+                LineDecor::Comment(comment) => {
                     self.buffer.push_str(&comment.value);
+                    self.break_line();
                 }
             }
         }
+    }
+
+    fn write_trailing_comment(&mut self, comment: Option<Comment>) {
+        if let Some(comment) = comment {
+            self.buffer.push(' ');
+            self.buffer.push_str(&comment.value);
+        }
+    }
+
+    fn indent(&mut self) {
+        self.indent += 2;
+    }
+
+    fn dedent(&mut self) {
+        self.indent = self.indent.saturating_sub(2);
     }
 
     fn break_line(&mut self) {
         self.buffer.push('\n');
         let spaces = " ".repeat(self.indent);
         self.buffer.push_str(&spaces);
-    }
-
-    fn indent(&mut self) {
-        self.indent = self.indent.saturating_add(2);
-    }
-
-    fn dedent(&mut self) {
-        self.indent = self.indent.saturating_sub(2);
     }
 }
