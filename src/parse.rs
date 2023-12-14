@@ -50,7 +50,8 @@ type MidDecors = (Option<fmt::Comment>, Vec<fmt::LineDecor>);
 impl FmtNodeBuilder {
     fn build_fmt_node(&mut self, node: Option<Box<Node>>) -> fmt::Node {
         let fmt_node = node.map(|n| self.visit(*n));
-        self.wrap_as_exprs(fmt_node, Some(self.src.len()))
+        let exprs = self.wrap_as_exprs(fmt_node, Some(self.src.len()));
+        fmt::Node::new(fmt::Pos::none(), fmt::Kind::Exprs(exprs))
     }
 
     fn next_pos(&mut self) -> fmt::Pos {
@@ -74,7 +75,7 @@ impl FmtNodeBuilder {
             Node::Gvar(node) => self.parse_atom(&node.expression_l, pos, node.name),
             Node::Begin(node) => {
                 let nodes = node.statements.into_iter().map(|n| self.visit(n)).collect();
-                fmt::Node::new(pos, fmt::Kind::Exprs(nodes))
+                fmt::Node::new(pos, fmt::Kind::Exprs(fmt::Exprs(nodes)))
             }
             Node::If(node) => {
                 // Consume decors above the if expression.
@@ -158,7 +159,7 @@ impl FmtNodeBuilder {
                 let body = self.wrap_as_exprs(body, None);
                 ifexpr.if_last = Some(fmt::Else {
                     pos: else_pos,
-                    body: Box::new(body),
+                    body,
                 });
             }
             _ => {}
@@ -167,12 +168,12 @@ impl FmtNodeBuilder {
 
     // Wrap the given node as Exprs to handle decors around it.
     // If the given node is Exprs, just add the EndDecors to it if necessary.
-    fn wrap_as_exprs(&mut self, orig_node: Option<fmt::Node>, end: Option<usize>) -> fmt::Node {
-        let (node_id, mut expr_nodes) = match orig_node {
-            None => (self.next_pos(), vec![]),
+    fn wrap_as_exprs(&mut self, orig_node: Option<fmt::Node>, end: Option<usize>) -> fmt::Exprs {
+        let mut expr_nodes = match orig_node {
+            None => vec![],
             Some(node) => match node.kind {
-                fmt::Kind::Exprs(nodes) => (node.pos, nodes),
-                _ => (self.next_pos(), vec![node]),
+                fmt::Kind::Exprs(fmt::Exprs(nodes)) => nodes,
+                _ => vec![node],
             },
         };
 
@@ -184,7 +185,7 @@ impl FmtNodeBuilder {
             }
         }
 
-        fmt::Node::new(node_id, fmt::Kind::Exprs(expr_nodes))
+        fmt::Exprs(expr_nodes)
     }
 
     fn consume_and_store_decors_until(&mut self, pos: fmt::Pos, end: usize) {

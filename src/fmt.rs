@@ -3,6 +3,12 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Pos(pub usize);
 
+impl Pos {
+    pub(crate) fn none() -> Self {
+        Self(0)
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Node {
     pub pos: Pos,
@@ -18,7 +24,7 @@ impl Node {
 #[derive(Debug)]
 pub(crate) enum Kind {
     Atom(String),
-    Exprs(Vec<Node>),
+    Exprs(Exprs),
     EndDecors,
     IfExpr(IfExpr),
 }
@@ -28,6 +34,9 @@ impl Kind {
         matches!(self, Self::EndDecors)
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct Exprs(pub Vec<Node>);
 
 #[derive(Debug)]
 pub(crate) struct IfExpr {
@@ -43,7 +52,7 @@ impl IfExpr {
             if_first,
             elsifs: vec![],
             if_last: None,
-            end_pos: Pos(0),
+            end_pos: Pos::none(),
         }
     }
 }
@@ -57,20 +66,20 @@ pub(crate) struct Elsif {
 #[derive(Debug)]
 pub(crate) struct Else {
     pub pos: Pos,
-    pub body: Box<Node>,
+    pub body: Exprs,
 }
 
 #[derive(Debug)]
 pub(crate) struct IfPart {
     pub cond: Box<Node>,
-    pub body: Box<Node>,
+    pub body: Exprs,
 }
 
 impl IfPart {
-    pub(crate) fn new(cond: Node, body: Node) -> Self {
+    pub(crate) fn new(cond: Node, body: Exprs) -> Self {
         Self {
             cond: Box::new(cond),
-            body: Box::new(body),
+            body,
         }
     }
 }
@@ -168,21 +177,8 @@ struct Formatter {
 impl Formatter {
     fn format(&mut self, node: Node) {
         match node.kind {
-            Kind::Atom(value) => {
-                self.buffer.push_str(&value);
-            }
-            Kind::Exprs(nodes) => {
-                if nodes.is_empty() {
-                    return;
-                }
-                for (i, n) in nodes.into_iter().enumerate() {
-                    let (leading_decors, trailing_comment) = self.decor_store.consume(n.pos);
-                    self.write_leading_decors(leading_decors, i == 0, n.kind.is_end_decors());
-                    self.break_line();
-                    self.format(n);
-                    self.write_trailing_comment(trailing_comment);
-                }
-            }
+            Kind::Atom(value) => self.buffer.push_str(&value),
+            Kind::Exprs(exprs) => self.format_exprs(exprs),
             Kind::EndDecors => {
                 let line_len = self.indent + 1; // newline
                 if line_len < self.buffer.len() {
@@ -195,7 +191,7 @@ impl Formatter {
                 self.format(*node.if_first.cond);
                 self.write_trailing_comment(cond_trailing);
                 self.indent();
-                self.format(*node.if_first.body);
+                self.format_exprs(node.if_first.body);
 
                 for elsif in node.elsifs {
                     let (_, elsif_trailing) = self.decor_store.consume(elsif.pos);
@@ -207,7 +203,7 @@ impl Formatter {
                     // todo: write decors around cond
                     self.format(*elsif.part.cond);
                     self.indent();
-                    self.format(*elsif.part.body);
+                    self.format_exprs(elsif.part.body);
                 }
 
                 if let Some(if_last) = node.if_last {
@@ -218,7 +214,7 @@ impl Formatter {
                     self.buffer.push_str("else");
                     self.write_trailing_comment(else_trailing);
                     self.indent();
-                    self.format(*if_last.body);
+                    self.format_exprs(if_last.body);
                 }
 
                 let (end_leading, end_trailing) = self.decor_store.consume(node.end_pos);
@@ -228,6 +224,20 @@ impl Formatter {
                 self.buffer.push_str("end");
                 self.write_trailing_comment(end_trailing);
             }
+        }
+    }
+
+    fn format_exprs(&mut self, exprs: Exprs) {
+        let Exprs(nodes) = exprs;
+        if nodes.is_empty() {
+            return;
+        }
+        for (i, n) in nodes.into_iter().enumerate() {
+            let (leading_decors, trailing_comment) = self.decor_store.consume(n.pos);
+            self.write_leading_decors(leading_decors, i == 0, n.kind.is_end_decors());
+            self.break_line();
+            self.format(n);
+            self.write_trailing_comment(trailing_comment);
         }
     }
 
