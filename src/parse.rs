@@ -15,8 +15,8 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
         src: source,
         comments: reversed_comments,
         decor_store,
-        node_id_gen: 0,
-        last_node_id: 0,
+        position_gen: 0,
+        last_pos: fmt::Pos(0),
         last_loc_end: 0,
     };
     let fmt_node = builder.build_fmt_node(result.ast);
@@ -39,8 +39,8 @@ struct FmtNodeBuilder {
     src: Vec<u8>,
     comments: Vec<Comment>,
     decor_store: fmt::DecorStore,
-    node_id_gen: usize,
-    last_node_id: usize,
+    position_gen: usize,
+    last_pos: fmt::Pos,
     last_loc_end: usize,
 }
 
@@ -52,32 +52,32 @@ impl FmtNodeBuilder {
         self.wrap_as_exprs(fmt_node, self.src.len())
     }
 
-    fn next_node_id(&mut self) -> usize {
-        self.node_id_gen += 1;
-        self.node_id_gen
+    fn next_pos(&mut self) -> fmt::Pos {
+        self.position_gen += 1;
+        fmt::Pos(self.position_gen)
     }
 
     fn visit(&mut self, node: Node) -> fmt::Node {
-        let node_id = self.next_node_id();
+        let pos = self.next_pos();
         let node_end = node.expression().end;
         let fmt_node = match node {
-            Node::Nil(node) => self.parse_atom(&node.expression_l, node_id, "nil".to_string()),
-            Node::True(node) => self.parse_atom(&node.expression_l, node_id, "true".to_string()),
-            Node::False(node) => self.parse_atom(&node.expression_l, node_id, "false".to_string()),
-            Node::Int(node) => self.parse_atom(&node.expression_l, node_id, node.value),
-            Node::Float(node) => self.parse_atom(&node.expression_l, node_id, node.value),
-            Node::Rational(node) => self.parse_atom(&node.expression_l, node_id, node.value),
-            Node::Complex(node) => self.parse_atom(&node.expression_l, node_id, node.value),
-            Node::Ivar(node) => self.parse_atom(&node.expression_l, node_id, node.name),
-            Node::Cvar(node) => self.parse_atom(&node.expression_l, node_id, node.name),
-            Node::Gvar(node) => self.parse_atom(&node.expression_l, node_id, node.name),
+            Node::Nil(node) => self.parse_atom(&node.expression_l, pos, "nil".to_string()),
+            Node::True(node) => self.parse_atom(&node.expression_l, pos, "true".to_string()),
+            Node::False(node) => self.parse_atom(&node.expression_l, pos, "false".to_string()),
+            Node::Int(node) => self.parse_atom(&node.expression_l, pos, node.value),
+            Node::Float(node) => self.parse_atom(&node.expression_l, pos, node.value),
+            Node::Rational(node) => self.parse_atom(&node.expression_l, pos, node.value),
+            Node::Complex(node) => self.parse_atom(&node.expression_l, pos, node.value),
+            Node::Ivar(node) => self.parse_atom(&node.expression_l, pos, node.name),
+            Node::Cvar(node) => self.parse_atom(&node.expression_l, pos, node.name),
+            Node::Gvar(node) => self.parse_atom(&node.expression_l, pos, node.name),
             Node::Begin(node) => {
                 let nodes = node.statements.into_iter().map(|n| self.visit(n)).collect();
-                fmt::Node::new(node_id, fmt::Kind::Exprs(nodes))
+                fmt::Node::new(pos, fmt::Kind::Exprs(nodes))
             }
             Node::If(node) => {
                 // Consume the decors before the if expression itself.
-                self.consume_and_store_decors_until(node_id, node.expression_l.begin);
+                self.consume_and_store_decors_until(pos, node.expression_l.begin);
 
                 // Consume the decors between "if" and the condition expression.
                 // Then merge it to the decors of "if" itself.
@@ -85,11 +85,10 @@ impl FmtNodeBuilder {
                 if let Some((if_trailing, cond_leading)) = decors_in_if_and_cond {
                     if let Some(c) = if_trailing {
                         self.decor_store
-                            .append_leading_decors(node_id, vec![fmt::LineDecor::Comment(c)]);
+                            .append_leading_decors(pos, vec![fmt::LineDecor::Comment(c)]);
                     }
                     if !cond_leading.is_empty() {
-                        self.decor_store
-                            .append_leading_decors(node_id, cond_leading);
+                        self.decor_store.append_leading_decors(pos, cond_leading);
                     }
                 }
 
@@ -110,21 +109,21 @@ impl FmtNodeBuilder {
                     self.visit_ifelse(*if_false, &mut ifexpr);
                 }
 
-                fmt::Node::new(node_id, fmt::Kind::IfExpr(ifexpr))
+                fmt::Node::new(pos, fmt::Kind::IfExpr(ifexpr))
             }
 
             _ => {
                 todo!("{}", format!("convert node {:?}", node));
             }
         };
-        self.last_node_id = node_id;
+        self.last_pos = pos;
         self.last_loc_end = node_end;
         fmt_node
     }
 
-    fn parse_atom(&mut self, loc: &Loc, node_id: usize, value: String) -> fmt::Node {
-        self.consume_and_store_decors_until(node_id, loc.begin);
-        fmt::Node::new(node_id, fmt::Kind::Atom(value))
+    fn parse_atom(&mut self, loc: &Loc, pos: fmt::Pos, value: String) -> fmt::Node {
+        self.consume_and_store_decors_until(pos, loc.begin);
+        fmt::Node::new(pos, fmt::Kind::Atom(value))
     }
 
     fn visit_ifelse(&mut self, node: Node, ifexpr: &mut fmt::IfExpr) {
@@ -155,35 +154,35 @@ impl FmtNodeBuilder {
     // If the given node is Exprs, just add the EndDecors to it if necessary.
     fn wrap_as_exprs(&mut self, orig_node: Option<fmt::Node>, end: usize) -> fmt::Node {
         let (node_id, mut expr_nodes) = match orig_node {
-            None => (self.next_node_id(), vec![]),
+            None => (self.next_pos(), vec![]),
             Some(node) => match node.kind {
-                fmt::Kind::Exprs(nodes) => (node.id, nodes),
-                _ => (self.next_node_id(), vec![node]),
+                fmt::Kind::Exprs(nodes) => (node.pos, nodes),
+                _ => (self.next_pos(), vec![node]),
             },
         };
 
         if let Some(end_decors) = self.consume_decors_until(end) {
-            let end_node = fmt::Node::new(self.next_node_id(), fmt::Kind::EndDecors);
-            self.store_decors_to(self.last_node_id, end_node.id, end_decors);
+            let end_node = fmt::Node::new(self.next_pos(), fmt::Kind::EndDecors);
+            self.store_decors_to(self.last_pos, end_node.pos, end_decors);
             expr_nodes.push(end_node);
         }
 
         fmt::Node::new(node_id, fmt::Kind::Exprs(expr_nodes))
     }
 
-    fn consume_and_store_decors_until(&mut self, node_id: usize, end: usize) {
+    fn consume_and_store_decors_until(&mut self, pos: fmt::Pos, end: usize) {
         if let Some(decors) = self.consume_decors_until(end) {
-            self.store_decors_to(self.last_node_id, node_id, decors);
+            self.store_decors_to(self.last_pos, pos, decors);
         }
     }
 
-    fn store_decors_to(&mut self, last_node_id: usize, node_id: usize, decors: MidDecors) {
+    fn store_decors_to(&mut self, last_pos: fmt::Pos, pos: fmt::Pos, decors: MidDecors) {
         let (trailing_comment, line_decors) = decors;
         if let Some(comment) = trailing_comment {
-            self.decor_store.set_trailing_comment(last_node_id, comment);
+            self.decor_store.set_trailing_comment(last_pos, comment);
         }
         if !line_decors.is_empty() {
-            self.decor_store.append_leading_decors(node_id, line_decors);
+            self.decor_store.append_leading_decors(pos, line_decors);
         }
     }
 

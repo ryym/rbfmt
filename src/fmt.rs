@@ -1,14 +1,17 @@
 use std::collections::HashMap;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct Pos(pub usize);
+
 #[derive(Debug)]
 pub(crate) struct Node {
-    pub id: usize,
+    pub pos: Pos,
     pub kind: Kind,
 }
 
 impl Node {
-    pub(crate) fn new(id: usize, kind: Kind) -> Self {
-        Self { id, kind }
+    pub(crate) fn new(pos: Pos, kind: Kind) -> Self {
+        Self { pos, kind }
     }
 }
 
@@ -50,7 +53,7 @@ impl IfPart {
 
 #[derive(Debug)]
 pub(crate) struct DecorStore {
-    map: HashMap<usize, DecorSet>,
+    map: HashMap<Pos, DecorSet>,
 }
 
 impl DecorStore {
@@ -60,16 +63,16 @@ impl DecorStore {
         }
     }
 
-    pub(crate) fn consume(&mut self, node_id: usize) -> (Vec<LineDecor>, Option<Comment>) {
-        if let Some(decors) = self.map.remove(&node_id) {
+    pub(crate) fn consume(&mut self, pos: Pos) -> (Vec<LineDecor>, Option<Comment>) {
+        if let Some(decors) = self.map.remove(&pos) {
             (decors.leading, decors.trailing)
         } else {
             (vec![], None)
         }
     }
 
-    pub(crate) fn append_leading_decors(&mut self, node_id: usize, mut decors: Vec<LineDecor>) {
-        match self.map.get_mut(&node_id) {
+    pub(crate) fn append_leading_decors(&mut self, pos: Pos, mut decors: Vec<LineDecor>) {
+        match self.map.get_mut(&pos) {
             Some(d) => {
                 d.leading.append(&mut decors);
             }
@@ -78,13 +81,13 @@ impl DecorStore {
                     leading: decors,
                     trailing: None,
                 };
-                self.map.insert(node_id, d);
+                self.map.insert(pos, d);
             }
         }
     }
 
-    pub(crate) fn set_trailing_comment(&mut self, node_id: usize, comment: Comment) {
-        match self.map.get_mut(&node_id) {
+    pub(crate) fn set_trailing_comment(&mut self, pos: Pos, comment: Comment) {
+        match self.map.get_mut(&pos) {
             Some(d) => {
                 d.trailing = Some(comment);
             }
@@ -93,7 +96,7 @@ impl DecorStore {
                     leading: vec![],
                     trailing: Some(comment),
                 };
-                self.map.insert(node_id, d);
+                self.map.insert(pos, d);
             }
         }
     }
@@ -150,7 +153,7 @@ impl Formatter {
                     if i > 0 {
                         self.break_line();
                     }
-                    let (leading_decors, trailing_comment) = self.decor_store.consume(n.id);
+                    let (leading_decors, trailing_comment) = self.decor_store.consume(n.pos);
                     self.write_leading_decors(leading_decors, i == 0, n.kind.is_end_decors());
                     self.format(n);
                     self.write_trailing_comment(trailing_comment);
@@ -164,7 +167,7 @@ impl Formatter {
             }
             Kind::IfExpr(node) => {
                 self.buffer.push_str("if ");
-                let (_, cond_trailing) = self.decor_store.consume(node.if_first.cond.id);
+                let (_, cond_trailing) = self.decor_store.consume(node.if_first.cond.pos);
                 self.format(*node.if_first.cond);
                 self.write_trailing_comment(cond_trailing);
                 self.indent();
