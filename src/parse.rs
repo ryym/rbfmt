@@ -76,7 +76,11 @@ impl FmtNodeBuilder {
                 fmt::Node::new(node_id, fmt::Kind::Exprs(nodes))
             }
             Node::If(node) => {
+                // Consume the decors before the if expression itself.
                 self.consume_and_store_decors_until(node_id, node.expression_l.begin);
+
+                // Consume the decors between "if" and the condition expression.
+                // Then merge it to the decors of "if" itself.
                 let decors_in_if_and_cond = self.consume_decors_until(node.cond.expression().begin);
                 if let Some((if_trailing, cond_leading)) = decors_in_if_and_cond {
                     if let Some(c) = if_trailing {
@@ -88,17 +92,27 @@ impl FmtNodeBuilder {
                             .append_leading_decors(node_id, cond_leading);
                     }
                 }
+
                 let cond = self.visit(*node.cond);
                 let body = node.if_true.map(|n| self.visit(*n));
-                let body = self.wrap_as_exprs(body, node.end_l.unwrap().begin);
-                fmt::Node::new(
-                    node_id,
-                    fmt::Kind::IfExpr(fmt::IfExpr {
-                        cond: Box::new(cond),
-                        body: Box::new(body),
-                    }),
-                )
+                let body_end_loc = node.else_l.or(node.end_l);
+                let body = match body_end_loc {
+                    Some(loc) => self.wrap_as_exprs(body, loc.end),
+                    None => panic!("invalid if expression"),
+                };
+
+                let mut ifexpr = fmt::IfExpr {
+                    if_first: fmt::IfPart::new(cond, body),
+                    elsifs: vec![],
+                    if_last: None,
+                };
+                if let Some(if_false) = node.if_false {
+                    self.visit_ifelse(*if_false, &mut ifexpr);
+                }
+
+                fmt::Node::new(node_id, fmt::Kind::IfExpr(ifexpr))
             }
+
             _ => {
                 todo!("{}", format!("convert node {:?}", node));
             }
@@ -111,6 +125,30 @@ impl FmtNodeBuilder {
     fn parse_atom(&mut self, loc: &Loc, node_id: usize, value: String) -> fmt::Node {
         self.consume_and_store_decors_until(node_id, loc.begin);
         fmt::Node::new(node_id, fmt::Kind::Atom(value))
+    }
+
+    fn visit_ifelse(&mut self, node: Node, ifexpr: &mut fmt::IfExpr) {
+        match node {
+            // elsif
+            Node::If(node) => {
+                let cond = self.visit(*node.cond);
+                let body = node.if_true.map(|n| self.visit(*n));
+                let body_end_loc = node.else_l.or(node.end_l);
+                let body = match body_end_loc {
+                    Some(loc) => self.wrap_as_exprs(body, loc.end),
+                    None => panic!("invalid if expression"),
+                };
+                ifexpr.elsifs.push(fmt::IfPart::new(cond, body));
+                if let Some(if_false) = node.if_false {
+                    self.visit_ifelse(*if_false, ifexpr);
+                }
+            }
+            // else
+            _ => {
+                let fmt_node = self.visit(node);
+                ifexpr.if_last = Some(Box::new(fmt_node));
+            }
+        }
     }
 
     // Wrap the given node as Exprs to handle decors around it.

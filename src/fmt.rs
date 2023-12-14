@@ -28,8 +28,24 @@ impl Kind {
 
 #[derive(Debug)]
 pub(crate) struct IfExpr {
+    pub if_first: IfPart,
+    pub elsifs: Vec<IfPart>,
+    pub if_last: Option<Box<Node>>,
+}
+
+#[derive(Debug)]
+pub(crate) struct IfPart {
     pub cond: Box<Node>,
     pub body: Box<Node>,
+}
+
+impl IfPart {
+    pub(crate) fn new(cond: Node, body: Node) -> Self {
+        Self {
+            cond: Box::new(cond),
+            body: Box::new(body),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -148,14 +164,36 @@ impl Formatter {
             }
             Kind::IfExpr(node) => {
                 self.buffer.push_str("if ");
-                let (_, cond_trailing) = self.decor_store.consume(node.cond.id);
-                self.format(*node.cond);
+                let (_, cond_trailing) = self.decor_store.consume(node.if_first.cond.id);
+                self.format(*node.if_first.cond);
                 self.write_trailing_comment(cond_trailing);
                 self.indent();
                 self.break_line();
-                self.format(*node.body);
+                self.format(*node.if_first.body);
                 self.dedent();
                 self.break_line();
+
+                for elsif in node.elsifs {
+                    self.buffer.push_str("elsif ");
+                    // todo: write decors around elsif
+                    self.format(*elsif.cond);
+                    self.indent();
+                    self.break_line();
+                    self.format(*elsif.body);
+                    self.dedent();
+                    self.break_line();
+                }
+
+                if let Some(if_last) = node.if_last {
+                    self.buffer.push_str("else");
+                    self.indent();
+                    self.break_line();
+                    // todo: write decors around else
+                    self.format(*if_last);
+                    self.dedent();
+                    self.break_line();
+                }
+
                 self.buffer.push_str("end");
             }
         }
