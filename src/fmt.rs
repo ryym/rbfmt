@@ -32,8 +32,32 @@ impl Kind {
 #[derive(Debug)]
 pub(crate) struct IfExpr {
     pub if_first: IfPart,
-    pub elsifs: Vec<IfPart>,
-    pub if_last: Option<Box<Node>>,
+    pub elsifs: Vec<Elsif>,
+    pub if_last: Option<Else>,
+    pub end_pos: Pos,
+}
+
+impl IfExpr {
+    pub(crate) fn new(if_first: IfPart) -> Self {
+        Self {
+            if_first,
+            elsifs: vec![],
+            if_last: None,
+            end_pos: Pos(0),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Elsif {
+    pub pos: Pos,
+    pub part: IfPart,
+}
+
+#[derive(Debug)]
+pub(crate) struct Else {
+    pub pos: Pos,
+    pub body: Box<Node>,
 }
 
 #[derive(Debug)]
@@ -126,10 +150,12 @@ pub(crate) fn format(node: Node, decor_store: DecorStore) -> String {
         indent: 0,
     };
     formatter.format(node);
-    if !formatter.buffer.is_empty() {
+    if formatter.buffer.is_empty() {
+        formatter.buffer
+    } else {
         formatter.buffer.push('\n');
+        formatter.buffer.trim_start().to_string()
     }
-    formatter.buffer
 }
 
 #[derive(Debug)]
@@ -150,11 +176,9 @@ impl Formatter {
                     return;
                 }
                 for (i, n) in nodes.into_iter().enumerate() {
-                    if i > 0 {
-                        self.break_line();
-                    }
                     let (leading_decors, trailing_comment) = self.decor_store.consume(n.pos);
                     self.write_leading_decors(leading_decors, i == 0, n.kind.is_end_decors());
+                    self.break_line();
                     self.format(n);
                     self.write_trailing_comment(trailing_comment);
                 }
@@ -171,33 +195,38 @@ impl Formatter {
                 self.format(*node.if_first.cond);
                 self.write_trailing_comment(cond_trailing);
                 self.indent();
-                self.break_line();
                 self.format(*node.if_first.body);
-                self.dedent();
-                self.break_line();
 
                 for elsif in node.elsifs {
-                    self.buffer.push_str("elsif ");
-                    // todo: write decors around elsif
-                    self.format(*elsif.cond);
-                    self.indent();
-                    self.break_line();
-                    self.format(*elsif.body);
+                    let (_, elsif_trailing) = self.decor_store.consume(elsif.pos);
+                    // self.write_leading_decors(elsif_leading, false, true);
                     self.dedent();
                     self.break_line();
+                    self.buffer.push_str("elsif ");
+                    self.write_trailing_comment(elsif_trailing);
+                    // todo: write decors around cond
+                    self.format(*elsif.part.cond);
+                    self.indent();
+                    self.format(*elsif.part.body);
                 }
 
                 if let Some(if_last) = node.if_last {
-                    self.buffer.push_str("else");
-                    self.indent();
-                    self.break_line();
-                    // todo: write decors around else
-                    self.format(*if_last);
+                    let (_, else_trailing) = self.decor_store.consume(if_last.pos);
+                    // self.write_leading_decors(else_leading, false, true);
                     self.dedent();
                     self.break_line();
+                    self.buffer.push_str("else");
+                    self.write_trailing_comment(else_trailing);
+                    self.indent();
+                    self.format(*if_last.body);
                 }
 
+                let (end_leading, end_trailing) = self.decor_store.consume(node.end_pos);
+                self.write_leading_decors(end_leading, false, true);
+                self.dedent();
+                self.break_line();
                 self.buffer.push_str("end");
+                self.write_trailing_comment(end_trailing);
             }
         }
     }
@@ -206,7 +235,6 @@ impl Formatter {
         if decors.is_empty() {
             return;
         }
-        // NOTE: If decors is not empty, the result ends with a newline.
         let last_idx = decors.len() - 1;
         for (i, decor) in decors.into_iter().enumerate() {
             match decor {
@@ -216,8 +244,8 @@ impl Formatter {
                     }
                 }
                 LineDecor::Comment(comment) => {
-                    self.buffer.push_str(&comment.value);
                     self.break_line();
+                    self.buffer.push_str(&comment.value);
                 }
             }
         }

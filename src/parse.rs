@@ -4,6 +4,7 @@ use lib_ruby_parser::{source::Comment, Loc, Node, Parser};
 pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
     let parser = Parser::new(source.clone(), Default::default());
     let mut result = parser.do_parse();
+    // dbg!(&result.ast);
 
     // Sort the comments by their locations, because they are unordered when there is a heredoc.
     result.comments.sort_by_key(|c| c.location.begin);
@@ -49,7 +50,7 @@ type MidDecors = (Option<fmt::Comment>, Vec<fmt::LineDecor>);
 impl FmtNodeBuilder {
     fn build_fmt_node(&mut self, node: Option<Box<Node>>) -> fmt::Node {
         let fmt_node = node.map(|n| self.visit(*n));
-        self.wrap_as_exprs(fmt_node, self.src.len())
+        self.wrap_as_exprs(fmt_node, Some(self.src.len()))
     }
 
     fn next_pos(&mut self) -> fmt::Pos {
@@ -76,10 +77,10 @@ impl FmtNodeBuilder {
                 fmt::Node::new(pos, fmt::Kind::Exprs(nodes))
             }
             Node::If(node) => {
-                // Consume the decors before the if expression itself.
+                // Consume decors above the if expression.
                 self.consume_and_store_decors_until(pos, node.expression_l.begin);
 
-                // Consume the decors between "if" and the condition expression.
+                // Consume decors between "if" and the condition expression.
                 // Then merge it to the decors of "if" itself.
                 let decors_in_if_and_cond = self.consume_decors_until(node.cond.expression().begin);
                 if let Some((if_trailing, cond_leading)) = decors_in_if_and_cond {
@@ -94,20 +95,26 @@ impl FmtNodeBuilder {
 
                 let cond = self.visit(*node.cond);
                 let body = node.if_true.map(|n| self.visit(*n));
-                let body_end_loc = node.else_l.or(node.end_l);
-                let body = match body_end_loc {
-                    Some(loc) => self.wrap_as_exprs(body, loc.end),
-                    None => panic!("invalid if expression"),
-                };
 
-                let mut ifexpr = fmt::IfExpr {
-                    if_first: fmt::IfPart::new(cond, body),
-                    elsifs: vec![],
-                    if_last: None,
+                let ifexpr = match (node.else_l, node.if_false, node.end_l) {
+                    // if...end
+                    (None, None, Some(end_l)) => {
+                        let if_first = self.wrap_as_exprs(body, Some(end_l.begin));
+                        fmt::IfExpr::new(fmt::IfPart::new(cond, if_first))
+                    }
+                    // if...(elsif...|else...)+end
+                    (Some(else_l), if_false, Some(end_l)) => {
+                        let if_first = self.wrap_as_exprs(body, Some(else_l.begin));
+                        let mut ifexpr = fmt::IfExpr::new(fmt::IfPart::new(cond, if_first));
+                        if let Some(if_false) = if_false {
+                            self.visit_ifelse(*if_false, &mut ifexpr);
+                        }
+                        ifexpr.end_pos = self.next_pos();
+                        self.consume_and_store_decors_until(ifexpr.end_pos, end_l.begin);
+                        ifexpr
+                    }
+                    _ => panic!("invalid if expression"),
                 };
-                if let Some(if_false) = node.if_false {
-                    self.visit_ifelse(*if_false, &mut ifexpr);
-                }
 
                 fmt::Node::new(pos, fmt::Kind::IfExpr(ifexpr))
             }
@@ -130,29 +137,39 @@ impl FmtNodeBuilder {
         match node {
             // elsif
             Node::If(node) => {
+                let elsif_pos = self.next_pos();
+                self.last_pos = elsif_pos;
+
                 let cond = self.visit(*node.cond);
                 let body = node.if_true.map(|n| self.visit(*n));
-                let body_end_loc = node.else_l.or(node.end_l);
-                let body = match body_end_loc {
-                    Some(loc) => self.wrap_as_exprs(body, loc.end),
-                    None => panic!("invalid if expression"),
-                };
-                ifexpr.elsifs.push(fmt::IfPart::new(cond, body));
+                let body_end_loc = node.else_l.or(node.end_l).map(|l| l.begin);
+                let body = self.wrap_as_exprs(body, body_end_loc);
+
+                ifexpr.elsifs.push(fmt::Elsif {
+                    pos: elsif_pos,
+                    part: fmt::IfPart::new(cond, body),
+                });
                 if let Some(if_false) = node.if_false {
                     self.visit_ifelse(*if_false, ifexpr);
                 }
             }
             // else
             _ => {
-                let fmt_node = self.visit(node);
-                ifexpr.if_last = Some(Box::new(fmt_node));
+                let else_pos = self.next_pos();
+                self.last_pos = else_pos;
+                let body = self.visit(node);
+                let body = self.wrap_as_exprs(Some(body), None);
+                ifexpr.if_last = Some(fmt::Else {
+                    pos: else_pos,
+                    body: Box::new(body),
+                });
             }
         }
     }
 
     // Wrap the given node as Exprs to handle decors around it.
     // If the given node is Exprs, just add the EndDecors to it if necessary.
-    fn wrap_as_exprs(&mut self, orig_node: Option<fmt::Node>, end: usize) -> fmt::Node {
+    fn wrap_as_exprs(&mut self, orig_node: Option<fmt::Node>, end: Option<usize>) -> fmt::Node {
         let (node_id, mut expr_nodes) = match orig_node {
             None => (self.next_pos(), vec![]),
             Some(node) => match node.kind {
@@ -161,10 +178,12 @@ impl FmtNodeBuilder {
             },
         };
 
-        if let Some(end_decors) = self.consume_decors_until(end) {
-            let end_node = fmt::Node::new(self.next_pos(), fmt::Kind::EndDecors);
-            self.store_decors_to(self.last_pos, end_node.pos, end_decors);
-            expr_nodes.push(end_node);
+        if let Some(end) = end {
+            if let Some(end_decors) = self.consume_decors_until(end) {
+                let end_node = fmt::Node::new(self.next_pos(), fmt::Kind::EndDecors);
+                self.store_decors_to(self.last_pos, end_node.pos, end_decors);
+                expr_nodes.push(end_node);
+            }
         }
 
         fmt::Node::new(node_id, fmt::Kind::Exprs(expr_nodes))
