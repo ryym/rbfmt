@@ -22,3 +22,15 @@ elsif 3
 else
   999
 end
+
+if true
+end
+
+if true
+else
+end
+
+if true
+elsif true
+else
+end

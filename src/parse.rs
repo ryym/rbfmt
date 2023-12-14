@@ -106,9 +106,7 @@ impl FmtNodeBuilder {
                     (Some(else_l), if_false, Some(end_l)) => {
                         let if_first = self.wrap_as_exprs(body, Some(else_l.begin));
                         let mut ifexpr = fmt::IfExpr::new(fmt::IfPart::new(cond, if_first));
-                        if let Some(if_false) = if_false {
-                            self.visit_ifelse(*if_false, &mut ifexpr);
-                        }
+                        self.visit_ifelse(if_false, &mut ifexpr, true);
                         ifexpr.end_pos = self.next_pos();
                         self.consume_and_store_decors_until(ifexpr.end_pos, end_l.begin);
                         ifexpr
@@ -133,37 +131,37 @@ impl FmtNodeBuilder {
         fmt::Node::new(pos, fmt::Kind::Atom(value))
     }
 
-    fn visit_ifelse(&mut self, node: Node, ifexpr: &mut fmt::IfExpr) {
+    fn visit_ifelse(&mut self, node: Option<Box<Node>>, ifexpr: &mut fmt::IfExpr, has_else: bool) {
+        let node = node.map(|n| *n);
         match node {
             // elsif
-            Node::If(node) => {
+            Some(Node::If(node)) => {
                 let elsif_pos = self.next_pos();
                 self.last_pos = elsif_pos;
 
                 let cond = self.visit(*node.cond);
                 let body = node.if_true.map(|n| self.visit(*n));
-                let body_end_loc = node.else_l.or(node.end_l).map(|l| l.begin);
+                let body_end_loc = node.else_l.map(|l| l.begin);
                 let body = self.wrap_as_exprs(body, body_end_loc);
 
                 ifexpr.elsifs.push(fmt::Elsif {
                     pos: elsif_pos,
                     part: fmt::IfPart::new(cond, body),
                 });
-                if let Some(if_false) = node.if_false {
-                    self.visit_ifelse(*if_false, ifexpr);
-                }
+                self.visit_ifelse(node.if_false, ifexpr, node.else_l.is_some());
             }
             // else
-            _ => {
+            _ if has_else => {
                 let else_pos = self.next_pos();
                 self.last_pos = else_pos;
-                let body = self.visit(node);
-                let body = self.wrap_as_exprs(Some(body), None);
+                let body = node.map(|n| self.visit(n));
+                let body = self.wrap_as_exprs(body, None);
                 ifexpr.if_last = Some(fmt::Else {
                     pos: else_pos,
                     body: Box::new(body),
                 });
             }
+            _ => {}
         }
     }
 
