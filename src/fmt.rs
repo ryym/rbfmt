@@ -92,6 +92,14 @@ pub(crate) struct MethodCall {
     pub pos: Pos,
     pub name: String,
     pub args: Vec<Node>,
+    pub block: Option<MethodBlock>,
+}
+
+#[derive(Debug)]
+pub(crate) struct MethodBlock {
+    pub pos: Pos,
+    // pub args
+    pub body: Exprs,
 }
 
 #[derive(Debug)]
@@ -309,6 +317,21 @@ impl Formatter {
                     self.format(arg);
                 }
                 self.buffer.push(')');
+            }
+            if let Some(block) = call.block {
+                if block.body.0.is_empty() {
+                    self.buffer.push_str(" {}");
+                } else {
+                    let block_decors = self.decor_store.consume(block.pos);
+                    self.buffer.push_str(" do");
+                    self.write_trailing_comment(block_decors.trailing);
+                    self.indent();
+                    self.format_exprs(block.body);
+                    self.dedent();
+                    self.break_line();
+                    self.put_indent();
+                    self.buffer.push_str("end");
+                }
             }
             if i < last_idx {
                 self.buffer.push('.');

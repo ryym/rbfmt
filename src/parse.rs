@@ -1,7 +1,11 @@
 use std::collections::HashMap;
 
 use crate::fmt;
-use lib_ruby_parser::{nodes::Send, source::Comment, Lexer, Loc, Node, Parser, Token};
+use lib_ruby_parser::{
+    nodes::{Block, Send},
+    source::Comment,
+    Lexer, Loc, Node, Parser, Token,
+};
 
 pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
     let parser = Parser::new(source.clone(), Default::default());
@@ -167,6 +171,11 @@ impl FmtNodeBuilder {
                 let chain = self.visit_inner_send(node);
                 fmt::Node::new(pos, fmt::Kind::MethodChain(chain))
             }
+            Node::Block(node) => {
+                self.consume_and_store_decors_until(pos, node.expression_l.begin);
+                let chain = self.visit_inner_block(node);
+                fmt::Node::new(pos, fmt::Kind::MethodChain(chain))
+            }
 
             _ => {
                 todo!("{}", format!("convert node {:?}", node));
@@ -220,6 +229,7 @@ impl FmtNodeBuilder {
         let mut chain = match send.recv {
             Some(recv) => match *recv {
                 Node::Send(send) => self.visit_inner_send(send),
+                Node::Block(block) => self.visit_inner_block(block),
                 _ => {
                     let recv = self.visit(*recv);
                     fmt::MethodChain {
@@ -246,10 +256,32 @@ impl FmtNodeBuilder {
             pos: call_pos,
             name: send.method_name,
             args,
+            block: None,
         });
 
         self.last_pos = call_pos;
         self.last_loc_end = send.expression_l.end;
+        chain
+    }
+
+    fn visit_inner_block(&mut self, block: Block) -> fmt::MethodChain {
+        let send = match *block.call {
+            Node::Send(send) => send,
+            _ => panic!("unexpected block call node: {:?}", block.call),
+        };
+        let mut chain = self.visit_inner_send(send);
+
+        let block_pos = self.next_pos();
+        self.last_pos = block_pos;
+        let body = block.body.map(|b| self.visit(*b));
+        let body = self.wrap_as_exprs(body, Some(block.end_l.end));
+
+        let last_call = chain.calls.last_mut().unwrap();
+        last_call.block = Some(fmt::MethodBlock {
+            pos: block_pos,
+            body,
+        });
+
         chain
     }
 

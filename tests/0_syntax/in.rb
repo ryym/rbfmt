@@ -26,3 +26,4 @@ foo
 foo.bar
 1.foo.bar
 foo(1, 2, 3)
+foo { true }
