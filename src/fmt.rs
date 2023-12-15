@@ -189,11 +189,25 @@ impl Formatter {
                     self.break_line();
                     self.dedent();
                     self.put_indent();
-                    self.buffer.push_str("elsif ");
-                    self.write_trailing_comment(elsif_decors.trailing);
-                    // todo: write decors around cond
-                    self.format(*elsif.part.cond);
-                    self.indent();
+                    self.buffer.push_str("elsif");
+                    if elsif_decors.trailing.is_some() {
+                        self.write_trailing_comment(elsif_decors.trailing);
+                    } else {
+                        self.buffer.push(' ');
+                    }
+                    let cond_decors = self.decor_store.consume(elsif.part.cond.pos);
+                    if cond_decors.leading.is_empty() {
+                        self.format(*elsif.part.cond);
+                        self.write_trailing_comment(cond_decors.trailing);
+                        self.indent();
+                    } else {
+                        self.indent();
+                        self.write_leading_decors(cond_decors.leading, true, false);
+                        self.break_line();
+                        self.put_indent();
+                        self.format(*elsif.part.cond);
+                        self.write_trailing_comment(cond_decors.trailing);
+                    }
                     self.format_exprs(elsif.part.body);
                 }
 

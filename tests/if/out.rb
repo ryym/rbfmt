@@ -47,3 +47,10 @@ elsif 2
 
   # b
 end
+
+if 1
+elsif # elsif
+  # 2b
+  2 # 2a
+  2.0
+end
