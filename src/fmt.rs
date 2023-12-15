@@ -178,64 +178,7 @@ impl Formatter {
             Kind::Atom(value) => self.buffer.push_str(&value),
             Kind::Exprs(exprs) => self.format_exprs(exprs),
             Kind::EndDecors => unreachable!("end decors unexpectedly rendered"),
-            Kind::IfExpr(node) => {
-                if node.is_unless {
-                    self.buffer.push_str("unless ");
-                } else {
-                    self.buffer.push_str("if ");
-                }
-                let cond_decors = self.decor_store.consume(node.if_first.cond.pos);
-                self.format(*node.if_first.cond);
-                self.write_trailing_comment(cond_decors.trailing);
-                self.indent();
-                self.format_exprs(node.if_first.body);
-
-                for elsif in node.elsifs {
-                    let elsif_decors = self.decor_store.consume(elsif.pos);
-                    self.break_line();
-                    self.dedent();
-                    self.put_indent();
-                    self.buffer.push_str("elsif");
-                    if elsif_decors.trailing.is_some() {
-                        self.write_trailing_comment(elsif_decors.trailing);
-                    } else {
-                        self.buffer.push(' ');
-                    }
-                    let cond_decors = self.decor_store.consume(elsif.part.cond.pos);
-                    if cond_decors.leading.is_empty() {
-                        self.format(*elsif.part.cond);
-                        self.write_trailing_comment(cond_decors.trailing);
-                        self.indent();
-                    } else {
-                        self.indent();
-                        self.write_leading_decors(cond_decors.leading, true, false);
-                        self.break_line();
-                        self.put_indent();
-                        self.format(*elsif.part.cond);
-                        self.write_trailing_comment(cond_decors.trailing);
-                    }
-                    self.format_exprs(elsif.part.body);
-                }
-
-                if let Some(if_last) = node.if_last {
-                    let else_decors = self.decor_store.consume(if_last.pos);
-                    self.break_line();
-                    self.dedent();
-                    self.put_indent();
-                    self.buffer.push_str("else");
-                    self.write_trailing_comment(else_decors.trailing);
-                    self.indent();
-                    self.format_exprs(if_last.body);
-                }
-
-                let end_decors = self.decor_store.consume(node.end_pos);
-                self.write_leading_decors(end_decors.leading, false, true);
-                self.break_line();
-                self.dedent();
-                self.put_indent();
-                self.buffer.push_str("end");
-                self.write_trailing_comment(end_decors.trailing);
-            }
+            Kind::IfExpr(expr) => self.format_if_expr(expr),
         }
     }
 
@@ -254,6 +197,65 @@ impl Formatter {
             }
             self.write_trailing_comment(decors.trailing);
         }
+    }
+
+    fn format_if_expr(&mut self, expr: IfExpr) {
+        if expr.is_unless {
+            self.buffer.push_str("unless ");
+        } else {
+            self.buffer.push_str("if ");
+        }
+        let cond_decors = self.decor_store.consume(expr.if_first.cond.pos);
+        self.format(*expr.if_first.cond);
+        self.write_trailing_comment(cond_decors.trailing);
+        self.indent();
+        self.format_exprs(expr.if_first.body);
+
+        for elsif in expr.elsifs {
+            let elsif_decors = self.decor_store.consume(elsif.pos);
+            self.break_line();
+            self.dedent();
+            self.put_indent();
+            self.buffer.push_str("elsif");
+            if elsif_decors.trailing.is_some() {
+                self.write_trailing_comment(elsif_decors.trailing);
+            } else {
+                self.buffer.push(' ');
+            }
+            let cond_decors = self.decor_store.consume(elsif.part.cond.pos);
+            if cond_decors.leading.is_empty() {
+                self.format(*elsif.part.cond);
+                self.write_trailing_comment(cond_decors.trailing);
+                self.indent();
+            } else {
+                self.indent();
+                self.write_leading_decors(cond_decors.leading, true, false);
+                self.break_line();
+                self.put_indent();
+                self.format(*elsif.part.cond);
+                self.write_trailing_comment(cond_decors.trailing);
+            }
+            self.format_exprs(elsif.part.body);
+        }
+
+        if let Some(if_last) = expr.if_last {
+            let else_decors = self.decor_store.consume(if_last.pos);
+            self.break_line();
+            self.dedent();
+            self.put_indent();
+            self.buffer.push_str("else");
+            self.write_trailing_comment(else_decors.trailing);
+            self.indent();
+            self.format_exprs(if_last.body);
+        }
+
+        let end_decors = self.decor_store.consume(expr.end_pos);
+        self.write_leading_decors(end_decors.leading, false, true);
+        self.break_line();
+        self.dedent();
+        self.put_indent();
+        self.buffer.push_str("end");
+        self.write_trailing_comment(end_decors.trailing);
     }
 
     fn write_leading_decors(&mut self, decors: Vec<LineDecor>, trim_start: bool, trim_end: bool) {
