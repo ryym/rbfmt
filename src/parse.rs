@@ -1,5 +1,7 @@
+use std::collections::HashMap;
+
 use crate::fmt;
-use lib_ruby_parser::{source::Comment, Loc, Node, Parser};
+use lib_ruby_parser::{source::Comment, Lexer, Loc, Node, Parser, Token};
 
 pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
     let parser = Parser::new(source.clone(), Default::default());
@@ -11,10 +13,12 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
     let reversed_comments = result.comments.into_iter().rev().collect();
 
     let decor_store = fmt::DecorStore::new();
+    let token_set = TokenSet::new(result.tokens);
 
     let mut builder = FmtNodeBuilder {
         src: source,
         comments: reversed_comments,
+        token_set,
         decor_store,
         position_gen: 0,
         last_pos: fmt::Pos(0),
@@ -36,9 +40,35 @@ pub(crate) struct ParserResult {
 }
 
 #[derive(Debug)]
+struct TokenSet {
+    tokens: Vec<Token>,
+    begin_to_idx: HashMap<usize, usize>,
+}
+
+impl TokenSet {
+    fn new(tokens: Vec<Token>) -> Self {
+        let mut map = HashMap::with_capacity(tokens.len());
+        for (idx, token) in tokens.iter().enumerate() {
+            map.insert(token.loc.begin, idx);
+        }
+        Self {
+            tokens,
+            begin_to_idx: map,
+        }
+    }
+
+    fn token_at(&self, begin: usize) -> Option<&Token> {
+        self.begin_to_idx
+            .get(&begin)
+            .and_then(|i| self.tokens.get(*i))
+    }
+}
+
+#[derive(Debug)]
 struct FmtNodeBuilder {
     src: Vec<u8>,
     comments: Vec<Comment>,
+    token_set: TokenSet,
     decor_store: fmt::DecorStore,
     position_gen: usize,
     last_pos: fmt::Pos,
@@ -78,6 +108,9 @@ impl FmtNodeBuilder {
                 fmt::Node::new(pos, fmt::Kind::Exprs(fmt::Exprs(nodes)))
             }
             Node::If(node) => {
+                let token = self.token_set.token_at(node.keyword_l.begin);
+                let _is_unless = token.unwrap().token_type == Lexer::kUNLESS;
+
                 // Consume decors above the if expression.
                 self.consume_and_store_decors_until(pos, node.expression_l.begin);
 
