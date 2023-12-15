@@ -97,7 +97,7 @@ impl DecorStore {
     }
 
     pub(crate) fn consume(&mut self, pos: Pos) -> DecorSet {
-        self.map.remove(&pos).unwrap_or_else(DecorSet::default)
+        self.map.remove(&pos).unwrap_or_default()
     }
 
     pub(crate) fn append_leading_decors(&mut self, pos: Pos, mut decors: Vec<LineDecor>) {
