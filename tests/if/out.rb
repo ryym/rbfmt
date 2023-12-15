@@ -54,3 +54,38 @@ elsif # elsif
   2 # 2a
   2.0
 end
+
+# --- unless ---
+
+unless true
+  nil
+end
+
+unless true
+  1
+  2
+end
+
+unless true
+end
+
+unless true
+else
+end
+
+unless 1
+  # 0.9
+  1.0
+  # 1.1
+else # else
+  999
+end
+
+unless true
+  nil # a
+
+  # a
+else
+
+  # b
+end

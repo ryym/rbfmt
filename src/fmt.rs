@@ -40,6 +40,7 @@ pub(crate) struct Exprs(pub Vec<Node>);
 
 #[derive(Debug)]
 pub(crate) struct IfExpr {
+    pub is_unless: bool,
     pub if_first: IfPart,
     pub elsifs: Vec<Elsif>,
     pub if_last: Option<Else>,
@@ -47,8 +48,9 @@ pub(crate) struct IfExpr {
 }
 
 impl IfExpr {
-    pub(crate) fn new(if_first: IfPart) -> Self {
+    pub(crate) fn new(is_unless: bool, if_first: IfPart) -> Self {
         Self {
+            is_unless,
             if_first,
             elsifs: vec![],
             if_last: None,
@@ -177,7 +179,11 @@ impl Formatter {
             Kind::Exprs(exprs) => self.format_exprs(exprs),
             Kind::EndDecors => unreachable!("end decors unexpectedly rendered"),
             Kind::IfExpr(node) => {
-                self.buffer.push_str("if ");
+                if node.is_unless {
+                    self.buffer.push_str("unless ");
+                } else {
+                    self.buffer.push_str("if ");
+                }
                 let cond_decors = self.decor_store.consume(node.if_first.cond.pos);
                 self.format(*node.if_first.cond);
                 self.write_trailing_comment(cond_decors.trailing);

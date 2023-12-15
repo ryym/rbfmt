@@ -57,10 +57,14 @@ impl TokenSet {
         }
     }
 
-    fn token_at(&self, begin: usize) -> Option<&Token> {
+    fn try_token_at(&self, begin: usize) -> Option<&Token> {
         self.begin_to_idx
             .get(&begin)
             .and_then(|i| self.tokens.get(*i))
+    }
+
+    fn token_at(&self, begin: usize) -> &Token {
+        self.try_token_at(begin).expect("token must be at {begin}")
     }
 }
 
@@ -108,9 +112,6 @@ impl FmtNodeBuilder {
                 fmt::Node::new(pos, fmt::Kind::Exprs(fmt::Exprs(nodes)))
             }
             Node::If(node) => {
-                let token = self.token_set.token_at(node.keyword_l.begin);
-                let _is_unless = token.unwrap().token_type == Lexer::kUNLESS;
-
                 // Consume decors above the if expression.
                 self.consume_and_store_decors_until(pos, node.expression_l.begin);
 
@@ -128,19 +129,29 @@ impl FmtNodeBuilder {
                 }
 
                 let cond = self.visit(*node.cond);
-                let body = node.if_true.map(|n| self.visit(*n));
 
-                let ifexpr = match (node.else_l, node.if_false, node.end_l) {
+                let if_token = self.token_set.token_at(node.keyword_l.begin);
+                let is_unless = if_token.token_type == Lexer::kUNLESS;
+                let (if_first, if_next) = if is_unless {
+                    (node.if_false, node.if_true)
+                } else {
+                    (node.if_true, node.if_false)
+                };
+
+                let body = if_first.map(|n| self.visit(*n));
+                let ifexpr = match (node.else_l, if_next, node.end_l) {
                     // if...end
                     (None, None, Some(end_l)) => {
                         let if_first = self.wrap_as_exprs(body, Some(end_l.begin));
-                        fmt::IfExpr::new(fmt::IfPart::new(cond, if_first))
+                        let if_part = fmt::IfPart::new(cond, if_first);
+                        fmt::IfExpr::new(is_unless, if_part)
                     }
                     // if...(elsif...|else...)+end
-                    (Some(else_l), if_false, Some(end_l)) => {
+                    (Some(else_l), if_next, Some(end_l)) => {
                         let if_first = self.wrap_as_exprs(body, Some(else_l.begin));
-                        let mut ifexpr = fmt::IfExpr::new(fmt::IfPart::new(cond, if_first));
-                        self.visit_ifelse(if_false, &mut ifexpr, true);
+                        let if_part = fmt::IfPart::new(cond, if_first);
+                        let mut ifexpr = fmt::IfExpr::new(is_unless, if_part);
+                        self.visit_ifelse(if_next, &mut ifexpr, true);
                         ifexpr.end_pos = self.next_pos();
                         self.consume_and_store_decors_until(ifexpr.end_pos, end_l.begin);
                         ifexpr
@@ -168,7 +179,7 @@ impl FmtNodeBuilder {
     fn visit_ifelse(&mut self, node: Option<Box<Node>>, ifexpr: &mut fmt::IfExpr, has_else: bool) {
         let node = node.map(|n| *n);
         match node {
-            // elsif
+            // elsif ("if" only, "unles...elsif" is syntax error)
             Some(Node::If(node)) => {
                 let elsif_pos = self.next_pos();
                 self.last_pos = elsif_pos;
