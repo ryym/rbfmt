@@ -179,12 +179,7 @@ impl Formatter {
         match node.kind {
             Kind::Atom(value) => self.buffer.push_str(&value),
             Kind::Exprs(exprs) => self.format_exprs(exprs),
-            Kind::EndDecors => {
-                let line_len = self.indent + 1; // newline
-                if line_len < self.buffer.len() {
-                    self.buffer.truncate(self.buffer.len() - line_len);
-                }
-            }
+            Kind::EndDecors => unreachable!("end decors unexpectedly rendered"),
             Kind::IfExpr(node) => {
                 self.buffer.push_str("if ");
                 let (_, cond_trailing) = self.decor_store.consume(node.if_first.cond.pos);
@@ -196,8 +191,9 @@ impl Formatter {
                 for elsif in node.elsifs {
                     let (_, elsif_trailing) = self.decor_store.consume(elsif.pos);
                     // self.write_leading_decors(elsif_leading, false, true);
-                    self.dedent();
                     self.break_line();
+                    self.dedent();
+                    self.put_indent();
                     self.buffer.push_str("elsif ");
                     self.write_trailing_comment(elsif_trailing);
                     // todo: write decors around cond
@@ -209,8 +205,9 @@ impl Formatter {
                 if let Some(if_last) = node.if_last {
                     let (_, else_trailing) = self.decor_store.consume(if_last.pos);
                     // self.write_leading_decors(else_leading, false, true);
-                    self.dedent();
                     self.break_line();
+                    self.dedent();
+                    self.put_indent();
                     self.buffer.push_str("else");
                     self.write_trailing_comment(else_trailing);
                     self.indent();
@@ -219,8 +216,9 @@ impl Formatter {
 
                 let (end_leading, end_trailing) = self.decor_store.consume(node.end_pos);
                 self.write_leading_decors(end_leading, false, true);
-                self.dedent();
                 self.break_line();
+                self.dedent();
+                self.put_indent();
                 self.buffer.push_str("end");
                 self.write_trailing_comment(end_trailing);
             }
@@ -235,8 +233,11 @@ impl Formatter {
         for (i, n) in nodes.into_iter().enumerate() {
             let (leading_decors, trailing_comment) = self.decor_store.consume(n.pos);
             self.write_leading_decors(leading_decors, i == 0, n.kind.is_end_decors());
-            self.break_line();
-            self.format(n);
+            if !matches!(n.kind, Kind::EndDecors) {
+                self.break_line();
+                self.put_indent();
+                self.format(n);
+            }
             self.write_trailing_comment(trailing_comment);
         }
     }
@@ -255,6 +256,7 @@ impl Formatter {
                 }
                 LineDecor::Comment(comment) => {
                     self.break_line();
+                    self.put_indent();
                     self.buffer.push_str(&comment.value);
                 }
             }
@@ -278,6 +280,9 @@ impl Formatter {
 
     fn break_line(&mut self) {
         self.buffer.push('\n');
+    }
+
+    fn put_indent(&mut self) {
         let spaces = " ".repeat(self.indent);
         self.buffer.push_str(&spaces);
     }

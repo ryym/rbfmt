@@ -7,6 +7,22 @@ if true
   2
 end
 
+if true
+end
+
+if true
+else
+end
+
+if true
+elsif 1
+end
+
+if true
+elsif true
+else
+end
+
 if 1
   # 0.9
   1.0
@@ -24,13 +40,10 @@ else
 end
 
 if true
-end
+  nil # a
 
-if true
-else
-end
+  # a
+elsif 2
 
-if true
-elsif true
-else
+  # b
 end
