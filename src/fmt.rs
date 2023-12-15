@@ -96,12 +96,8 @@ impl DecorStore {
         }
     }
 
-    pub(crate) fn consume(&mut self, pos: Pos) -> (Vec<LineDecor>, Option<Comment>) {
-        if let Some(decors) = self.map.remove(&pos) {
-            (decors.leading, decors.trailing)
-        } else {
-            (vec![], None)
-        }
+    pub(crate) fn consume(&mut self, pos: Pos) -> DecorSet {
+        self.map.remove(&pos).unwrap_or_else(DecorSet::default)
     }
 
     pub(crate) fn append_leading_decors(&mut self, pos: Pos, mut decors: Vec<LineDecor>) {
@@ -182,20 +178,19 @@ impl Formatter {
             Kind::EndDecors => unreachable!("end decors unexpectedly rendered"),
             Kind::IfExpr(node) => {
                 self.buffer.push_str("if ");
-                let (_, cond_trailing) = self.decor_store.consume(node.if_first.cond.pos);
+                let cond_decors = self.decor_store.consume(node.if_first.cond.pos);
                 self.format(*node.if_first.cond);
-                self.write_trailing_comment(cond_trailing);
+                self.write_trailing_comment(cond_decors.trailing);
                 self.indent();
                 self.format_exprs(node.if_first.body);
 
                 for elsif in node.elsifs {
-                    let (_, elsif_trailing) = self.decor_store.consume(elsif.pos);
-                    // self.write_leading_decors(elsif_leading, false, true);
+                    let elsif_decors = self.decor_store.consume(elsif.pos);
                     self.break_line();
                     self.dedent();
                     self.put_indent();
                     self.buffer.push_str("elsif ");
-                    self.write_trailing_comment(elsif_trailing);
+                    self.write_trailing_comment(elsif_decors.trailing);
                     // todo: write decors around cond
                     self.format(*elsif.part.cond);
                     self.indent();
@@ -203,24 +198,23 @@ impl Formatter {
                 }
 
                 if let Some(if_last) = node.if_last {
-                    let (_, else_trailing) = self.decor_store.consume(if_last.pos);
-                    // self.write_leading_decors(else_leading, false, true);
+                    let else_decors = self.decor_store.consume(if_last.pos);
                     self.break_line();
                     self.dedent();
                     self.put_indent();
                     self.buffer.push_str("else");
-                    self.write_trailing_comment(else_trailing);
+                    self.write_trailing_comment(else_decors.trailing);
                     self.indent();
                     self.format_exprs(if_last.body);
                 }
 
-                let (end_leading, end_trailing) = self.decor_store.consume(node.end_pos);
-                self.write_leading_decors(end_leading, false, true);
+                let end_decors = self.decor_store.consume(node.end_pos);
+                self.write_leading_decors(end_decors.leading, false, true);
                 self.break_line();
                 self.dedent();
                 self.put_indent();
                 self.buffer.push_str("end");
-                self.write_trailing_comment(end_trailing);
+                self.write_trailing_comment(end_decors.trailing);
             }
         }
     }
@@ -231,14 +225,14 @@ impl Formatter {
             return;
         }
         for (i, n) in nodes.into_iter().enumerate() {
-            let (leading_decors, trailing_comment) = self.decor_store.consume(n.pos);
-            self.write_leading_decors(leading_decors, i == 0, n.kind.is_end_decors());
+            let decors = self.decor_store.consume(n.pos);
+            self.write_leading_decors(decors.leading, i == 0, n.kind.is_end_decors());
             if !matches!(n.kind, Kind::EndDecors) {
                 self.break_line();
                 self.put_indent();
                 self.format(n);
             }
-            self.write_trailing_comment(trailing_comment);
+            self.write_trailing_comment(decors.trailing);
         }
     }
 
