@@ -27,6 +27,7 @@ pub(crate) enum Kind {
     Exprs(Exprs),
     EndDecors,
     IfExpr(IfExpr),
+    MethodChain(MethodChain),
 }
 
 impl Kind {
@@ -84,6 +85,19 @@ impl IfPart {
             body,
         }
     }
+}
+
+#[derive(Debug)]
+pub(crate) struct MethodCall {
+    pub pos: Pos,
+    pub name: String,
+    pub args: Vec<Node>,
+}
+
+#[derive(Debug)]
+pub(crate) struct MethodChain {
+    pub receiver: Option<Box<Node>>,
+    pub calls: Vec<MethodCall>,
 }
 
 #[derive(Debug)]
@@ -179,6 +193,7 @@ impl Formatter {
             Kind::Exprs(exprs) => self.format_exprs(exprs),
             Kind::EndDecors => unreachable!("end decors unexpectedly rendered"),
             Kind::IfExpr(expr) => self.format_if_expr(expr),
+            Kind::MethodChain(chain) => self.format_method_chain(chain),
         }
     }
 
@@ -256,6 +271,54 @@ impl Formatter {
         self.put_indent();
         self.buffer.push_str("end");
         self.write_trailing_comment(end_decors.trailing);
+    }
+
+    fn format_method_chain(&mut self, chain: MethodChain) {
+        if let Some(recv) = chain.receiver {
+            let recv_decor = self.decor_store.consume(recv.pos);
+            self.format(*recv);
+            self.buffer.push('.');
+            if recv_decor.trailing.is_some() {
+                self.write_trailing_comment(recv_decor.trailing);
+                self.break_line();
+                self.put_indent();
+            }
+        }
+
+        let last_idx = chain.calls.len() - 1;
+        let mut is_flat = true;
+        for (i, call) in chain.calls.into_iter().enumerate() {
+            let call_decor = self.decor_store.consume(call.pos);
+            if !call_decor.leading.is_empty() {
+                if is_flat {
+                    self.indent();
+                    is_flat = false;
+                }
+                self.write_leading_decors(call_decor.leading, false, false);
+                self.break_line();
+                self.put_indent();
+            }
+            self.buffer.push_str(&call.name);
+
+            if !call.args.is_empty() {
+                self.buffer.push('(');
+                for (i, arg) in call.args.into_iter().enumerate() {
+                    if i > 0 {
+                        self.buffer.push_str(", ");
+                    }
+                    self.format(arg);
+                }
+                self.buffer.push(')');
+            }
+            if i < last_idx {
+                self.buffer.push('.');
+            }
+
+            self.write_trailing_comment(call_decor.trailing);
+        }
+        if !is_flat {
+            self.dedent();
+        }
     }
 
     fn write_leading_decors(&mut self, decors: Vec<LineDecor>, trim_start: bool, trim_end: bool) {

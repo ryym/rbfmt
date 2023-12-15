@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
 use crate::fmt;
-use lib_ruby_parser::{source::Comment, Lexer, Loc, Node, Parser, Token};
+use lib_ruby_parser::{nodes::Send, source::Comment, Lexer, Loc, Node, Parser, Token};
 
 pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
     let parser = Parser::new(source.clone(), Default::default());
     let mut result = parser.do_parse();
     // dbg!(&result.ast);
+    // dbg!(&result.comments);
 
     // Sort the comments by their locations, because they are unordered when there is a heredoc.
     result.comments.sort_by_key(|c| c.location.begin);
@@ -161,6 +162,11 @@ impl FmtNodeBuilder {
 
                 fmt::Node::new(pos, fmt::Kind::IfExpr(ifexpr))
             }
+            Node::Send(node) => {
+                self.consume_and_store_decors_until(pos, node.expression_l.begin);
+                let chain = self.visit_inner_send(node);
+                fmt::Node::new(pos, fmt::Kind::MethodChain(chain))
+            }
 
             _ => {
                 todo!("{}", format!("convert node {:?}", node));
@@ -208,6 +214,43 @@ impl FmtNodeBuilder {
             }
             _ => {}
         }
+    }
+
+    fn visit_inner_send(&mut self, send: Send) -> fmt::MethodChain {
+        let mut chain = match send.recv {
+            Some(recv) => match *recv {
+                Node::Send(send) => self.visit_inner_send(send),
+                _ => {
+                    let recv = self.visit(*recv);
+                    fmt::MethodChain {
+                        receiver: Some(Box::new(recv)),
+                        calls: vec![],
+                    }
+                }
+            },
+            None => fmt::MethodChain {
+                receiver: None,
+                calls: vec![],
+            },
+        };
+
+        let call_pos = self.next_pos();
+        if let Some(selector_l) = send.selector_l {
+            self.consume_and_store_decors_until(call_pos, selector_l.begin);
+        } else {
+            // foo.\n#hoge\n(2)
+        }
+
+        let args = send.args.into_iter().map(|n| self.visit(n)).collect();
+        chain.calls.push(fmt::MethodCall {
+            pos: call_pos,
+            name: send.method_name,
+            args,
+        });
+
+        self.last_pos = call_pos;
+        self.last_loc_end = send.expression_l.end;
+        chain
     }
 
     // Wrap the given node as Exprs to handle decors around it.
