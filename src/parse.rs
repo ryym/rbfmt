@@ -4,14 +4,11 @@ use std::collections::HashMap;
 
 pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
     let parser = Parser::new(source.clone(), Default::default());
-    let mut result = parser.do_parse();
+    let result = parser.do_parse();
     // dbg!(&result.ast);
     // dbg!(&result.comments);
 
-    // Sort the comments by their locations, because they are unordered when there is a heredoc.
-    result.comments.sort_by_key(|c| c.location.begin);
     let reversed_comments = result.comments.into_iter().rev().collect();
-
     let decor_store = fmt::DecorStore::new();
     let token_set = TokenSet::new(result.tokens);
 
