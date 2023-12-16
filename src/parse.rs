@@ -93,6 +93,11 @@ impl FmtNodeBuilder {
         fmt::Pos(self.position_gen)
     }
 
+    fn src_string_lossy(&self, loc: &Loc) -> String {
+        let src = &self.src[loc.to_range()];
+        String::from_utf8_lossy(src).to_string()
+    }
+
     fn visit(&mut self, node: Node) -> fmt::Node {
         let pos = self.next_pos();
         let node_end = node.expression().end;
@@ -205,10 +210,8 @@ impl FmtNodeBuilder {
         let (value_range, begin, end) = match (str.begin_l, str.end_l) {
             (Some(begin_l), Some(end_l)) => {
                 let value_range = begin_l.end..end_l.begin;
-                let begin = &self.src[begin_l.to_range()];
-                let end = &self.src[end_l.to_range()];
-                let begin = String::from_utf8_lossy(begin).to_string();
-                let end = String::from_utf8_lossy(end).to_string();
+                let begin = self.src_string_lossy(&begin_l);
+                let end = self.src_string_lossy(&end_l);
                 (value_range, Some(begin), Some(end))
             }
             _ => (str.expression_l.to_range(), None, None),
@@ -251,12 +254,8 @@ impl FmtNodeBuilder {
             }
         }
 
-        let begin = dstr
-            .begin_l
-            .map(|l| String::from_utf8_lossy(&self.src[l.to_range()]).to_string());
-        let end = dstr
-            .end_l
-            .map(|l| String::from_utf8_lossy(&self.src[l.to_range()]).to_string());
+        let begin = dstr.begin_l.map(|l| self.src_string_lossy(&l));
+        let end = dstr.end_l.map(|l| self.src_string_lossy(&l));
         fmt::DynStr { begin, parts, end }
     }
 
@@ -474,9 +473,9 @@ impl FmtNodeBuilder {
     }
 
     fn get_comment_content(&self, comment: &Comment) -> fmt::Comment {
-        let comment_bytes = &self.src[comment.location.begin..comment.location.end];
         // Ignore non-UTF8 source code for now.
-        let comment_str = String::from_utf8_lossy(comment_bytes)
+        let comment_str = self
+            .src_string_lossy(&comment.location)
             .trim_end()
             .to_string();
         fmt::Comment { value: comment_str }
