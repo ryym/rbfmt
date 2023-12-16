@@ -90,9 +90,25 @@ impl IfPart {
 #[derive(Debug)]
 pub(crate) struct MethodCall {
     pub pos: Pos,
+    pub chain_type: ChainType,
     pub name: String,
     pub args: Vec<Node>,
     pub block: Option<MethodBlock>,
+}
+
+#[derive(Debug)]
+pub(crate) enum ChainType {
+    Normal,
+    SafeNav,
+}
+
+impl ChainType {
+    pub fn dot(&self) -> &'static str {
+        match self {
+            Self::Normal => ".",
+            Self::SafeNav => "&.",
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -308,7 +324,7 @@ impl Formatter {
             }
             has_receiver = has_receiver || i > 0;
             if has_receiver {
-                self.buffer.push('.');
+                self.buffer.push_str(call.chain_type.dot());
             }
             self.buffer.push_str(&call.name);
 

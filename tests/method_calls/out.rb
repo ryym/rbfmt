@@ -1,5 +1,7 @@
 1.foo(2).bar.baz
 
+a&.b.c&.d
+
 # for now disallow empty lines within method chain
 foo(1) #bbb
   # bar
@@ -26,13 +28,13 @@ end
 foo do # do
 end
 
-a {}.b(1).c(1, 2) do
+a {}.b(1)&.c(1, 2) do
   d(e {}) {}
 end.f
 
 foo.bar
   # baz
-  .baz.a do
+  &.baz.a do
     2
   end.b.c
   # d

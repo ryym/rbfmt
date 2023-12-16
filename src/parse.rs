@@ -163,12 +163,17 @@ impl FmtNodeBuilder {
             }
             Node::Send(node) => {
                 self.consume_and_store_decors_until(pos, node.expression_l.begin);
-                let chain = self.visit_inner_send(node);
+                let chain = self.visit_send(node);
+                fmt::Node::new(pos, fmt::Kind::MethodChain(chain))
+            }
+            Node::CSend(node) => {
+                self.consume_and_store_decors_until(pos, node.expression_l.begin);
+                let chain = self.visit_csend(node);
                 fmt::Node::new(pos, fmt::Kind::MethodChain(chain))
             }
             Node::Block(node) => {
                 self.consume_and_store_decors_until(pos, node.expression_l.begin);
-                let chain = self.visit_inner_block(node);
+                let chain = self.visit_block(node);
                 fmt::Node::new(pos, fmt::Kind::MethodChain(chain))
             }
 
@@ -220,11 +225,35 @@ impl FmtNodeBuilder {
         }
     }
 
-    fn visit_inner_send(&mut self, send: nodes::Send) -> fmt::MethodChain {
+    fn visit_send(&mut self, send: nodes::Send) -> fmt::MethodChain {
+        self.visit_any_send(send, fmt::ChainType::Normal)
+    }
+
+    fn visit_csend(&mut self, csend: nodes::CSend) -> fmt::MethodChain {
+        let send = nodes::Send {
+            recv: Some(csend.recv),
+            method_name: csend.method_name,
+            args: csend.args,
+            dot_l: Some(csend.dot_l),
+            selector_l: csend.selector_l,
+            begin_l: csend.begin_l,
+            end_l: csend.end_l,
+            operator_l: csend.operator_l,
+            expression_l: csend.expression_l,
+        };
+        self.visit_any_send(send, fmt::ChainType::SafeNav)
+    }
+
+    fn visit_any_send(
+        &mut self,
+        send: nodes::Send,
+        chain_type: fmt::ChainType,
+    ) -> fmt::MethodChain {
         let mut chain = match send.recv {
             Some(recv) => match *recv {
-                Node::Send(send) => self.visit_inner_send(send),
-                Node::Block(block) => self.visit_inner_block(block),
+                Node::Send(send) => self.visit_send(send),
+                Node::CSend(csend) => self.visit_csend(csend),
+                Node::Block(block) => self.visit_block(block),
                 _ => {
                     let recv = self.visit(*recv);
                     fmt::MethodChain {
@@ -249,6 +278,7 @@ impl FmtNodeBuilder {
         let args = send.args.into_iter().map(|n| self.visit(n)).collect();
         chain.calls.push(fmt::MethodCall {
             pos: call_pos,
+            chain_type,
             name: send.method_name,
             args,
             block: None,
@@ -259,12 +289,12 @@ impl FmtNodeBuilder {
         chain
     }
 
-    fn visit_inner_block(&mut self, block: nodes::Block) -> fmt::MethodChain {
-        let send = match *block.call {
-            Node::Send(send) => send,
+    fn visit_block(&mut self, block: nodes::Block) -> fmt::MethodChain {
+        let mut chain = match *block.call {
+            Node::Send(send) => self.visit_send(send),
+            Node::CSend(csend) => self.visit_csend(csend),
             _ => panic!("unexpected block call node: {:?}", block.call),
         };
-        let mut chain = self.visit_inner_send(send);
 
         let block_pos = self.next_pos();
         self.last_pos = block_pos;
