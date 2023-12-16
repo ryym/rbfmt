@@ -282,18 +282,18 @@ impl Formatter {
     }
 
     fn format_method_chain(&mut self, chain: MethodChain) {
+        let mut has_receiver = false;
         if let Some(recv) = chain.receiver {
             let recv_decor = self.decor_store.consume(recv.pos);
             self.format(*recv);
-            self.buffer.push('.');
             if recv_decor.trailing.is_some() {
                 self.write_trailing_comment(recv_decor.trailing);
                 self.break_line();
                 self.put_indent();
             }
+            has_receiver = true;
         }
 
-        let last_idx = chain.calls.len() - 1;
         let mut is_flat = true;
         for (i, call) in chain.calls.into_iter().enumerate() {
             let call_decor = self.decor_store.consume(call.pos);
@@ -302,9 +302,13 @@ impl Formatter {
                     self.indent();
                     is_flat = false;
                 }
-                self.write_leading_decors(call_decor.leading, false, false);
+                self.write_leading_decors(call_decor.leading, true, true);
                 self.break_line();
                 self.put_indent();
+            }
+            has_receiver = has_receiver || i > 0;
+            if has_receiver {
+                self.buffer.push('.');
             }
             self.buffer.push_str(&call.name);
 
@@ -332,9 +336,6 @@ impl Formatter {
                     self.put_indent();
                     self.buffer.push_str("end");
                 }
-            }
-            if i < last_idx {
-                self.buffer.push('.');
             }
 
             self.write_trailing_comment(call_decor.trailing);
