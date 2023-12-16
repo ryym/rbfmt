@@ -15,6 +15,10 @@ false
 'abc\n'
 "abc\n"
 
+# Here document literals
+<<HERE
+HERE
+
 # Non-local variables
 @instance_var
 @@class_var

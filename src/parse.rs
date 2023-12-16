@@ -10,6 +10,7 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
 
     let reversed_comments = result.comments.into_iter().rev().collect();
     let decor_store = fmt::DecorStore::new();
+    let heredoc_map = HashMap::new();
     let token_set = TokenSet::new(result.tokens);
 
     let mut builder = FmtNodeBuilder {
@@ -17,16 +18,19 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
         comments: reversed_comments,
         token_set,
         decor_store,
+        heredoc_map,
         position_gen: 0,
         last_pos: fmt::Pos(0),
         last_loc_end: 0,
     };
     let fmt_node = builder.build_fmt_node(result.ast);
     // dbg!(&fmt_node);
+    // dbg!(&builder.heredoc_map);
     // dbg!(&builder.decor_store);
     Some(ParserResult {
         node: fmt_node,
         decor_store: builder.decor_store,
+        heredoc_map: builder.heredoc_map,
     })
 }
 
@@ -34,6 +38,7 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
 pub(crate) struct ParserResult {
     pub node: fmt::Node,
     pub decor_store: fmt::DecorStore,
+    pub heredoc_map: fmt::HeredocMap,
 }
 
 #[derive(Debug)]
@@ -71,6 +76,7 @@ struct FmtNodeBuilder {
     comments: Vec<Comment>,
     token_set: TokenSet,
     decor_store: fmt::DecorStore,
+    heredoc_map: fmt::HeredocMap,
     position_gen: usize,
     last_pos: fmt::Pos,
     last_loc_end: usize,
@@ -188,6 +194,47 @@ impl FmtNodeBuilder {
                 let chain = self.visit_block(node);
                 fmt::Node::new(pos, fmt::Kind::MethodChain(chain))
             }
+            Node::Heredoc(node) => {
+                self.consume_and_store_decors_until(pos, node.expression_l.begin);
+
+                let indent_mode_char = self.src[node.expression_l.begin + 2];
+                let (indent_mode, mode_size) = match indent_mode_char {
+                    b'-' => (fmt::HeredocIndentMode::EndIndented, 3),
+                    b'~' => (fmt::HeredocIndentMode::AllIndented, 3),
+                    _ => (fmt::HeredocIndentMode::None, 2),
+                };
+                let id = self.src_string_lossy(&Loc {
+                    begin: node.expression_l.begin + mode_size,
+                    end: node.expression_l.end,
+                });
+
+                self.last_loc_end = self
+                    .next_newline_after(node.expression_l.end)
+                    .expect("newline must exist after heredoc");
+                let parts = node
+                    .parts
+                    .into_iter()
+                    .map(|n| match n {
+                        Node::Str(str) => {
+                            let str = self.visit_str(str);
+                            fmt::HeredocPart::Str(str)
+                        }
+                        Node::Begin(begin) => {
+                            let (exprs_pos, exprs) = self.visit_begin_in_str(begin);
+                            fmt::HeredocPart::Exprs(exprs_pos, exprs)
+                        }
+                        _ => panic!("unexpected heredoc part: {:?}", n),
+                    })
+                    .collect();
+
+                let heredoc = fmt::Heredoc {
+                    id,
+                    indent_mode,
+                    parts,
+                };
+                self.heredoc_map.insert(pos, heredoc);
+                fmt::Node::new(pos, fmt::Kind::HeredocBegin)
+            }
 
             _ => {
                 todo!("{}", format!("convert node {:?}", node));
@@ -234,17 +281,7 @@ impl FmtNodeBuilder {
                     self.last_loc_end = node_end;
                 }
                 Node::Begin(node) => {
-                    let exprs_pos = self.next_pos();
-                    self.last_pos = exprs_pos;
-                    let exprs_end = node.expression_l.end;
-                    let mut exprs = self.visit_begin(node);
-                    // The Begin node at a string interpolation spans to the closing brace,
-                    // so it includes the decors at the end.
-                    if let Some(end_decors) = self.consume_decors_until(exprs_end) {
-                        let end_node = fmt::Node::new(self.next_pos(), fmt::Kind::EndDecors);
-                        self.store_decors_to(self.last_pos, end_node.pos, end_decors);
-                        exprs.0.push(end_node);
-                    }
+                    let (exprs_pos, exprs) = self.visit_begin_in_str(node);
                     parts.push(fmt::DynStrPart::Exprs(exprs_pos, exprs));
                 }
                 _ => panic!("unexpected string interpolation node: {:?}", part),
@@ -254,6 +291,21 @@ impl FmtNodeBuilder {
         let begin = dstr.begin_l.map(|l| self.src_string_lossy(&l));
         let end = dstr.end_l.map(|l| self.src_string_lossy(&l));
         fmt::DynStr { begin, parts, end }
+    }
+
+    fn visit_begin_in_str(&mut self, begin: nodes::Begin) -> (fmt::Pos, fmt::Exprs) {
+        let exprs_pos = self.next_pos();
+        self.last_pos = exprs_pos;
+        let exprs_end = begin.expression_l.end;
+        let mut exprs = self.visit_begin(begin);
+        // The Begin node at a string interpolation spans to the closing brace,
+        // so it includes the decors at the end.
+        if let Some(end_decors) = self.consume_decors_until(exprs_end) {
+            let end_node = fmt::Node::new(self.next_pos(), fmt::Kind::EndDecors);
+            self.store_decors_to(self.last_pos, end_node.pos, end_decors);
+            exprs.0.push(end_node);
+        };
+        (exprs_pos, exprs)
     }
 
     fn visit_begin(&mut self, begin: nodes::Begin) -> fmt::Exprs {
@@ -526,5 +578,19 @@ impl FmtNodeBuilder {
             }
         }
         !has_char_between_last_newline
+    }
+
+    fn next_newline_after(&self, begin: usize) -> Option<usize> {
+        let mut i = begin + 1;
+        loop {
+            if let Some(b) = self.src.get(i) {
+                if *b == b'\n' {
+                    return Some(i);
+                }
+                i += 1;
+            } else {
+                return None;
+            }
+        }
     }
 }

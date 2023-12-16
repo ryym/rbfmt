@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Pos(pub usize);
@@ -26,6 +26,7 @@ pub(crate) enum Kind {
     Atom(String),
     Str(Str),
     DynStr(DynStr),
+    HeredocBegin,
     Exprs(Exprs),
     EndDecors,
     IfExpr(IfExpr),
@@ -56,6 +57,37 @@ pub(crate) struct DynStr {
 pub(crate) enum DynStrPart {
     Str(Str),
     DynStr(DynStr),
+    Exprs(Pos, Exprs),
+}
+
+#[derive(Debug)]
+pub(crate) struct Heredoc {
+    pub id: String,
+    pub indent_mode: HeredocIndentMode,
+    #[allow(unused)]
+    pub parts: Vec<HeredocPart>,
+}
+
+#[derive(Debug)]
+pub(crate) enum HeredocIndentMode {
+    None,
+    EndIndented,
+    AllIndented,
+}
+
+impl HeredocIndentMode {
+    fn begin_symbols(&self) -> &'static str {
+        match self {
+            Self::None => "<<",
+            Self::EndIndented => "<<-",
+            Self::AllIndented => "<<~",
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum HeredocPart {
+    Str(Str),
     Exprs(Pos, Exprs),
 }
 
@@ -211,10 +243,14 @@ pub(crate) enum LineDecor {
     Comment(Comment),
 }
 
-pub(crate) fn format(node: Node, decor_store: DecorStore) -> String {
+pub(crate) type HeredocMap = HashMap<Pos, Heredoc>;
+
+pub(crate) fn format(node: Node, decor_store: DecorStore, heredoc_map: HeredocMap) -> String {
     let mut formatter = Formatter {
         buffer: String::new(),
         decor_store,
+        heredoc_map,
+        heredoc_queue: VecDeque::new(),
         indent: 0,
     };
     formatter.format(node);
@@ -230,6 +266,8 @@ pub(crate) fn format(node: Node, decor_store: DecorStore) -> String {
 struct Formatter {
     buffer: String,
     decor_store: DecorStore,
+    heredoc_map: HeredocMap,
+    heredoc_queue: VecDeque<Pos>,
     indent: usize,
 }
 
@@ -239,6 +277,7 @@ impl Formatter {
             Kind::Atom(value) => self.buffer.push_str(&value),
             Kind::Str(str) => self.format_str(str),
             Kind::DynStr(dstr) => self.format_dyn_str(dstr),
+            Kind::HeredocBegin => self.format_heredoc_begin(node.pos),
             Kind::Exprs(exprs) => self.format_exprs(exprs),
             Kind::EndDecors => unreachable!("end decors unexpectedly rendered"),
             Kind::IfExpr(expr) => self.format_if_expr(expr),
@@ -294,6 +333,13 @@ impl Formatter {
         if let Some(end) = dstr.end {
             self.buffer.push_str(&end);
         }
+    }
+
+    fn format_heredoc_begin(&mut self, pos: Pos) {
+        let heredoc = self.heredoc_map.get(&pos).expect("heredoc must exist");
+        self.buffer.push_str(heredoc.indent_mode.begin_symbols());
+        self.buffer.push_str(&heredoc.id);
+        self.heredoc_queue.push_back(pos);
     }
 
     fn format_exprs(&mut self, exprs: Exprs) {
@@ -479,6 +525,11 @@ impl Formatter {
 
     fn break_line(&mut self) {
         self.buffer.push('\n');
+        while let Some(pos) = self.heredoc_queue.pop_front() {
+            let heredoc = self.heredoc_map.get(&pos).expect("heredoc must exist");
+            self.buffer.push_str(&heredoc.id);
+            self.buffer.push('\n');
+        }
     }
 
     fn put_indent(&mut self) {
