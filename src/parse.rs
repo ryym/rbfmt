@@ -1,11 +1,6 @@
-use std::collections::HashMap;
-
 use crate::fmt;
-use lib_ruby_parser::{
-    nodes::{Block, Send},
-    source::Comment,
-    Lexer, Loc, Node, Parser, Token,
-};
+use lib_ruby_parser::{nodes, source::Comment, Lexer, Loc, Node, Parser, Token};
+use std::collections::HashMap;
 
 pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
     let parser = Parser::new(source.clone(), Default::default());
@@ -225,7 +220,7 @@ impl FmtNodeBuilder {
         }
     }
 
-    fn visit_inner_send(&mut self, send: Send) -> fmt::MethodChain {
+    fn visit_inner_send(&mut self, send: nodes::Send) -> fmt::MethodChain {
         let mut chain = match send.recv {
             Some(recv) => match *recv {
                 Node::Send(send) => self.visit_inner_send(send),
@@ -264,7 +259,7 @@ impl FmtNodeBuilder {
         chain
     }
 
-    fn visit_inner_block(&mut self, block: Block) -> fmt::MethodChain {
+    fn visit_inner_block(&mut self, block: nodes::Block) -> fmt::MethodChain {
         let send = match *block.call {
             Node::Send(send) => send,
             _ => panic!("unexpected block call node: {:?}", block.call),
