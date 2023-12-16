@@ -7,7 +7,9 @@ foo(1). #bbb
 
   # bar
 
-  bar # bar2
+  # bar2
+
+  bar # bar3
   # baz
   .baz
 

@@ -5,7 +5,8 @@ a&.b.c&.d
 # for now disallow empty lines within method chain
 foo(1) #bbb
   # bar
-  .bar # bar2
+  # bar2
+  .bar # bar3
   # baz
   .baz
 

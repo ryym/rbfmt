@@ -313,12 +313,17 @@ impl Formatter {
         let mut is_flat = true;
         for (i, call) in chain.calls.into_iter().enumerate() {
             let call_decor = self.decor_store.consume(call.pos);
-            if !call_decor.leading.is_empty() {
+            let call_leading = call_decor
+                .leading
+                .into_iter()
+                .filter(|d| matches!(d, LineDecor::Comment(_)))
+                .collect::<Vec<_>>();
+            if !call_leading.is_empty() {
                 if is_flat {
                     self.indent();
                     is_flat = false;
                 }
-                self.write_leading_decors(call_decor.leading, true, true);
+                self.write_leading_decors(call_leading, true, true);
                 self.break_line();
                 self.put_indent();
             }
