@@ -431,17 +431,19 @@ impl FmtNodeBuilder {
 
         // Find the first comment. It may be a trailing comment of the last node.
         match self.comments.last() {
-            Some(comment) if comment.location.begin <= end => {
-                let (comment_begin, comment_end) = (comment.location.begin, comment.location.end);
-                let fmt_comment = self.get_comment_content(comment);
-                if self.is_at_line_start(comment_begin) {
-                    self.consume_empty_lines_until(comment_begin, &mut line_decors);
-                    line_decors.push(fmt::LineDecor::Comment(fmt_comment));
-                } else {
-                    trailing_comment = Some(fmt_comment);
+            Some(comment) => {
+                if (self.last_loc_end..=end).contains(&comment.location.begin) {
+                    let comment_range = comment.location.to_range();
+                    let fmt_comment = self.get_comment_content(comment);
+                    if self.is_at_line_start(comment_range.start) {
+                        self.consume_empty_lines_until(comment_range.start, &mut line_decors);
+                        line_decors.push(fmt::LineDecor::Comment(fmt_comment));
+                    } else {
+                        trailing_comment = Some(fmt_comment);
+                    }
+                    self.last_loc_end = comment_range.end - 1;
+                    self.comments.pop();
                 }
-                self.last_loc_end = comment_end - 1;
-                self.comments.pop();
             }
             _ => {}
         };
@@ -450,7 +452,13 @@ impl FmtNodeBuilder {
         if !line_decors.is_empty() || trailing_comment.is_some() {
             loop {
                 let comment = match self.comments.last() {
-                    Some(comment) if comment.location.begin <= end => comment,
+                    Some(comment) => {
+                        if (self.last_loc_end..=end).contains(&comment.location.begin) {
+                            comment
+                        } else {
+                            break;
+                        }
+                    }
                     _ => break,
                 };
                 let fmt_comment = self.get_comment_content(comment);
