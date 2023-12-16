@@ -24,6 +24,7 @@ impl Node {
 #[derive(Debug)]
 pub(crate) enum Kind {
     Atom(String),
+    Str(Str),
     Exprs(Exprs),
     EndDecors,
     IfExpr(IfExpr),
@@ -34,6 +35,13 @@ impl Kind {
     fn is_end_decors(&self) -> bool {
         matches!(self, Self::EndDecors)
     }
+}
+
+#[derive(Debug)]
+pub(crate) struct Str {
+    pub begin: Option<String>,
+    pub value: Vec<u8>,
+    pub end: Option<String>,
 }
 
 #[derive(Debug)]
@@ -214,10 +222,23 @@ impl Formatter {
     fn format(&mut self, node: Node) {
         match node.kind {
             Kind::Atom(value) => self.buffer.push_str(&value),
+            Kind::Str(str) => self.format_str(str),
             Kind::Exprs(exprs) => self.format_exprs(exprs),
             Kind::EndDecors => unreachable!("end decors unexpectedly rendered"),
             Kind::IfExpr(expr) => self.format_if_expr(expr),
             Kind::MethodChain(chain) => self.format_method_chain(chain),
+        }
+    }
+
+    fn format_str(&mut self, str: Str) {
+        // Ignore non-UTF8 source code for now.
+        let value = String::from_utf8_lossy(&str.value);
+        if let Some(begin) = str.begin {
+            self.buffer.push_str(&begin);
+        }
+        self.buffer.push_str(&value);
+        if let Some(end) = str.end {
+            self.buffer.push_str(&end);
         }
     }
 

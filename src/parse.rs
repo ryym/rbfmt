@@ -107,6 +107,23 @@ impl FmtNodeBuilder {
             Node::Ivar(node) => self.parse_atom(&node.expression_l, pos, node.name),
             Node::Cvar(node) => self.parse_atom(&node.expression_l, pos, node.name),
             Node::Gvar(node) => self.parse_atom(&node.expression_l, pos, node.name),
+            Node::Str(node) => {
+                self.consume_and_store_decors_until(pos, node.expression_l.begin);
+                let (value_range, begin, end) = match (node.begin_l, node.end_l) {
+                    (Some(begin_l), Some(end_l)) => {
+                        let value_range = begin_l.end..end_l.begin;
+                        let begin = &self.src[begin_l.to_range()];
+                        let end = &self.src[end_l.to_range()];
+                        let begin = String::from_utf8_lossy(begin).to_string();
+                        let end = String::from_utf8_lossy(end).to_string();
+                        (value_range, Some(begin), Some(end))
+                    }
+                    _ => (node.expression_l.to_range(), None, None),
+                };
+                let value = self.src[value_range].to_vec();
+                let str = fmt::Str { begin, value, end };
+                fmt::Node::new(pos, fmt::Kind::Str(str))
+            }
             Node::Begin(node) => {
                 let nodes = node.statements.into_iter().map(|n| self.visit(n)).collect();
                 fmt::Node::new(pos, fmt::Kind::Exprs(fmt::Exprs(nodes)))

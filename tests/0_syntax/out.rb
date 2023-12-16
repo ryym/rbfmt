@@ -11,6 +11,10 @@ false
 2r
 3i
 
+# String literals
+'abc\n'
+"abc\n"
+
 # Non-local variables
 @instance_var
 @@class_var
