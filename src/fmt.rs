@@ -182,17 +182,19 @@ pub(crate) struct MethodChain {
 #[derive(Debug)]
 pub(crate) struct DecorStore {
     map: HashMap<Pos, DecorSet>,
+    empty_decors: DecorSet,
 }
 
 impl DecorStore {
     pub(crate) fn new() -> Self {
         Self {
             map: HashMap::new(),
+            empty_decors: DecorSet::default(),
         }
     }
 
-    pub(crate) fn consume(&mut self, pos: Pos) -> DecorSet {
-        self.map.remove(&pos).unwrap_or_default()
+    pub(crate) fn get(&self, pos: &Pos) -> &DecorSet {
+        self.map.get(pos).unwrap_or(&self.empty_decors)
     }
 
     pub(crate) fn append_leading_decors(&mut self, pos: Pos, mut decors: Vec<LineDecor>) {
@@ -243,17 +245,47 @@ pub(crate) enum LineDecor {
     Comment(Comment),
 }
 
+#[derive(Debug)]
+enum EmptyLineHandling {
+    Trim { begin: bool, end: bool },
+    Skip,
+}
+
+impl EmptyLineHandling {
+    fn trim_begin() -> Self {
+        Self::Trim {
+            begin: true,
+            end: false,
+        }
+    }
+
+    fn trim_end() -> Self {
+        Self::Trim {
+            begin: false,
+            end: true,
+        }
+    }
+}
+
 pub(crate) type HeredocMap = HashMap<Pos, Heredoc>;
 
+#[derive(Debug)]
+struct FormatContext {
+    decor_store: DecorStore,
+    heredoc_map: HeredocMap,
+}
+
 pub(crate) fn format(node: Node, decor_store: DecorStore, heredoc_map: HeredocMap) -> String {
-    let mut formatter = Formatter {
-        buffer: String::new(),
+    let ctx = FormatContext {
         decor_store,
         heredoc_map,
+    };
+    let mut formatter = Formatter {
+        buffer: String::new(),
         heredoc_queue: VecDeque::new(),
         indent: 0,
     };
-    formatter.format(node);
+    formatter.format(&node, &ctx);
     if formatter.buffer.is_empty() {
         formatter.buffer
     } else {
@@ -265,44 +297,42 @@ pub(crate) fn format(node: Node, decor_store: DecorStore, heredoc_map: HeredocMa
 #[derive(Debug)]
 struct Formatter {
     buffer: String,
-    decor_store: DecorStore,
-    heredoc_map: HeredocMap,
     heredoc_queue: VecDeque<Pos>,
     indent: usize,
 }
 
 impl Formatter {
-    fn format(&mut self, node: Node) {
-        match node.kind {
-            Kind::Atom(value) => self.buffer.push_str(&value),
+    fn format(&mut self, node: &Node, ctx: &FormatContext) {
+        match &node.kind {
+            Kind::Atom(value) => self.buffer.push_str(value),
             Kind::Str(str) => self.format_str(str),
-            Kind::DynStr(dstr) => self.format_dyn_str(dstr),
-            Kind::HeredocBegin => self.format_heredoc_begin(node.pos),
-            Kind::Exprs(exprs) => self.format_exprs(exprs),
+            Kind::DynStr(dstr) => self.format_dyn_str(dstr, ctx),
+            Kind::HeredocBegin => self.format_heredoc_begin(node.pos, ctx),
+            Kind::Exprs(exprs) => self.format_exprs(exprs, ctx),
             Kind::EndDecors => unreachable!("end decors unexpectedly rendered"),
-            Kind::IfExpr(expr) => self.format_if_expr(expr),
-            Kind::MethodChain(chain) => self.format_method_chain(chain),
+            Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
+            Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
         }
     }
 
-    fn format_str(&mut self, str: Str) {
+    fn format_str(&mut self, str: &Str) {
         // Ignore non-UTF8 source code for now.
         let value = String::from_utf8_lossy(&str.value);
-        if let Some(begin) = str.begin {
-            self.buffer.push_str(&begin);
+        if let Some(begin) = &str.begin {
+            self.buffer.push_str(begin);
         }
         self.buffer.push_str(&value);
-        if let Some(end) = str.end {
-            self.buffer.push_str(&end);
+        if let Some(end) = &str.end {
+            self.buffer.push_str(end);
         }
     }
 
-    fn format_dyn_str(&mut self, dstr: DynStr) {
-        if let Some(begin) = dstr.begin {
-            self.buffer.push_str(&begin);
+    fn format_dyn_str(&mut self, dstr: &DynStr, ctx: &FormatContext) {
+        if let Some(begin) = &dstr.begin {
+            self.buffer.push_str(begin);
         }
         let mut divided = false;
-        for part in dstr.parts {
+        for part in &dstr.parts {
             if divided {
                 self.buffer.push(' ');
             }
@@ -313,16 +343,16 @@ impl Formatter {
                 }
                 DynStrPart::DynStr(dstr) => {
                     divided = true;
-                    self.format_dyn_str(dstr);
+                    self.format_dyn_str(dstr, ctx);
                 }
                 DynStrPart::Exprs(pos, exprs) => {
                     self.buffer.push_str("#{");
                     if !exprs.0.is_empty() {
-                        let decors = self.decor_store.consume(pos);
-                        self.write_trailing_comment(decors.trailing);
+                        let decors = ctx.decor_store.get(pos);
+                        self.write_trailing_comment(&decors.trailing);
                         self.indent();
-                        self.format_exprs(exprs);
-                        self.break_line();
+                        self.format_exprs(exprs, ctx);
+                        self.break_line(ctx);
                         self.dedent();
                         self.put_indent();
                     }
@@ -330,122 +360,128 @@ impl Formatter {
                 }
             }
         }
-        if let Some(end) = dstr.end {
-            self.buffer.push_str(&end);
+        if let Some(end) = &dstr.end {
+            self.buffer.push_str(end);
         }
     }
 
-    fn format_heredoc_begin(&mut self, pos: Pos) {
-        let heredoc = self.heredoc_map.get(&pos).expect("heredoc must exist");
+    fn format_heredoc_begin(&mut self, pos: Pos, ctx: &FormatContext) {
+        let heredoc = ctx.heredoc_map.get(&pos).expect("heredoc must exist");
         self.buffer.push_str(heredoc.indent_mode.begin_symbols());
         self.buffer.push_str(&heredoc.id);
         self.heredoc_queue.push_back(pos);
     }
 
-    fn format_exprs(&mut self, exprs: Exprs) {
+    fn format_exprs(&mut self, exprs: &Exprs, ctx: &FormatContext) {
         let Exprs(nodes) = exprs;
         if nodes.is_empty() {
             return;
         }
-        for (i, n) in nodes.into_iter().enumerate() {
-            let decors = self.decor_store.consume(n.pos);
-            self.write_leading_decors(decors.leading, i == 0, n.kind.is_end_decors());
+        for (i, n) in nodes.iter().enumerate() {
+            let decors = ctx.decor_store.get(&n.pos);
+            self.write_leading_decors(
+                &decors.leading,
+                ctx,
+                EmptyLineHandling::Trim {
+                    begin: i == 0,
+                    end: n.kind.is_end_decors(),
+                },
+            );
             if !matches!(n.kind, Kind::EndDecors) {
-                self.break_line();
+                self.break_line(ctx);
                 self.put_indent();
-                self.format(n);
+                self.format(n, ctx);
             }
-            self.write_trailing_comment(decors.trailing);
+            self.write_trailing_comment(&decors.trailing);
         }
     }
 
-    fn format_if_expr(&mut self, expr: IfExpr) {
+    fn format_if_expr(&mut self, expr: &IfExpr, ctx: &FormatContext) {
         if expr.is_unless {
             self.buffer.push_str("unless ");
         } else {
             self.buffer.push_str("if ");
         }
-        let cond_decors = self.decor_store.consume(expr.if_first.cond.pos);
-        self.format(*expr.if_first.cond);
-        self.write_trailing_comment(cond_decors.trailing);
+        let cond_decors = ctx.decor_store.get(&expr.if_first.cond.pos);
+        self.format(&expr.if_first.cond, ctx);
+        self.write_trailing_comment(&cond_decors.trailing);
         self.indent();
-        self.format_exprs(expr.if_first.body);
+        self.format_exprs(&expr.if_first.body, ctx);
 
-        for elsif in expr.elsifs {
-            let elsif_decors = self.decor_store.consume(elsif.pos);
-            self.break_line();
+        for elsif in &expr.elsifs {
+            let elsif_decors = ctx.decor_store.get(&elsif.pos);
+            self.break_line(ctx);
             self.dedent();
             self.put_indent();
             self.buffer.push_str("elsif");
             if elsif_decors.trailing.is_some() {
-                self.write_trailing_comment(elsif_decors.trailing);
+                self.write_trailing_comment(&elsif_decors.trailing);
             } else {
                 self.buffer.push(' ');
             }
-            let cond_decors = self.decor_store.consume(elsif.part.cond.pos);
+            let cond_decors = ctx.decor_store.get(&elsif.part.cond.pos);
             if cond_decors.leading.is_empty() {
-                self.format(*elsif.part.cond);
-                self.write_trailing_comment(cond_decors.trailing);
+                self.format(&elsif.part.cond, ctx);
+                self.write_trailing_comment(&cond_decors.trailing);
                 self.indent();
             } else {
                 self.indent();
-                self.write_leading_decors(cond_decors.leading, true, false);
-                self.break_line();
+                self.write_leading_decors(
+                    &cond_decors.leading,
+                    ctx,
+                    EmptyLineHandling::trim_begin(),
+                );
+                self.break_line(ctx);
                 self.put_indent();
-                self.format(*elsif.part.cond);
-                self.write_trailing_comment(cond_decors.trailing);
+                self.format(&elsif.part.cond, ctx);
+                self.write_trailing_comment(&cond_decors.trailing);
             }
-            self.format_exprs(elsif.part.body);
+            self.format_exprs(&elsif.part.body, ctx);
         }
 
-        if let Some(if_last) = expr.if_last {
-            let else_decors = self.decor_store.consume(if_last.pos);
-            self.break_line();
+        if let Some(if_last) = &expr.if_last {
+            let else_decors = ctx.decor_store.get(&if_last.pos);
+            self.break_line(ctx);
             self.dedent();
             self.put_indent();
             self.buffer.push_str("else");
-            self.write_trailing_comment(else_decors.trailing);
+            self.write_trailing_comment(&else_decors.trailing);
             self.indent();
-            self.format_exprs(if_last.body);
+            self.format_exprs(&if_last.body, ctx);
         }
 
-        let end_decors = self.decor_store.consume(expr.end_pos);
-        self.write_leading_decors(end_decors.leading, false, true);
-        self.break_line();
+        let end_decors = ctx.decor_store.get(&expr.end_pos);
+        self.write_leading_decors(&end_decors.leading, ctx, EmptyLineHandling::trim_end());
+        self.break_line(ctx);
         self.dedent();
         self.put_indent();
         self.buffer.push_str("end");
-        self.write_trailing_comment(end_decors.trailing);
+        self.write_trailing_comment(&end_decors.trailing);
     }
 
-    fn format_method_chain(&mut self, chain: MethodChain) {
+    fn format_method_chain(&mut self, chain: &MethodChain, ctx: &FormatContext) {
         let mut has_receiver = false;
-        if let Some(recv) = chain.receiver {
-            let recv_decor = self.decor_store.consume(recv.pos);
-            self.format(*recv);
+        if let Some(recv) = &chain.receiver {
+            let recv_decor = ctx.decor_store.get(&recv.pos);
+            self.format(recv, ctx);
             if recv_decor.trailing.is_some() {
-                self.write_trailing_comment(recv_decor.trailing);
-                self.break_line();
+                self.write_trailing_comment(&recv_decor.trailing);
+                self.break_line(ctx);
                 self.put_indent();
             }
             has_receiver = true;
         }
 
         let mut is_flat = true;
-        for (i, call) in chain.calls.into_iter().enumerate() {
-            let call_decor = self.decor_store.consume(call.pos);
-            let call_leading = call_decor
-                .leading
-                .into_iter()
-                .filter(|d| matches!(d, LineDecor::Comment(_)))
-                .collect::<Vec<_>>();
-            if !call_leading.is_empty() {
+        for (i, call) in chain.calls.iter().enumerate() {
+            let call_decor = ctx.decor_store.get(&call.pos);
+            if !call_decor.leading.is_empty() {
                 if is_flat {
                     self.indent();
                     is_flat = false;
                 }
-                self.write_leading_decors(call_leading, true, true);
-                self.break_line();
+                self.write_leading_decors(&call_decor.leading, ctx, EmptyLineHandling::Skip);
+                self.break_line(ctx);
                 self.put_indent();
             }
             has_receiver = has_receiver || i > 0;
@@ -456,51 +492,62 @@ impl Formatter {
 
             if !call.args.is_empty() {
                 self.buffer.push('(');
-                for (i, arg) in call.args.into_iter().enumerate() {
+                for (i, arg) in call.args.iter().enumerate() {
                     if i > 0 {
                         self.buffer.push_str(", ");
                     }
-                    self.format(arg);
+                    self.format(arg, ctx);
                 }
                 self.buffer.push(')');
             }
-            if let Some(block) = call.block {
+            if let Some(block) = &call.block {
                 if block.body.0.is_empty() {
                     self.buffer.push_str(" {}");
                 } else {
-                    let block_decors = self.decor_store.consume(block.pos);
+                    let block_decors = ctx.decor_store.get(&block.pos);
                     self.buffer.push_str(" do");
-                    self.write_trailing_comment(block_decors.trailing);
+                    self.write_trailing_comment(&block_decors.trailing);
                     self.indent();
-                    self.format_exprs(block.body);
+                    self.format_exprs(&block.body, ctx);
                     self.dedent();
-                    self.break_line();
+                    self.break_line(ctx);
                     self.put_indent();
                     self.buffer.push_str("end");
                 }
             }
 
-            self.write_trailing_comment(call_decor.trailing);
+            self.write_trailing_comment(&call_decor.trailing);
         }
         if !is_flat {
             self.dedent();
         }
     }
 
-    fn write_leading_decors(&mut self, decors: Vec<LineDecor>, trim_start: bool, trim_end: bool) {
+    fn write_leading_decors(
+        &mut self,
+        decors: &Vec<LineDecor>,
+        ctx: &FormatContext,
+        emp_line_handling: EmptyLineHandling,
+    ) {
         if decors.is_empty() {
             return;
         }
         let last_idx = decors.len() - 1;
-        for (i, decor) in decors.into_iter().enumerate() {
+        for (i, decor) in decors.iter().enumerate() {
             match decor {
                 LineDecor::EmptyLine => {
-                    if (!trim_start || 0 < i) && (!trim_end || i < last_idx) {
-                        self.break_line();
+                    let should_skip = match emp_line_handling {
+                        EmptyLineHandling::Skip => true,
+                        EmptyLineHandling::Trim { begin, end } => {
+                            (begin && i == 0) || (end && i == last_idx)
+                        }
+                    };
+                    if !should_skip {
+                        self.break_line(ctx);
                     }
                 }
                 LineDecor::Comment(comment) => {
-                    self.break_line();
+                    self.break_line(ctx);
                     self.put_indent();
                     self.buffer.push_str(&comment.value);
                 }
@@ -508,7 +555,7 @@ impl Formatter {
         }
     }
 
-    fn write_trailing_comment(&mut self, comment: Option<Comment>) {
+    fn write_trailing_comment(&mut self, comment: &Option<Comment>) {
         if let Some(comment) = comment {
             self.buffer.push(' ');
             self.buffer.push_str(&comment.value);
@@ -523,10 +570,10 @@ impl Formatter {
         self.indent = self.indent.saturating_sub(2);
     }
 
-    fn break_line(&mut self) {
+    fn break_line(&mut self, ctx: &FormatContext) {
         self.buffer.push('\n');
         while let Some(pos) = self.heredoc_queue.pop_front() {
-            let heredoc = self.heredoc_map.get(&pos).expect("heredoc must exist");
+            let heredoc = ctx.heredoc_map.get(&pos).expect("heredoc must exist");
             self.buffer.push_str(&heredoc.id);
             self.buffer.push('\n');
         }
