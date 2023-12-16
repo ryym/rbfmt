@@ -430,36 +430,26 @@ impl FmtNodeBuilder {
         let mut trailing_comment = None;
 
         // Find the first comment. It may be a trailing comment of the last node.
-        match self.comments.last() {
-            Some(comment) => {
-                if (self.last_loc_end..=end).contains(&comment.location.begin) {
-                    let comment_range = comment.location.to_range();
-                    let fmt_comment = self.get_comment_content(comment);
-                    if self.is_at_line_start(comment_range.start) {
-                        self.consume_empty_lines_until(comment_range.start, &mut line_decors);
-                        line_decors.push(fmt::LineDecor::Comment(fmt_comment));
-                    } else {
-                        trailing_comment = Some(fmt_comment);
-                    }
-                    self.last_loc_end = comment_range.end - 1;
-                    self.comments.pop();
+        if let Some(comment) = self.comments.last() {
+            if (self.last_loc_end..=end).contains(&comment.location.begin) {
+                let comment_range = comment.location.to_range();
+                let fmt_comment = self.get_comment_content(comment);
+                if self.is_at_line_start(comment_range.start) {
+                    self.consume_empty_lines_until(comment_range.start, &mut line_decors);
+                    line_decors.push(fmt::LineDecor::Comment(fmt_comment));
+                } else {
+                    trailing_comment = Some(fmt_comment);
                 }
+                self.last_loc_end = comment_range.end - 1;
+                self.comments.pop();
             }
-            _ => {}
-        };
+        }
 
         // Then find the other comments. They must not be a trailing comment.
         if !line_decors.is_empty() || trailing_comment.is_some() {
-            loop {
-                let comment = match self.comments.last() {
-                    Some(comment) => {
-                        if (self.last_loc_end..=end).contains(&comment.location.begin) {
-                            comment
-                        } else {
-                            break;
-                        }
-                    }
-                    _ => break,
+            while let Some(comment) = self.comments.last() {
+                if !(self.last_loc_end..=end).contains(&comment.location.begin) {
+                    break;
                 };
                 let fmt_comment = self.get_comment_content(comment);
                 let comment_end = comment.location.end;
