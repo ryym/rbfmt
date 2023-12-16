@@ -25,6 +25,7 @@ impl Node {
 pub(crate) enum Kind {
     Atom(String),
     Str(Str),
+    DynStr(DynStr),
     Exprs(Exprs),
     EndDecors,
     IfExpr(IfExpr),
@@ -42,6 +43,20 @@ pub(crate) struct Str {
     pub begin: Option<String>,
     pub value: Vec<u8>,
     pub end: Option<String>,
+}
+
+#[derive(Debug)]
+pub(crate) struct DynStr {
+    pub begin: Option<String>,
+    pub parts: Vec<DynStrPart>,
+    pub end: Option<String>,
+}
+
+#[derive(Debug)]
+pub(crate) enum DynStrPart {
+    Str(Str),
+    DynStr(DynStr),
+    Exprs(Pos, Exprs),
 }
 
 #[derive(Debug)]
@@ -223,6 +238,7 @@ impl Formatter {
         match node.kind {
             Kind::Atom(value) => self.buffer.push_str(&value),
             Kind::Str(str) => self.format_str(str),
+            Kind::DynStr(dstr) => self.format_dyn_str(dstr),
             Kind::Exprs(exprs) => self.format_exprs(exprs),
             Kind::EndDecors => unreachable!("end decors unexpectedly rendered"),
             Kind::IfExpr(expr) => self.format_if_expr(expr),
@@ -238,6 +254,44 @@ impl Formatter {
         }
         self.buffer.push_str(&value);
         if let Some(end) = str.end {
+            self.buffer.push_str(&end);
+        }
+    }
+
+    fn format_dyn_str(&mut self, dstr: DynStr) {
+        if let Some(begin) = dstr.begin {
+            self.buffer.push_str(&begin);
+        }
+        let mut divided = false;
+        for part in dstr.parts {
+            if divided {
+                self.buffer.push(' ');
+            }
+            match part {
+                DynStrPart::Str(str) => {
+                    divided = str.begin.is_some();
+                    self.format_str(str);
+                }
+                DynStrPart::DynStr(dstr) => {
+                    divided = true;
+                    self.format_dyn_str(dstr);
+                }
+                DynStrPart::Exprs(pos, exprs) => {
+                    self.buffer.push_str("#{");
+                    if !exprs.0.is_empty() {
+                        let decors = self.decor_store.consume(pos);
+                        self.write_trailing_comment(decors.trailing);
+                        self.indent();
+                        self.format_exprs(exprs);
+                        self.break_line();
+                        self.dedent();
+                        self.put_indent();
+                    }
+                    self.buffer.push('}');
+                }
+            }
+        }
+        if let Some(end) = dstr.end {
             self.buffer.push_str(&end);
         }
     }

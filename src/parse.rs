@@ -109,24 +109,17 @@ impl FmtNodeBuilder {
             Node::Gvar(node) => self.parse_atom(&node.expression_l, pos, node.name),
             Node::Str(node) => {
                 self.consume_and_store_decors_until(pos, node.expression_l.begin);
-                let (value_range, begin, end) = match (node.begin_l, node.end_l) {
-                    (Some(begin_l), Some(end_l)) => {
-                        let value_range = begin_l.end..end_l.begin;
-                        let begin = &self.src[begin_l.to_range()];
-                        let end = &self.src[end_l.to_range()];
-                        let begin = String::from_utf8_lossy(begin).to_string();
-                        let end = String::from_utf8_lossy(end).to_string();
-                        (value_range, Some(begin), Some(end))
-                    }
-                    _ => (node.expression_l.to_range(), None, None),
-                };
-                let value = self.src[value_range].to_vec();
-                let str = fmt::Str { begin, value, end };
+                let str = self.visit_str(node);
                 fmt::Node::new(pos, fmt::Kind::Str(str))
             }
+            Node::Dstr(node) => {
+                self.consume_and_store_decors_until(pos, node.expression_l.begin);
+                let dstr = self.visit_dstr(node);
+                fmt::Node::new(pos, fmt::Kind::DynStr(dstr))
+            }
             Node::Begin(node) => {
-                let nodes = node.statements.into_iter().map(|n| self.visit(n)).collect();
-                fmt::Node::new(pos, fmt::Kind::Exprs(fmt::Exprs(nodes)))
+                let exprs = self.visit_begin(node);
+                fmt::Node::new(pos, fmt::Kind::Exprs(exprs))
             }
             Node::If(node) => {
                 // Consume decors above the if expression.
@@ -206,6 +199,74 @@ impl FmtNodeBuilder {
     fn parse_atom(&mut self, loc: &Loc, pos: fmt::Pos, value: String) -> fmt::Node {
         self.consume_and_store_decors_until(pos, loc.begin);
         fmt::Node::new(pos, fmt::Kind::Atom(value))
+    }
+
+    fn visit_str(&mut self, str: nodes::Str) -> fmt::Str {
+        let (value_range, begin, end) = match (str.begin_l, str.end_l) {
+            (Some(begin_l), Some(end_l)) => {
+                let value_range = begin_l.end..end_l.begin;
+                let begin = &self.src[begin_l.to_range()];
+                let end = &self.src[end_l.to_range()];
+                let begin = String::from_utf8_lossy(begin).to_string();
+                let end = String::from_utf8_lossy(end).to_string();
+                (value_range, Some(begin), Some(end))
+            }
+            _ => (str.expression_l.to_range(), None, None),
+        };
+        let value = self.src[value_range].to_vec();
+        fmt::Str { begin, value, end }
+    }
+
+    fn visit_dstr(&mut self, dstr: nodes::Dstr) -> fmt::DynStr {
+        let mut parts = vec![];
+        for part in dstr.parts {
+            match part {
+                Node::Str(node) => {
+                    let node_end = node.expression_l.end;
+                    let str = self.visit_str(node);
+                    parts.push(fmt::DynStrPart::Str(str));
+                    self.last_loc_end = node_end;
+                }
+                Node::Dstr(node) => {
+                    let node_end = node.expression_l.end;
+                    let dstr = self.visit_dstr(node);
+                    parts.push(fmt::DynStrPart::DynStr(dstr));
+                    self.last_loc_end = node_end;
+                }
+                Node::Begin(node) => {
+                    let exprs_pos = self.next_pos();
+                    self.last_pos = exprs_pos;
+                    let exprs_end = node.expression_l.end;
+                    let mut exprs = self.visit_begin(node);
+                    // The Begin node at a string interpolation spans to the closing brace,
+                    // so it includes the decors at the end.
+                    if let Some(end_decors) = self.consume_decors_until(exprs_end) {
+                        let end_node = fmt::Node::new(self.next_pos(), fmt::Kind::EndDecors);
+                        self.store_decors_to(self.last_pos, end_node.pos, end_decors);
+                        exprs.0.push(end_node);
+                    }
+                    parts.push(fmt::DynStrPart::Exprs(exprs_pos, exprs));
+                }
+                _ => panic!("unexpected string interpolation node: {:?}", part),
+            }
+        }
+
+        let begin = dstr
+            .begin_l
+            .map(|l| String::from_utf8_lossy(&self.src[l.to_range()]).to_string());
+        let end = dstr
+            .end_l
+            .map(|l| String::from_utf8_lossy(&self.src[l.to_range()]).to_string());
+        fmt::DynStr { begin, parts, end }
+    }
+
+    fn visit_begin(&mut self, begin: nodes::Begin) -> fmt::Exprs {
+        let nodes = begin
+            .statements
+            .into_iter()
+            .map(|n| self.visit(n))
+            .collect();
+        fmt::Exprs(nodes)
     }
 
     fn visit_ifelse(&mut self, node: Option<Box<Node>>, ifexpr: &mut fmt::IfExpr, has_else: bool) {
