@@ -85,6 +85,12 @@ impl FmtNodeBuilder<'_> {
                 let exprs = self.visit_statements(Some(node.statements()), Some(self.src.len()));
                 fmt::Node::new(pos, fmt::Kind::Exprs(exprs))
             }
+            Node::StatementsNode { .. } => {
+                let node = node.as_statements_node().unwrap();
+                let pos = self.next_pos();
+                let exprs = self.visit_statements(Some(node), None);
+                fmt::Node::new(pos, fmt::Kind::Exprs(exprs))
+            }
 
             Node::NilNode { .. } => self.parse_atom(node),
             Node::TrueNode { .. } => self.parse_atom(node),
@@ -118,6 +124,14 @@ impl FmtNodeBuilder<'_> {
                     consequent: node.consequent().map(|n| n.as_node()),
                     end_loc: node.end_keyword_loc(),
                 })
+            }
+
+            Node::CallNode { .. } => {
+                let node = node.as_call_node().unwrap();
+                let pos = self.next_pos();
+                self.consume_and_store_decors_until(pos, node.location().start_offset());
+                let chain = self.visit_call(node);
+                fmt::Node::new(pos, fmt::Kind::MethodChain(chain))
             }
 
             _ => todo!("parse {:?}", node),
@@ -241,6 +255,92 @@ impl FmtNodeBuilder<'_> {
                 panic!("unexpected node in IfNode: {:?}", node);
             }
         }
+    }
+
+    fn visit_call(&mut self, call: prism::CallNode) -> fmt::MethodChain {
+        let mut chain = match call.receiver() {
+            Some(receiver) => match receiver {
+                prism::Node::CallNode { .. } => {
+                    let node = receiver.as_call_node().unwrap();
+                    self.visit_call(node)
+                }
+                _ => {
+                    let recv = self.visit(receiver);
+                    fmt::MethodChain {
+                        receiver: Some(Box::new(recv)),
+                        calls: vec![],
+                    }
+                }
+            },
+            None => fmt::MethodChain {
+                receiver: None,
+                calls: vec![],
+            },
+        };
+
+        let call_pos = self.next_pos();
+        if let Some(msg_loc) = call.message_loc() {
+            self.consume_and_store_decors_until(call_pos, msg_loc.start_offset());
+        } else {
+            // foo.\n#hoge\n(2)
+        }
+
+        let args = if let Some(args) = call.arguments() {
+            args.arguments().iter().map(|n| self.visit(n)).collect()
+        } else {
+            vec![]
+        };
+        let name = String::from_utf8_lossy(call.name().as_slice()).to_string();
+
+        // XXX: We can just use call.call_operator_loc()
+        let chain_type = if call.is_safe_navigation() {
+            fmt::ChainType::SafeNav
+        } else {
+            fmt::ChainType::Normal
+        };
+
+        let block = call.block().map(|node| match node {
+            prism::Node::BlockNode { .. } => {
+                let node = node.as_block_node().unwrap();
+                let block_pos = self.next_pos();
+                self.last_pos = block_pos;
+                let body = node.body().map(|n| self.visit(n));
+                let body_end_loc = node.closing_loc().start_offset();
+                let body = self.wrap_as_exprs(body, Some(body_end_loc));
+                fmt::MethodBlock {
+                    pos: block_pos,
+                    body,
+                }
+            }
+            _ => panic!("unexpected node for call block: {:?}", node),
+        });
+
+        chain.calls.push(fmt::MethodCall {
+            pos: call_pos,
+            chain_type,
+            name,
+            args,
+            block,
+        });
+
+        self.last_pos = call_pos;
+        self.last_loc_end = call.location().end_offset();
+        chain
+    }
+
+    fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: Option<usize>) -> fmt::Exprs {
+        let expr_nodes = match node {
+            None => vec![],
+            Some(node) => match node.kind {
+                fmt::Kind::Exprs(fmt::Exprs(nodes)) => nodes,
+                _ => vec![node],
+            },
+        };
+        let mut exprs = fmt::Exprs(expr_nodes);
+        if let Some(end) = end {
+            self.append_end_decors(&mut exprs, end);
+        }
+        exprs
     }
 
     fn append_end_decors(&mut self, exprs: &mut fmt::Exprs, end: usize) {

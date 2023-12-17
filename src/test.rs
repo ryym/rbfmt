@@ -16,6 +16,7 @@ fn system_tests() {
         "tests/0_only_spaces",
         "tests/decors",
         "tests/if",
+        "tests/method_calls",
         "tests/numbers",
         "tests/nil_bool",
         "tests/variables",
