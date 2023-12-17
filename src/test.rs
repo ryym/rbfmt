@@ -1,7 +1,5 @@
 use pretty_assertions::assert_eq;
 use std::{
-    collections::HashSet,
-    ffi::OsStr,
     fs,
     path::{Path, PathBuf},
 };
@@ -9,28 +7,9 @@ use std::{
 #[test]
 fn system_tests() {
     let dirs = get_test_dirs(Path::new("tests"));
-
-    let targets = [
-        "tests/0_empty",
-        "tests/0_only_decors",
-        "tests/0_only_spaces",
-        "tests/decors",
-        "tests/if",
-        "tests/method_calls",
-        "tests/numbers",
-        "tests/nil_bool",
-        "tests/strings",
-        "tests/variables",
-    ]
-    .into_iter()
-    .map(OsStr::new)
-    .collect::<HashSet<_>>();
-
     for dir_path in dirs {
-        if targets.contains(&dir_path.as_os_str()) {
-            println!("test: {:?}", dir_path);
-            compare_files(dir_path);
-        }
+        println!("test: {:?}", dir_path);
+        compare_files(dir_path);
     }
 }
 

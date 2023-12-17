@@ -68,6 +68,7 @@ pub(crate) struct Heredoc {
     pub parts: Vec<HeredocPart>,
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 pub(crate) enum HeredocIndentMode {
     None,
@@ -85,6 +86,7 @@ impl HeredocIndentMode {
     }
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 pub(crate) enum HeredocPart {
     Str(Str),

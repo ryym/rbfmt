@@ -50,8 +50,6 @@ struct IfOrUnless<'src> {
 
 struct FmtNodeBuilder<'src> {
     src: &'src [u8],
-    // comments: Vec<Comment>,
-    // token_set: TokenSet,
     comments: Peekable<prism::Comments<'src>>,
     decor_store: fmt::DecorStore,
     heredoc_map: fmt::HeredocMap,
