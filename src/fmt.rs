@@ -289,7 +289,7 @@ pub(crate) fn format(node: Node, decor_store: DecorStore, heredoc_map: HeredocMa
     if formatter.buffer.is_empty() {
         formatter.buffer
     } else {
-        formatter.buffer.push('\n');
+        formatter.break_line(&ctx);
         formatter.buffer.trim_start().to_string()
     }
 }

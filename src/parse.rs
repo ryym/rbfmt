@@ -106,16 +106,25 @@ impl FmtNodeBuilder<'_> {
             Node::StringNode { .. } => {
                 let node = node.as_string_node().unwrap();
                 let pos = self.next_pos();
-                self.consume_and_store_decors_until(pos, node.location().start_offset());
-                let str = self.visit_string(node);
-                fmt::Node::new(pos, fmt::Kind::Str(str))
+                if Self::is_heredoc(node.opening_loc().as_ref()) {
+                    self.visit_simple_heredoc(pos, node);
+                    fmt::Node::new(pos, fmt::Kind::HeredocBegin)
+                } else {
+                    self.consume_and_store_decors_until(pos, node.location().start_offset());
+                    let str = self.visit_string(node);
+                    fmt::Node::new(pos, fmt::Kind::Str(str))
+                }
             }
             Node::InterpolatedStringNode { .. } => {
                 let node = node.as_interpolated_string_node().unwrap();
                 let pos = self.next_pos();
-                self.consume_and_store_decors_until(pos, node.location().start_offset());
-                let dstr = self.visit_interpolated_string(node);
-                fmt::Node::new(pos, fmt::Kind::DynStr(dstr))
+                if Self::is_heredoc(node.opening_loc().as_ref()) {
+                    todo!("complex heredoc")
+                } else {
+                    self.consume_and_store_decors_until(pos, node.location().start_offset());
+                    let dstr = self.visit_interpolated_string(node);
+                    fmt::Node::new(pos, fmt::Kind::DynStr(dstr))
+                }
             }
 
             Node::IfNode { .. } => {
@@ -211,6 +220,31 @@ impl FmtNodeBuilder<'_> {
             parts,
             end: close,
         }
+    }
+
+    fn is_heredoc(str_opening_loc: Option<&prism::Location>) -> bool {
+        if let Some(loc) = str_opening_loc {
+            let bytes = loc.as_slice();
+            bytes.len() > 2 && bytes[0] == b'<' && bytes[1] == b'<'
+        } else {
+            false
+        }
+    }
+
+    fn visit_simple_heredoc(&mut self, pos: fmt::Pos, node: prism::StringNode) {
+        let open = node.opening_loc().unwrap().as_slice();
+        let (indent_mode, id_start) = match open[2] {
+            b'~' => (fmt::HeredocIndentMode::AllIndented, 3),
+            b'-' => (fmt::HeredocIndentMode::EndIndented, 3),
+            _ => (fmt::HeredocIndentMode::None, 2),
+        };
+        let id = String::from_utf8_lossy(&open[id_start..]).to_string();
+        let heredoc = fmt::Heredoc {
+            id,
+            indent_mode,
+            parts: vec![],
+        };
+        self.heredoc_map.insert(pos, heredoc);
     }
 
     fn visit_statements(
