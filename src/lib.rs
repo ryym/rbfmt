@@ -1,7 +1,7 @@
-use parse::parse_into_fmt_node;
+use parse_old::parse_into_fmt_node;
 
 mod fmt;
-mod parse;
+mod parse_old;
 
 #[cfg(test)]
 mod test;
