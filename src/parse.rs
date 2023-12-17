@@ -103,6 +103,14 @@ impl FmtNodeBuilder<'_> {
             Node::ClassVariableReadNode { .. } => self.parse_atom(node),
             Node::GlobalVariableReadNode { .. } => self.parse_atom(node),
 
+            Node::StringNode { .. } => {
+                let node = node.as_string_node().unwrap();
+                let pos = self.next_pos();
+                self.consume_and_store_decors_until(pos, node.location().start_offset());
+                let str = self.visit_string(node);
+                fmt::Node::new(pos, fmt::Kind::Str(str))
+            }
+
             Node::IfNode { .. } => {
                 let node = node.as_if_node().unwrap();
                 self.visit_if_or_unless(IfOrUnless {
@@ -147,6 +155,17 @@ impl FmtNodeBuilder<'_> {
         self.consume_and_store_decors_until(pos, node.location().start_offset());
         let value = Self::source_lossy_at(&node.location());
         fmt::Node::new(pos, fmt::Kind::Atom(value))
+    }
+
+    fn visit_string(&mut self, node: prism::StringNode) -> fmt::Str {
+        let value = Self::source_lossy_at(&node.content_loc());
+        let open = node.opening_loc().as_ref().map(Self::source_lossy_at);
+        let close = node.closing_loc().as_ref().map(Self::source_lossy_at);
+        fmt::Str {
+            begin: open,
+            value: value.into(),
+            end: close,
+        }
     }
 
     fn visit_statements(
