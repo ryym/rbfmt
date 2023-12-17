@@ -110,6 +110,13 @@ impl FmtNodeBuilder<'_> {
                 let str = self.visit_string(node);
                 fmt::Node::new(pos, fmt::Kind::Str(str))
             }
+            Node::InterpolatedStringNode { .. } => {
+                let node = node.as_interpolated_string_node().unwrap();
+                let pos = self.next_pos();
+                self.consume_and_store_decors_until(pos, node.location().start_offset());
+                let dstr = self.visit_interpolated_string(node);
+                fmt::Node::new(pos, fmt::Kind::DynStr(dstr))
+            }
 
             Node::IfNode { .. } => {
                 let node = node.as_if_node().unwrap();
@@ -164,6 +171,44 @@ impl FmtNodeBuilder<'_> {
         fmt::Str {
             begin: open,
             value: value.into(),
+            end: close,
+        }
+    }
+
+    fn visit_interpolated_string(&mut self, itp_str: prism::InterpolatedStringNode) -> fmt::DynStr {
+        let mut parts = vec![];
+        for part in itp_str.parts().iter() {
+            match part {
+                prism::Node::StringNode { .. } => {
+                    let node = part.as_string_node().unwrap();
+                    let node_end = node.location().end_offset();
+                    let str = self.visit_string(node);
+                    parts.push(fmt::DynStrPart::Str(str));
+                    self.last_loc_end = node_end;
+                }
+                prism::Node::InterpolatedStringNode { .. } => {
+                    let node = part.as_interpolated_string_node().unwrap();
+                    let node_end = node.location().end_offset();
+                    let itp_str = self.visit_interpolated_string(node);
+                    parts.push(fmt::DynStrPart::DynStr(itp_str));
+                    self.last_loc_end = node_end;
+                }
+                prism::Node::EmbeddedStatementsNode { .. } => {
+                    let node = part.as_embedded_statements_node().unwrap();
+                    let loc = node.location();
+                    let exprs_pos = self.next_pos();
+                    self.last_pos = exprs_pos;
+                    let exprs = self.visit_statements(node.statements(), Some(loc.end_offset()));
+                    parts.push(fmt::DynStrPart::Exprs(exprs_pos, exprs));
+                }
+                _ => panic!("unexpected string interpolation node: {:?}", part),
+            }
+        }
+        let open = itp_str.opening_loc().as_ref().map(Self::source_lossy_at);
+        let close = itp_str.closing_loc().as_ref().map(Self::source_lossy_at);
+        fmt::DynStr {
+            begin: open,
+            parts,
             end: close,
         }
     }

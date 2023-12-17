@@ -19,6 +19,7 @@ fn system_tests() {
         "tests/method_calls",
         "tests/numbers",
         "tests/nil_bool",
+        "tests/strings",
         "tests/variables",
     ]
     .into_iter()
