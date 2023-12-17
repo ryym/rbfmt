@@ -12,6 +12,8 @@ fn system_tests() {
 
     let targets = [
         "tests/0_empty",
+        "tests/0_only_decors",
+        "tests/0_only_spaces",
         "tests/numbers",
         "tests/nil_bool",
         "tests/variables",
