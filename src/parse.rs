@@ -21,8 +21,8 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
     };
     let fmt_node = builder.build_fmt_node(result.node());
     // dbg!(&fmt_node);
-    // dbg!(&builder.heredoc_map);
     // dbg!(&builder.decor_store);
+    // dbg!(&builder.heredoc_map);
     Some(ParserResult {
         node: fmt_node,
         decor_store: builder.decor_store,
@@ -38,6 +38,15 @@ pub(crate) struct ParserResult {
 }
 
 type MidDecors = (Option<fmt::Comment>, Vec<fmt::LineDecor>);
+
+struct IfOrUnless<'src> {
+    is_if: bool,
+    loc: prism::Location<'src>,
+    predicate: prism::Node<'src>,
+    statements: Option<prism::StatementsNode<'src>>,
+    consequent: Option<prism::Node<'src>>,
+    end_loc: Option<prism::Location<'src>>,
+}
 
 struct FmtNodeBuilder<'src> {
     src: &'src [u8],
@@ -73,12 +82,7 @@ impl FmtNodeBuilder<'_> {
             Node::ProgramNode { .. } => {
                 let node = node.as_program_node().unwrap();
                 let pos = self.next_pos();
-                let mut nodes = vec![];
-                for n in node.statements().body().iter() {
-                    nodes.push(self.visit(n));
-                }
-                let mut exprs = fmt::Exprs(nodes);
-                self.append_end_decors(&mut exprs, self.src.len());
+                let exprs = self.visit_statements(Some(node.statements()), Some(self.src.len()));
                 fmt::Node::new(pos, fmt::Kind::Exprs(exprs))
             }
 
@@ -93,6 +97,29 @@ impl FmtNodeBuilder<'_> {
             Node::ClassVariableReadNode { .. } => self.parse_atom(node),
             Node::GlobalVariableReadNode { .. } => self.parse_atom(node),
 
+            Node::IfNode { .. } => {
+                let node = node.as_if_node().unwrap();
+                self.visit_if_or_unless(IfOrUnless {
+                    is_if: true,
+                    loc: node.location(),
+                    predicate: node.predicate(),
+                    statements: node.statements(),
+                    consequent: node.consequent(),
+                    end_loc: node.end_keyword_loc(),
+                })
+            }
+            Node::UnlessNode { .. } => {
+                let node = node.as_unless_node().unwrap();
+                self.visit_if_or_unless(IfOrUnless {
+                    is_if: false,
+                    loc: node.location(),
+                    predicate: node.predicate(),
+                    statements: node.statements(),
+                    consequent: node.consequent().map(|n| n.as_node()),
+                    end_loc: node.end_keyword_loc(),
+                })
+            }
+
             _ => todo!("parse {:?}", node),
         };
 
@@ -106,6 +133,114 @@ impl FmtNodeBuilder<'_> {
         self.consume_and_store_decors_until(pos, node.location().start_offset());
         let value = Self::source_lossy_at(&node.location());
         fmt::Node::new(pos, fmt::Kind::Atom(value))
+    }
+
+    fn visit_statements(
+        &mut self,
+        node: Option<prism::StatementsNode>,
+        end: Option<usize>,
+    ) -> fmt::Exprs {
+        let mut nodes = vec![];
+        if let Some(node) = node {
+            for n in node.body().iter() {
+                nodes.push(self.visit(n));
+            }
+        }
+        let mut exprs = fmt::Exprs(nodes);
+        if let Some(end) = end {
+            self.append_end_decors(&mut exprs, end);
+        }
+        exprs
+    }
+
+    fn visit_if_or_unless(&mut self, node: IfOrUnless) -> fmt::Node {
+        let pos = self.next_pos();
+
+        // Consume decors above the if expression.
+        self.consume_and_store_decors_until(pos, node.loc.start_offset());
+
+        // XXX: If we can move the responsibility of this decors merging to fmt.rs,
+        // visit_if and the logic inside of visit_ifelse could be unified.
+        //
+        // Consume decors between "if" and the condition expression.
+        // Then merge it to the decors of "if" itself.
+        let predicate_start = node.predicate.location().start_offset();
+        let decors_in_if_and_cond = self.consume_decors_until(predicate_start);
+        if let Some((if_trailing, cond_leading)) = decors_in_if_and_cond {
+            if let Some(c) = if_trailing {
+                self.decor_store
+                    .append_leading_decors(pos, vec![fmt::LineDecor::Comment(c)]);
+            }
+            if !cond_leading.is_empty() {
+                self.decor_store.append_leading_decors(pos, cond_leading);
+            }
+        }
+
+        let predicate = self.visit(node.predicate);
+        let end_loc = node.end_loc.expect("end must exist in root if/unless");
+
+        let ifexpr = match node.consequent {
+            // if...(elsif...|else...)+end
+            Some(conseq) => {
+                let else_start = conseq.location().start_offset();
+                let body = self.visit_statements(node.statements, Some(else_start));
+                let if_part = fmt::IfPart::new(predicate, body);
+                let mut ifexpr = fmt::IfExpr::new(!node.is_if, if_part);
+                self.visit_ifelse(conseq, &mut ifexpr);
+                ifexpr.end_pos = self.next_pos();
+                self.consume_and_store_decors_until(ifexpr.end_pos, end_loc.start_offset());
+                ifexpr
+            }
+            // if...end
+            None => {
+                let body = self.visit_statements(node.statements, Some(end_loc.start_offset()));
+                let if_part = fmt::IfPart::new(predicate, body);
+                fmt::IfExpr::new(!node.is_if, if_part)
+            }
+        };
+
+        fmt::Node::new(pos, fmt::Kind::IfExpr(ifexpr))
+    }
+
+    fn visit_ifelse(&mut self, node: prism::Node, ifexpr: &mut fmt::IfExpr) {
+        match node {
+            // elsif ("if" only, "unles...elsif" is syntax error)
+            prism::Node::IfNode { .. } => {
+                let node = node.as_if_node().unwrap();
+                let elsif_pos = self.next_pos();
+                self.last_pos = elsif_pos;
+
+                let predicate = self.visit(node.predicate());
+                let conseq = node.consequent();
+
+                let body_end_loc = conseq.as_ref().map(|n| n.location().start_offset());
+                let body = self.visit_statements(node.statements(), body_end_loc);
+
+                ifexpr.elsifs.push(fmt::Elsif {
+                    pos: elsif_pos,
+                    part: fmt::IfPart::new(predicate, body),
+                });
+                if let Some(conseq) = conseq {
+                    self.visit_ifelse(conseq, ifexpr);
+                }
+            }
+            // else
+            prism::Node::ElseNode { .. } => {
+                let node = node.as_else_node().unwrap();
+                let else_pos = self.next_pos();
+                self.last_pos = else_pos;
+
+                // XXX: ElseNode has "end" so we can use it.
+                let body = self.visit_statements(node.statements(), None);
+                ifexpr.if_last = Some(fmt::Else {
+                    pos: else_pos,
+                    body,
+                });
+            }
+            _ => {
+                panic!("unexpected node in IfNode: {:?}", node);
+            }
+        }
     }
 
     fn append_end_decors(&mut self, exprs: &mut fmt::Exprs, end: usize) {
