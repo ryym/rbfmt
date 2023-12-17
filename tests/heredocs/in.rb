@@ -3,3 +3,27 @@ foo(<<~HERE).bar # bar
 HERE
 # 1
 1
+
+<<AA
+foo
+bar
+AA
+
+<<-BB
+
+x
+ y
+
+    z
+
+BB
+
+<<~CC
+  squiggly
+CC
+
+foo(<<~H1, <<~H2).bar
+  h1 content
+H1
+  h2 content
+H2

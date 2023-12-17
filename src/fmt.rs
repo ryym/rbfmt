@@ -64,11 +64,9 @@ pub(crate) enum DynStrPart {
 pub(crate) struct Heredoc {
     pub id: String,
     pub indent_mode: HeredocIndentMode,
-    #[allow(unused)]
     pub parts: Vec<HeredocPart>,
 }
 
-#[allow(unused)]
 #[derive(Debug)]
 pub(crate) enum HeredocIndentMode {
     None,
@@ -575,10 +573,45 @@ impl Formatter {
     fn break_line(&mut self, ctx: &FormatContext) {
         self.buffer.push('\n');
         while let Some(pos) = self.heredoc_queue.pop_front() {
-            let heredoc = ctx.heredoc_map.get(&pos).expect("heredoc must exist");
-            self.buffer.push_str(&heredoc.id);
-            self.buffer.push('\n');
+            self.write_heredoc_body(&pos, ctx);
         }
+    }
+
+    fn write_heredoc_body(&mut self, pos: &Pos, ctx: &FormatContext) {
+        let heredoc = ctx.heredoc_map.get(pos).expect("heredoc must exist");
+        match heredoc.indent_mode {
+            HeredocIndentMode::None | HeredocIndentMode::EndIndented => {
+                for part in &heredoc.parts {
+                    match part {
+                        HeredocPart::Str(str) => {
+                            // Ignore non-UTF8 source code for now.
+                            let value = String::from_utf8_lossy(&str.value);
+                            self.buffer.push_str(&value);
+                        }
+                        HeredocPart::Exprs(..) => todo!("heredoc interpolation"),
+                    }
+                }
+                if matches!(heredoc.indent_mode, HeredocIndentMode::EndIndented) {
+                    self.put_indent();
+                }
+                self.buffer.push_str(&heredoc.id);
+            }
+            HeredocIndentMode::AllIndented => {
+                for part in &heredoc.parts {
+                    match part {
+                        HeredocPart::Str(str) => {
+                            // Ignore non-UTF8 source code for now.
+                            let value = String::from_utf8_lossy(&str.value);
+                            self.buffer.push_str(&value);
+                        }
+                        HeredocPart::Exprs(..) => todo!("heredoc interpolation"),
+                    }
+                }
+                self.put_indent();
+                self.buffer.push_str(&heredoc.id);
+            }
+        }
+        self.buffer.push('\n');
     }
 
     fn put_indent(&mut self) {
