@@ -54,3 +54,24 @@ HH
 <<-HERE
  aa   #{}
 HERE
+
+<<~H1
+  aa
+  #{
+    <<~H2
+      not-formatted-well
+    H2
+  }
+  bb
+H1
+
+foo(<<~H1, <<~H2)
+  111
+  #{
+    <<~H3
+      not-formatted-well
+    H3
+  }
+H1
+  222
+H2

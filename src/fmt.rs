@@ -1,4 +1,7 @@
-use std::collections::{HashMap, VecDeque};
+use std::{
+    collections::{HashMap, VecDeque},
+    mem,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Pos(pub usize);
@@ -586,7 +589,8 @@ impl Formatter {
 
     fn break_line(&mut self, ctx: &FormatContext) {
         self.buffer.push('\n');
-        while let Some(pos) = self.heredoc_queue.pop_front() {
+        let mut queue = mem::take(&mut self.heredoc_queue);
+        while let Some(pos) = queue.pop_front() {
             self.write_heredoc_body(&pos, ctx);
         }
     }
