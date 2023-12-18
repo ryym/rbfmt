@@ -118,7 +118,8 @@ impl FmtNodeBuilder<'_> {
                 let pos = self.next_pos();
                 self.consume_and_store_decors_until(pos, node.location().start_offset());
                 if Self::is_heredoc(node.opening_loc().as_ref()) {
-                    todo!("complex heredoc")
+                    self.visit_complex_heredoc(pos, node);
+                    fmt::Node::new(pos, fmt::Kind::HeredocBegin)
                 } else {
                     let dstr = self.visit_interpolated_string(node);
                     fmt::Node::new(pos, fmt::Kind::DynStr(dstr))
@@ -231,17 +232,60 @@ impl FmtNodeBuilder<'_> {
 
     fn visit_simple_heredoc(&mut self, pos: fmt::Pos, node: prism::StringNode) {
         let open = node.opening_loc().unwrap().as_slice();
-        let (indent_mode, id_start) = match open[2] {
-            b'~' => (fmt::HeredocIndentMode::AllIndented, 3),
-            b'-' => (fmt::HeredocIndentMode::EndIndented, 3),
-            _ => (fmt::HeredocIndentMode::None, 2),
-        };
-        let id = String::from_utf8_lossy(&open[id_start..]).to_string();
+        let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
+        let id = String::from_utf8_lossy(id).to_string();
         let str = self.visit_string(node);
         let heredoc = fmt::Heredoc {
             id,
             indent_mode,
             parts: vec![fmt::HeredocPart::Str(str)],
+        };
+        self.heredoc_map.insert(pos, heredoc);
+    }
+
+    fn visit_complex_heredoc(&mut self, pos: fmt::Pos, node: prism::InterpolatedStringNode) {
+        let open = node.opening_loc().unwrap().as_slice();
+        let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
+        let id = String::from_utf8_lossy(id).to_string();
+        let mut parts = vec![];
+        let mut last_str_end: Option<usize> = None;
+        for part in node.parts().iter() {
+            match part {
+                prism::Node::StringNode { .. } => {
+                    let node = part.as_string_node().unwrap();
+                    let node_end = node.location().end_offset();
+                    let str = self.visit_string(node);
+                    parts.push(fmt::HeredocPart::Str(str));
+                    self.last_loc_end = node_end;
+                    last_str_end = Some(node_end);
+                }
+                prism::Node::EmbeddedStatementsNode { .. } => {
+                    let node = part.as_embedded_statements_node().unwrap();
+                    let loc = node.location();
+                    if let Some(last_str_end) = last_str_end {
+                        // I don't know why but ruby-prism ignores spaces before an interpolation in some cases.
+                        if last_str_end < loc.start_offset() {
+                            let value = self.src[last_str_end..loc.start_offset()].to_vec();
+                            let str = fmt::Str {
+                                begin: None,
+                                value,
+                                end: None,
+                            };
+                            parts.push(fmt::HeredocPart::Str(str))
+                        }
+                    }
+                    let exprs_pos = self.next_pos();
+                    self.last_pos = exprs_pos;
+                    let exprs = self.visit_statements(node.statements(), Some(loc.end_offset()));
+                    parts.push(fmt::HeredocPart::Exprs(exprs_pos, exprs));
+                }
+                _ => panic!("unexpected heredoc part: {:?}", part),
+            }
+        }
+        let heredoc = fmt::Heredoc {
+            id,
+            indent_mode,
+            parts,
         };
         self.heredoc_map.insert(pos, heredoc);
     }

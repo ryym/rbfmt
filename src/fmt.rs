@@ -75,6 +75,15 @@ pub(crate) enum HeredocIndentMode {
 }
 
 impl HeredocIndentMode {
+    pub(crate) fn parse_mode_and_id(opening: &[u8]) -> (Self, &[u8]) {
+        let (indent_mode, id_start) = match opening[2] {
+            b'~' => (Self::AllIndented, 3),
+            b'-' => (Self::EndIndented, 3),
+            _ => (Self::None, 2),
+        };
+        (indent_mode, &opening[id_start..])
+    }
+
     fn begin_symbols(&self) -> &'static str {
         match self {
             Self::None => "<<",
@@ -346,23 +355,28 @@ impl Formatter {
                     self.format_dyn_str(dstr, ctx);
                 }
                 DynStrPart::Exprs(pos, exprs) => {
-                    self.buffer.push_str("#{");
-                    if !exprs.0.is_empty() {
-                        let decors = ctx.decor_store.get(pos);
-                        self.write_trailing_comment(&decors.trailing);
-                        self.indent();
-                        self.format_exprs(exprs, ctx);
-                        self.break_line(ctx);
-                        self.dedent();
-                        self.put_indent();
-                    }
-                    self.buffer.push('}');
+                    self.format_embedded_exprs(pos, exprs, ctx);
                 }
             }
         }
         if let Some(end) = &dstr.end {
             self.buffer.push_str(end);
         }
+    }
+
+    fn format_embedded_exprs(&mut self, pos: &Pos, exprs: &Exprs, ctx: &FormatContext) {
+        // XXX: We should use opening/closing of prism::EmbeddedStatementsNode.
+        self.buffer.push_str("#{");
+        if !exprs.0.is_empty() {
+            let decors = ctx.decor_store.get(pos);
+            self.write_trailing_comment(&decors.trailing);
+            self.indent();
+            self.format_exprs(exprs, ctx);
+            self.break_line(ctx);
+            self.dedent();
+            self.put_indent();
+        }
+        self.buffer.push('}');
     }
 
     fn format_heredoc_begin(&mut self, pos: Pos, ctx: &FormatContext) {
@@ -588,7 +602,9 @@ impl Formatter {
                             let value = String::from_utf8_lossy(&str.value);
                             self.buffer.push_str(&value);
                         }
-                        HeredocPart::Exprs(..) => todo!("heredoc interpolation"),
+                        HeredocPart::Exprs(pos, exprs) => {
+                            self.format_embedded_exprs(pos, exprs, ctx);
+                        }
                     }
                 }
                 if matches!(heredoc.indent_mode, HeredocIndentMode::EndIndented) {
@@ -604,7 +620,9 @@ impl Formatter {
                             let value = String::from_utf8_lossy(&str.value);
                             self.buffer.push_str(&value);
                         }
-                        HeredocPart::Exprs(..) => todo!("heredoc interpolation"),
+                        HeredocPart::Exprs(pos, exprs) => {
+                            self.format_embedded_exprs(pos, exprs, ctx);
+                        }
                     }
                 }
                 self.put_indent();

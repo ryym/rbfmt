@@ -27,3 +27,30 @@ foo(<<~H1, <<~H2).bar
 H1
   h2 content
 H2
+
+<<HERE
+  aa
+  #{1}
+  bb
+HERE
+
+<<~HERE
+  aa
+  #{1}
+  cc
+HERE
+
+<<~HH
+    
+  aa
+  #{}
+   #{}
+    bb
+    #{}
+  #{}
+	 #{}
+HH
+
+<<-HERE
+ aa   #{}
+HERE
