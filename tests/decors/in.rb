@@ -16,28 +16,8 @@
 
 100     # comment-8
 
-# if-1
-if # if-2
-  # if-3
-  true # if-4
-  # if-5
-  nil # if-6
-  # if-7
-
-end # if-8
-
-if # if-1
-  true
-
-  nil
-
-end
-
-if
-  # if-1
-  true
-  nil
-end
+# spaces only
+    
 
 # comment-9
 
