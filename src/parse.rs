@@ -329,8 +329,6 @@ impl FmtNodeBuilder<'_> {
                 };
                 let mut ifexpr = fmt::IfExpr::new(node.is_if, if_first);
                 self.visit_ifelse(conseq, &mut ifexpr);
-                ifexpr.end_pos = self.next_pos();
-                self.consume_and_store_decors_until(ifexpr.end_pos, end_loc.start_offset());
                 ifexpr
             }
             // if...end
@@ -355,11 +353,13 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_if_node().unwrap();
                 let elsif_pos = self.next_pos();
                 self.last_pos = elsif_pos;
-
                 let predicate = self.visit(node.predicate());
                 let conseq = node.consequent();
 
-                let body_end_loc = conseq.as_ref().map(|n| n.location().start_offset());
+                let body_end_loc = conseq
+                    .as_ref()
+                    .map(|n| n.location().start_offset())
+                    .or_else(|| node.end_keyword_loc().map(|l| l.end_offset()));
                 let body = self.visit_statements(node.statements(), body_end_loc);
 
                 ifexpr.elsifs.push(fmt::Conditional {
@@ -377,8 +377,8 @@ impl FmtNodeBuilder<'_> {
                 let else_pos = self.next_pos();
                 self.last_pos = else_pos;
 
-                // XXX: ElseNode has "end" so we can use it.
-                let body = self.visit_statements(node.statements(), None);
+                let body_end_loc = node.end_keyword_loc().map(|l| l.end_offset());
+                let body = self.visit_statements(node.statements(), body_end_loc);
                 ifexpr.if_last = Some(fmt::Else {
                     pos: else_pos,
                     body,

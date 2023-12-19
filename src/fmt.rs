@@ -6,12 +6,6 @@ use std::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Pos(pub usize);
 
-impl Pos {
-    pub(crate) fn none() -> Self {
-        Self(0)
-    }
-}
-
 #[derive(Debug)]
 pub(crate) struct Node {
     pub pos: Pos,
@@ -112,7 +106,6 @@ pub(crate) struct IfExpr {
     pub if_first: Conditional,
     pub elsifs: Vec<Conditional>,
     pub if_last: Option<Else>,
-    pub end_pos: Pos,
 }
 
 impl IfExpr {
@@ -122,7 +115,6 @@ impl IfExpr {
             if_first,
             elsifs: vec![],
             if_last: None,
-            end_pos: Pos::none(),
         }
     }
 }
@@ -254,13 +246,6 @@ impl EmptyLineHandling {
         Self::Trim {
             begin: true,
             end: false,
-        }
-    }
-
-    fn trim_end() -> Self {
-        Self::Trim {
-            begin: false,
-            end: true,
         }
     }
 }
@@ -436,13 +421,10 @@ impl Formatter {
             self.format_exprs(&if_last.body, ctx);
         }
 
-        let end_decors = ctx.decor_store.get(&expr.end_pos);
-        self.write_leading_decors(&end_decors.leading, ctx, EmptyLineHandling::trim_end());
         self.break_line(ctx);
         self.dedent();
         self.put_indent();
         self.buffer.push_str("end");
-        self.write_trailing_comment(&end_decors.trailing);
     }
 
     // Handle comments like "if # foo\n #bar\n predicate"

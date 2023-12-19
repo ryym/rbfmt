@@ -44,7 +44,6 @@ if true
 
   # a
 elsif 2
-
   # b
 end
 
@@ -113,6 +112,5 @@ unless true
 
   # a
 else
-
   # b
 end
