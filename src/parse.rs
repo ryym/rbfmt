@@ -87,10 +87,9 @@ impl FmtNodeBuilder<'_> {
             }
             prism::Node::StatementsNode { .. } => {
                 let node = node.as_statements_node().unwrap();
-                let pos = self.next_pos();
                 let exprs = self.visit_statements(Some(node), None);
                 fmt::Node {
-                    pos,
+                    pos: fmt::Pos::none(),
                     width: exprs.width(),
                     kind: fmt::Kind::Exprs(exprs),
                 }

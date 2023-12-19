@@ -25,6 +25,12 @@ pub(crate) fn format(node: Node, decor_store: DecorStore, heredoc_map: HeredocMa
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Pos(pub usize);
 
+impl Pos {
+    pub(crate) fn none() -> Self {
+        Self(0)
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Width {
     Flat(usize),
