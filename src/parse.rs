@@ -73,35 +73,33 @@ impl FmtNodeBuilder<'_> {
     }
 
     fn visit(&mut self, node: prism::Node) -> fmt::Node {
-        use prism::Node;
-
         let loc_end = node.location().end_offset();
         let node = match node {
-            Node::ProgramNode { .. } => {
+            prism::Node::ProgramNode { .. } => {
                 let node = node.as_program_node().unwrap();
                 let pos = self.next_pos();
                 let exprs = self.visit_statements(Some(node.statements()), Some(self.src.len()));
                 fmt::Node::new(pos, fmt::Kind::Exprs(exprs))
             }
-            Node::StatementsNode { .. } => {
+            prism::Node::StatementsNode { .. } => {
                 let node = node.as_statements_node().unwrap();
                 let pos = self.next_pos();
                 let exprs = self.visit_statements(Some(node), None);
                 fmt::Node::new(pos, fmt::Kind::Exprs(exprs))
             }
 
-            Node::NilNode { .. } => self.parse_atom(node),
-            Node::TrueNode { .. } => self.parse_atom(node),
-            Node::FalseNode { .. } => self.parse_atom(node),
-            Node::IntegerNode { .. } => self.parse_atom(node),
-            Node::FloatNode { .. } => self.parse_atom(node),
-            Node::RationalNode { .. } => self.parse_atom(node),
-            Node::ImaginaryNode { .. } => self.parse_atom(node),
-            Node::InstanceVariableReadNode { .. } => self.parse_atom(node),
-            Node::ClassVariableReadNode { .. } => self.parse_atom(node),
-            Node::GlobalVariableReadNode { .. } => self.parse_atom(node),
+            prism::Node::NilNode { .. } => self.parse_atom(node),
+            prism::Node::TrueNode { .. } => self.parse_atom(node),
+            prism::Node::FalseNode { .. } => self.parse_atom(node),
+            prism::Node::IntegerNode { .. } => self.parse_atom(node),
+            prism::Node::FloatNode { .. } => self.parse_atom(node),
+            prism::Node::RationalNode { .. } => self.parse_atom(node),
+            prism::Node::ImaginaryNode { .. } => self.parse_atom(node),
+            prism::Node::InstanceVariableReadNode { .. } => self.parse_atom(node),
+            prism::Node::ClassVariableReadNode { .. } => self.parse_atom(node),
+            prism::Node::GlobalVariableReadNode { .. } => self.parse_atom(node),
 
-            Node::StringNode { .. } => {
+            prism::Node::StringNode { .. } => {
                 let node = node.as_string_node().unwrap();
                 let pos = self.next_pos();
                 self.consume_and_store_decors_until(pos, node.location().start_offset());
@@ -113,7 +111,7 @@ impl FmtNodeBuilder<'_> {
                     fmt::Node::new(pos, fmt::Kind::Str(str))
                 }
             }
-            Node::InterpolatedStringNode { .. } => {
+            prism::Node::InterpolatedStringNode { .. } => {
                 let node = node.as_interpolated_string_node().unwrap();
                 let pos = self.next_pos();
                 self.consume_and_store_decors_until(pos, node.location().start_offset());
@@ -126,7 +124,7 @@ impl FmtNodeBuilder<'_> {
                 }
             }
 
-            Node::IfNode { .. } => {
+            prism::Node::IfNode { .. } => {
                 let node = node.as_if_node().unwrap();
                 self.visit_if_or_unless(IfOrUnless {
                     is_if: true,
@@ -137,7 +135,7 @@ impl FmtNodeBuilder<'_> {
                     end_loc: node.end_keyword_loc(),
                 })
             }
-            Node::UnlessNode { .. } => {
+            prism::Node::UnlessNode { .. } => {
                 let node = node.as_unless_node().unwrap();
                 self.visit_if_or_unless(IfOrUnless {
                     is_if: false,
@@ -149,7 +147,7 @@ impl FmtNodeBuilder<'_> {
                 })
             }
 
-            Node::CallNode { .. } => {
+            prism::Node::CallNode { .. } => {
                 let node = node.as_call_node().unwrap();
                 let pos = self.next_pos();
                 self.consume_and_store_decors_until(pos, node.location().start_offset());
