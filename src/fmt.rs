@@ -23,7 +23,7 @@ pub(crate) enum Kind {
     Atom(String),
     Str(Str),
     DynStr(DynStr),
-    HeredocBegin,
+    HeredocOpening,
     Exprs(Exprs),
     EndDecors,
     IfExpr(IfExpr),
@@ -38,16 +38,16 @@ impl Kind {
 
 #[derive(Debug)]
 pub(crate) struct Str {
-    pub begin: Option<String>,
+    pub opening: Option<String>,
     pub value: Vec<u8>,
-    pub end: Option<String>,
+    pub closing: Option<String>,
 }
 
 #[derive(Debug)]
 pub(crate) struct DynStr {
-    pub begin: Option<String>,
+    pub opening: Option<String>,
     pub parts: Vec<DynStrPart>,
-    pub end: Option<String>,
+    pub closing: Option<String>,
 }
 
 #[derive(Debug)]
@@ -89,7 +89,7 @@ impl HeredocIndentMode {
         (indent_mode, &opening[id_start..])
     }
 
-    fn begin_symbols(&self) -> &'static str {
+    fn prefix_symbols(&self) -> &'static str {
         match self {
             Self::None => "<<",
             Self::EndIndented => "<<-",
@@ -245,14 +245,14 @@ pub(crate) enum LineDecor {
 
 #[derive(Debug)]
 enum EmptyLineHandling {
-    Trim { begin: bool, end: bool },
+    Trim { start: bool, end: bool },
     Skip,
 }
 
 impl EmptyLineHandling {
-    fn trim_begin() -> Self {
+    fn trim_start() -> Self {
         Self::Trim {
-            begin: true,
+            start: true,
             end: false,
         }
     }
@@ -298,7 +298,7 @@ impl Formatter {
             Kind::Atom(value) => self.buffer.push_str(value),
             Kind::Str(str) => self.format_str(str),
             Kind::DynStr(dstr) => self.format_dyn_str(dstr, ctx),
-            Kind::HeredocBegin => self.format_heredoc_begin(node.pos, ctx),
+            Kind::HeredocOpening => self.format_heredoc_opening(node.pos, ctx),
             Kind::Exprs(exprs) => self.format_exprs(exprs, ctx),
             Kind::EndDecors => unreachable!("end decors unexpectedly rendered"),
             Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
@@ -309,18 +309,18 @@ impl Formatter {
     fn format_str(&mut self, str: &Str) {
         // Ignore non-UTF8 source code for now.
         let value = String::from_utf8_lossy(&str.value);
-        if let Some(begin) = &str.begin {
-            self.buffer.push_str(begin);
+        if let Some(opening) = &str.opening {
+            self.buffer.push_str(opening);
         }
         self.buffer.push_str(&value);
-        if let Some(end) = &str.end {
-            self.buffer.push_str(end);
+        if let Some(closing) = &str.closing {
+            self.buffer.push_str(closing);
         }
     }
 
     fn format_dyn_str(&mut self, dstr: &DynStr, ctx: &FormatContext) {
-        if let Some(begin) = &dstr.begin {
-            self.buffer.push_str(begin);
+        if let Some(opening) = &dstr.opening {
+            self.buffer.push_str(opening);
         }
         let mut divided = false;
         for part in &dstr.parts {
@@ -329,7 +329,7 @@ impl Formatter {
             }
             match part {
                 DynStrPart::Str(str) => {
-                    divided = str.begin.is_some();
+                    divided = str.opening.is_some();
                     self.format_str(str);
                 }
                 DynStrPart::DynStr(dstr) => {
@@ -341,8 +341,8 @@ impl Formatter {
                 }
             }
         }
-        if let Some(end) = &dstr.end {
-            self.buffer.push_str(end);
+        if let Some(closing) = &dstr.closing {
+            self.buffer.push_str(closing);
         }
     }
 
@@ -360,9 +360,9 @@ impl Formatter {
         self.buffer.push_str(&embedded.closing);
     }
 
-    fn format_heredoc_begin(&mut self, pos: Pos, ctx: &FormatContext) {
+    fn format_heredoc_opening(&mut self, pos: Pos, ctx: &FormatContext) {
         let heredoc = ctx.heredoc_map.get(&pos).expect("heredoc must exist");
-        self.buffer.push_str(heredoc.indent_mode.begin_symbols());
+        self.buffer.push_str(heredoc.indent_mode.prefix_symbols());
         self.buffer.push_str(&heredoc.id);
         self.heredoc_queue.push_back(pos);
     }
@@ -378,7 +378,7 @@ impl Formatter {
                 &decors.leading,
                 ctx,
                 EmptyLineHandling::Trim {
-                    begin: i == 0,
+                    start: i == 0,
                     end: n.kind.is_end_decors(),
                 },
             );
@@ -450,7 +450,7 @@ impl Formatter {
         } else {
             self.write_trailing_comment(&keyword_decors.trailing);
             self.indent();
-            self.write_leading_decors(&next_decors.leading, ctx, EmptyLineHandling::trim_begin());
+            self.write_leading_decors(&next_decors.leading, ctx, EmptyLineHandling::trim_start());
             self.break_line(ctx);
             self.put_indent();
             next_node(self);
@@ -537,8 +537,8 @@ impl Formatter {
                 LineDecor::EmptyLine => {
                     let should_skip = match emp_line_handling {
                         EmptyLineHandling::Skip => true,
-                        EmptyLineHandling::Trim { begin, end } => {
-                            (begin && i == 0) || (end && i == last_idx)
+                        EmptyLineHandling::Trim { start, end } => {
+                            (start && i == 0) || (end && i == last_idx)
                         }
                     };
                     if !should_skip {

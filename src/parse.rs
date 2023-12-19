@@ -105,7 +105,7 @@ impl FmtNodeBuilder<'_> {
                 self.consume_and_store_decors_until(pos, node.location().start_offset());
                 if Self::is_heredoc(node.opening_loc().as_ref()) {
                     self.visit_simple_heredoc(pos, node);
-                    fmt::Node::new(pos, fmt::Kind::HeredocBegin)
+                    fmt::Node::new(pos, fmt::Kind::HeredocOpening)
                 } else {
                     let str = self.visit_string(node);
                     fmt::Node::new(pos, fmt::Kind::Str(str))
@@ -117,7 +117,7 @@ impl FmtNodeBuilder<'_> {
                 self.consume_and_store_decors_until(pos, node.location().start_offset());
                 if Self::is_heredoc(node.opening_loc().as_ref()) {
                     self.visit_complex_heredoc(pos, node);
-                    fmt::Node::new(pos, fmt::Kind::HeredocBegin)
+                    fmt::Node::new(pos, fmt::Kind::HeredocOpening)
                 } else {
                     let dstr = self.visit_interpolated_string(node);
                     fmt::Node::new(pos, fmt::Kind::DynStr(dstr))
@@ -172,12 +172,12 @@ impl FmtNodeBuilder<'_> {
 
     fn visit_string(&mut self, node: prism::StringNode) -> fmt::Str {
         let value = Self::source_lossy_at(&node.content_loc());
-        let open = node.opening_loc().as_ref().map(Self::source_lossy_at);
-        let close = node.closing_loc().as_ref().map(Self::source_lossy_at);
+        let opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
+        let closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
         fmt::Str {
-            begin: open,
+            opening,
             value: value.into(),
-            end: close,
+            closing,
         }
     }
 
@@ -217,12 +217,12 @@ impl FmtNodeBuilder<'_> {
                 _ => panic!("unexpected string interpolation node: {:?}", part),
             }
         }
-        let open = itp_str.opening_loc().as_ref().map(Self::source_lossy_at);
-        let close = itp_str.closing_loc().as_ref().map(Self::source_lossy_at);
+        let opening = itp_str.opening_loc().as_ref().map(Self::source_lossy_at);
+        let closing = itp_str.closing_loc().as_ref().map(Self::source_lossy_at);
         fmt::DynStr {
-            begin: open,
+            opening,
             parts,
-            end: close,
+            closing,
         }
     }
 
@@ -272,9 +272,9 @@ impl FmtNodeBuilder<'_> {
                         if last_str_end < loc.start_offset() {
                             let value = self.src[last_str_end..loc.start_offset()].to_vec();
                             let str = fmt::Str {
-                                begin: None,
+                                opening: None,
                                 value,
-                                end: None,
+                                closing: None,
                             };
                             parts.push(fmt::HeredocPart::Str(str))
                         }
@@ -566,33 +566,33 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn last_empty_line_range_within(&self, begin: usize, end: usize) -> Option<Range<usize>> {
-        let mut line_begin: Option<usize> = None;
+    fn last_empty_line_range_within(&self, start: usize, end: usize) -> Option<Range<usize>> {
+        let mut line_start: Option<usize> = None;
         let mut line_end: Option<usize> = None;
-        for i in (begin..end).rev() {
+        for i in (start..end).rev() {
             let b = self.src[i];
             if b == b'\n' {
                 if line_end.is_none() {
                     line_end = Some(i + 1);
                 } else {
-                    line_begin = Some(i);
+                    line_start = Some(i);
                     break;
                 }
             } else if line_end.is_some() && b != b' ' {
                 line_end = None;
             }
         }
-        match (line_begin, line_end) {
-            (Some(begin), Some(end)) => Some(begin..end),
+        match (line_start, line_end) {
+            (Some(start), Some(end)) => Some(start..end),
             _ => None,
         }
     }
 
-    fn is_at_line_start(&self, begin: usize) -> bool {
-        if begin == 0 {
+    fn is_at_line_start(&self, start: usize) -> bool {
+        if start == 0 {
             return true;
         }
-        let mut idx = begin - 1;
+        let mut idx = start - 1;
         let mut has_char_between_last_newline = false;
         while let Some(b) = self.src.get(idx) {
             match b {
