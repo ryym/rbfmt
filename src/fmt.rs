@@ -25,16 +25,33 @@ pub(crate) fn format(node: Node, decor_store: DecorStore, heredoc_map: HeredocMa
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Pos(pub usize);
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Width {
+    Flat(usize),
+    NotFlat,
+}
+
+impl Width {
+    pub(crate) fn append(&mut self, other: &Self) {
+        let width = match (&self, other) {
+            (Self::Flat(w1), Self::Flat(w2)) => Self::Flat(*w1 + w2),
+            _ => Self::NotFlat,
+        };
+        let _ = mem::replace(self, width);
+    }
+
+    pub(crate) fn append_value(&mut self, value: usize) {
+        if let Self::Flat(width) = &self {
+            let _ = mem::replace(self, Self::Flat(width + value));
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Node {
     pub pos: Pos,
     pub kind: Kind,
-}
-
-impl Node {
-    pub(crate) fn new(pos: Pos, kind: Kind) -> Self {
-        Self { pos, kind }
-    }
+    pub width: Width,
 }
 
 #[derive(Debug)]
@@ -60,6 +77,14 @@ pub(crate) struct Str {
     pub opening: Option<String>,
     pub value: Vec<u8>,
     pub closing: Option<String>,
+}
+
+impl Str {
+    pub(crate) fn len(&self) -> usize {
+        let open = self.opening.as_ref().map_or(0, |s| s.len());
+        let close = self.closing.as_ref().map_or(0, |s| s.len());
+        self.value.len() + open + close
+    }
 }
 
 #[derive(Debug)]
@@ -125,7 +150,30 @@ pub(crate) enum HeredocPart {
 
 #[derive(Debug)]
 pub(crate) struct Exprs {
-    pub nodes: Vec<Node>,
+    nodes: Vec<Node>,
+    width: Width,
+}
+
+impl Exprs {
+    pub(crate) fn new() -> Self {
+        Self {
+            nodes: vec![],
+            width: Width::Flat(0),
+        }
+    }
+
+    pub(crate) fn append_node(&mut self, node: Node) {
+        if self.nodes.is_empty() {
+            self.width = node.width;
+        } else {
+            self.width = Width::NotFlat;
+        }
+        self.nodes.push(node);
+    }
+
+    pub(crate) fn width(&self) -> Width {
+        self.width
+    }
 }
 
 #[derive(Debug)]
@@ -163,6 +211,7 @@ pub(crate) struct Else {
 #[derive(Debug)]
 pub(crate) struct MethodCall {
     pub pos: Pos,
+    pub width: Width,
     pub chain_type: ChainType,
     pub name: String,
     pub args: Vec<Node>,
@@ -193,8 +242,28 @@ pub(crate) struct MethodBlock {
 
 #[derive(Debug)]
 pub(crate) struct MethodChain {
-    pub receiver: Option<Box<Node>>,
-    pub calls: Vec<MethodCall>,
+    width: Width,
+    receiver: Option<Box<Node>>,
+    calls: Vec<MethodCall>,
+}
+
+impl MethodChain {
+    pub(crate) fn new(receiver: Option<Node>) -> Self {
+        Self {
+            width: receiver.as_ref().map_or(Width::Flat(0), |r| r.width),
+            receiver: receiver.map(Box::new),
+            calls: vec![],
+        }
+    }
+
+    pub(crate) fn append_call(&mut self, call: MethodCall) {
+        self.width.append(&call.width);
+        self.calls.push(call);
+    }
+
+    pub(crate) fn width(&self) -> Width {
+        self.width
+    }
 }
 
 #[derive(Debug)]

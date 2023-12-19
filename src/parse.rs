@@ -79,13 +79,21 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_program_node().unwrap();
                 let pos = self.next_pos();
                 let exprs = self.visit_statements(Some(node.statements()), Some(self.src.len()));
-                fmt::Node::new(pos, fmt::Kind::Exprs(exprs))
+                fmt::Node {
+                    pos,
+                    width: exprs.width(),
+                    kind: fmt::Kind::Exprs(exprs),
+                }
             }
             prism::Node::StatementsNode { .. } => {
                 let node = node.as_statements_node().unwrap();
                 let pos = self.next_pos();
                 let exprs = self.visit_statements(Some(node), None);
-                fmt::Node::new(pos, fmt::Kind::Exprs(exprs))
+                fmt::Node {
+                    pos,
+                    width: exprs.width(),
+                    kind: fmt::Kind::Exprs(exprs),
+                }
             }
 
             prism::Node::NilNode { .. } => self.parse_atom(node),
@@ -102,25 +110,59 @@ impl FmtNodeBuilder<'_> {
             prism::Node::StringNode { .. } => {
                 let node = node.as_string_node().unwrap();
                 let pos = self.next_pos();
-                self.consume_and_store_decors_until(pos, node.location().start_offset());
+                let loc = node.location();
+                let has_decors = self.consume_and_store_decors_until(pos, loc.start_offset());
                 if Self::is_heredoc(node.opening_loc().as_ref()) {
-                    self.visit_simple_heredoc(pos, node);
-                    fmt::Node::new(pos, fmt::Kind::HeredocOpening)
+                    let opening_len = self.visit_simple_heredoc(pos, node);
+                    let width = if has_decors {
+                        fmt::Width::NotFlat
+                    } else {
+                        fmt::Width::Flat(opening_len)
+                    };
+                    fmt::Node {
+                        pos,
+                        width,
+                        kind: fmt::Kind::HeredocOpening,
+                    }
                 } else {
-                    let str = self.visit_string(node);
-                    fmt::Node::new(pos, fmt::Kind::Str(str))
+                    let (str, mut width) = self.visit_string(node);
+                    if has_decors {
+                        width = fmt::Width::NotFlat
+                    }
+                    fmt::Node {
+                        pos,
+                        width,
+                        kind: fmt::Kind::Str(str),
+                    }
                 }
             }
             prism::Node::InterpolatedStringNode { .. } => {
                 let node = node.as_interpolated_string_node().unwrap();
                 let pos = self.next_pos();
-                self.consume_and_store_decors_until(pos, node.location().start_offset());
+                let loc = node.location();
+                let has_decors = self.consume_and_store_decors_until(pos, loc.start_offset());
                 if Self::is_heredoc(node.opening_loc().as_ref()) {
-                    self.visit_complex_heredoc(pos, node);
-                    fmt::Node::new(pos, fmt::Kind::HeredocOpening)
+                    let opening_len = self.visit_complex_heredoc(pos, node);
+                    let width = if has_decors {
+                        fmt::Width::NotFlat
+                    } else {
+                        fmt::Width::Flat(opening_len)
+                    };
+                    fmt::Node {
+                        pos,
+                        width,
+                        kind: fmt::Kind::HeredocOpening,
+                    }
                 } else {
-                    let dstr = self.visit_interpolated_string(node);
-                    fmt::Node::new(pos, fmt::Kind::DynStr(dstr))
+                    let (str, mut width) = self.visit_interpolated_string(node);
+                    if has_decors {
+                        width = fmt::Width::NotFlat
+                    }
+                    fmt::Node {
+                        pos,
+                        width,
+                        kind: fmt::Kind::DynStr(str),
+                    }
                 }
             }
 
@@ -150,9 +192,19 @@ impl FmtNodeBuilder<'_> {
             prism::Node::CallNode { .. } => {
                 let node = node.as_call_node().unwrap();
                 let pos = self.next_pos();
-                self.consume_and_store_decors_until(pos, node.location().start_offset());
+                let loc = node.location();
+                let has_decors = self.consume_and_store_decors_until(pos, loc.start_offset());
                 let chain = self.visit_call(node);
-                fmt::Node::new(pos, fmt::Kind::MethodChain(chain))
+                let width = if has_decors {
+                    fmt::Width::NotFlat
+                } else {
+                    chain.width()
+                };
+                fmt::Node {
+                    pos,
+                    width,
+                    kind: fmt::Kind::MethodChain(chain),
+                }
             }
 
             _ => todo!("parse {:?}", node),
@@ -165,38 +217,56 @@ impl FmtNodeBuilder<'_> {
 
     fn parse_atom(&mut self, node: prism::Node) -> fmt::Node {
         let pos = self.next_pos();
-        self.consume_and_store_decors_until(pos, node.location().start_offset());
-        let value = Self::source_lossy_at(&node.location());
-        fmt::Node::new(pos, fmt::Kind::Atom(value))
-    }
-
-    fn visit_string(&mut self, node: prism::StringNode) -> fmt::Str {
-        let value = Self::source_lossy_at(&node.content_loc());
-        let opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
-        let closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
-        fmt::Str {
-            opening,
-            value: value.into(),
-            closing,
+        let loc = node.location();
+        let has_decors = self.consume_and_store_decors_until(pos, loc.start_offset());
+        let value = Self::source_lossy_at(&loc);
+        let flat_width = if has_decors {
+            fmt::Width::NotFlat
+        } else {
+            fmt::Width::Flat(value.len())
+        };
+        fmt::Node {
+            pos,
+            kind: fmt::Kind::Atom(value),
+            width: flat_width,
         }
     }
 
-    fn visit_interpolated_string(&mut self, itp_str: prism::InterpolatedStringNode) -> fmt::DynStr {
+    fn visit_string(&mut self, node: prism::StringNode) -> (fmt::Str, fmt::Width) {
+        let value = Self::source_lossy_at(&node.content_loc());
+        let opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
+        let closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
+        let str = fmt::Str {
+            opening,
+            value: value.into(),
+            closing,
+        };
+        let width = fmt::Width::Flat(str.len());
+        (str, width)
+    }
+
+    fn visit_interpolated_string(
+        &mut self,
+        itp_str: prism::InterpolatedStringNode,
+    ) -> (fmt::DynStr, fmt::Width) {
         let mut parts = vec![];
+        let mut width = fmt::Width::Flat(0);
         for part in itp_str.parts().iter() {
             match part {
                 prism::Node::StringNode { .. } => {
                     let node = part.as_string_node().unwrap();
                     let node_end = node.location().end_offset();
-                    let str = self.visit_string(node);
+                    let (str, str_width) = self.visit_string(node);
                     parts.push(fmt::DynStrPart::Str(str));
+                    width.append(&str_width);
                     self.last_loc_end = node_end;
                 }
                 prism::Node::InterpolatedStringNode { .. } => {
                     let node = part.as_interpolated_string_node().unwrap();
                     let node_end = node.location().end_offset();
-                    let itp_str = self.visit_interpolated_string(node);
-                    parts.push(fmt::DynStrPart::DynStr(itp_str));
+                    let (str, str_width) = self.visit_interpolated_string(node);
+                    parts.push(fmt::DynStrPart::DynStr(str));
+                    width.append(&str_width);
                     self.last_loc_end = node_end;
                 }
                 prism::Node::EmbeddedStatementsNode { .. } => {
@@ -207,6 +277,7 @@ impl FmtNodeBuilder<'_> {
                     let exprs = self.visit_statements(node.statements(), Some(loc.end_offset()));
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
+                    width.append(&exprs.width());
                     parts.push(fmt::DynStrPart::Exprs(fmt::EmbeddedExprs {
                         pos: embedded_pos,
                         exprs,
@@ -219,11 +290,12 @@ impl FmtNodeBuilder<'_> {
         }
         let opening = itp_str.opening_loc().as_ref().map(Self::source_lossy_at);
         let closing = itp_str.closing_loc().as_ref().map(Self::source_lossy_at);
-        fmt::DynStr {
+        let str = fmt::DynStr {
             opening,
             parts,
             closing,
-        }
+        };
+        (str, width)
     }
 
     fn is_heredoc(str_opening_loc: Option<&prism::Location>) -> bool {
@@ -235,20 +307,25 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn visit_simple_heredoc(&mut self, pos: fmt::Pos, node: prism::StringNode) {
+    fn visit_simple_heredoc(&mut self, pos: fmt::Pos, node: prism::StringNode) -> usize {
         let open = node.opening_loc().unwrap().as_slice();
         let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
         let id = String::from_utf8_lossy(id).to_string();
-        let str = self.visit_string(node);
+        let (str, _) = self.visit_string(node);
         let heredoc = fmt::Heredoc {
             id,
             indent_mode,
             parts: vec![fmt::HeredocPart::Str(str)],
         };
         self.heredoc_map.insert(pos, heredoc);
+        open.len()
     }
 
-    fn visit_complex_heredoc(&mut self, pos: fmt::Pos, node: prism::InterpolatedStringNode) {
+    fn visit_complex_heredoc(
+        &mut self,
+        pos: fmt::Pos,
+        node: prism::InterpolatedStringNode,
+    ) -> usize {
         let open = node.opening_loc().unwrap().as_slice();
         let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
         let id = String::from_utf8_lossy(id).to_string();
@@ -259,7 +336,7 @@ impl FmtNodeBuilder<'_> {
                 prism::Node::StringNode { .. } => {
                     let node = part.as_string_node().unwrap();
                     let node_end = node.location().end_offset();
-                    let str = self.visit_string(node);
+                    let (str, _) = self.visit_string(node);
                     parts.push(fmt::HeredocPart::Str(str));
                     self.last_loc_end = node_end;
                     last_str_end = Some(node_end);
@@ -300,6 +377,7 @@ impl FmtNodeBuilder<'_> {
             parts,
         };
         self.heredoc_map.insert(pos, heredoc);
+        open.len()
     }
 
     fn visit_statements(
@@ -307,13 +385,13 @@ impl FmtNodeBuilder<'_> {
         node: Option<prism::StatementsNode>,
         end: Option<usize>,
     ) -> fmt::Exprs {
-        let mut nodes = vec![];
+        let mut exprs = fmt::Exprs::new();
         if let Some(node) = node {
             for n in node.body().iter() {
-                nodes.push(self.visit(n));
+                let node = self.visit(n);
+                exprs.append_node(node);
             }
         }
-        let mut exprs = fmt::Exprs { nodes };
         if let Some(end) = end {
             self.append_end_decors(&mut exprs, end);
         }
@@ -322,7 +400,7 @@ impl FmtNodeBuilder<'_> {
 
     fn visit_if_or_unless(&mut self, node: IfOrUnless) -> fmt::Node {
         let pos = self.next_pos();
-        self.consume_and_store_decors_until(pos, node.loc.start_offset());
+        let _ = self.consume_and_store_decors_until(pos, node.loc.start_offset());
 
         let if_pos = self.next_pos();
         self.last_pos = if_pos;
@@ -355,7 +433,11 @@ impl FmtNodeBuilder<'_> {
             }
         };
 
-        fmt::Node::new(pos, fmt::Kind::IfExpr(ifexpr))
+        fmt::Node {
+            pos,
+            kind: fmt::Kind::IfExpr(ifexpr),
+            width: fmt::Width::NotFlat,
+        }
     }
 
     fn visit_ifelse(&mut self, node: prism::Node, ifexpr: &mut fmt::IfExpr) {
@@ -411,46 +493,64 @@ impl FmtNodeBuilder<'_> {
                 }
                 _ => {
                     let recv = self.visit(receiver);
-                    fmt::MethodChain {
-                        receiver: Some(Box::new(recv)),
-                        calls: vec![],
-                    }
+                    fmt::MethodChain::new(Some(recv))
                 }
             },
-            None => fmt::MethodChain {
-                receiver: None,
-                calls: vec![],
-            },
+            None => fmt::MethodChain::new(None),
         };
+
+        let mut call_width = fmt::Width::Flat(0);
 
         let call_pos = self.next_pos();
         if let Some(msg_loc) = call.message_loc() {
-            self.consume_and_store_decors_until(call_pos, msg_loc.start_offset());
+            let has_decors = self.consume_and_store_decors_until(call_pos, msg_loc.start_offset());
+            if has_decors {
+                call_width = fmt::Width::NotFlat;
+            }
         } else {
             // foo.\n#hoge\n(2)
         }
-
-        let args = if let Some(args) = call.arguments() {
-            args.arguments().iter().map(|n| self.visit(n)).collect()
-        } else {
-            vec![]
-        };
-        let name = String::from_utf8_lossy(call.name().as_slice()).to_string();
 
         let chain_type = if call.is_safe_navigation() {
             fmt::ChainType::SafeNav
         } else {
             fmt::ChainType::Normal
         };
+        let name = String::from_utf8_lossy(call.name().as_slice()).to_string();
+
+        if let Some(loc) = call.call_operator_loc() {
+            let op_len = loc.end_offset() - loc.start_offset();
+            call_width.append_value(op_len);
+        }
+        call_width.append_value(name.len());
+
+        let mut args = vec![];
+        if let Some(args_node) = call.arguments() {
+            // For now surround the arguments by parentheses always.
+            call_width.append_value("()".len());
+            for (i, arg) in args_node.arguments().iter().enumerate() {
+                if i > 0 {
+                    call_width.append_value(", ".len());
+                }
+                let node = self.visit(arg);
+                call_width.append(&node.width);
+                args.push(node);
+            }
+        }
 
         let block = call.block().map(|node| match node {
             prism::Node::BlockNode { .. } => {
                 let node = node.as_block_node().unwrap();
                 let block_pos = self.next_pos();
+
                 self.last_pos = block_pos;
                 let body = node.body().map(|n| self.visit(n));
                 let body_end_loc = node.closing_loc().start_offset();
                 let body = self.wrap_as_exprs(body, Some(body_end_loc));
+
+                call_width.append_value(" {  }".len());
+                call_width.append(&body.width());
+
                 fmt::MethodBlock {
                     pos: block_pos,
                     body,
@@ -459,8 +559,9 @@ impl FmtNodeBuilder<'_> {
             _ => panic!("unexpected node for call block: {:?}", node),
         });
 
-        chain.calls.push(fmt::MethodCall {
+        chain.append_call(fmt::MethodCall {
             pos: call_pos,
+            width: call_width,
             chain_type,
             name,
             args,
@@ -473,14 +574,17 @@ impl FmtNodeBuilder<'_> {
     }
 
     fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: Option<usize>) -> fmt::Exprs {
-        let nodes = match node {
-            None => vec![],
+        let mut exprs = match node {
+            None => fmt::Exprs::new(),
             Some(node) => match node.kind {
-                fmt::Kind::Exprs(exprs) => exprs.nodes,
-                _ => vec![node],
+                fmt::Kind::Exprs(exprs) => exprs,
+                _ => {
+                    let mut exprs = fmt::Exprs::new();
+                    exprs.append_node(node);
+                    exprs
+                }
             },
         };
-        let mut exprs = fmt::Exprs { nodes };
         if let Some(end) = end {
             self.append_end_decors(&mut exprs, end);
         }
@@ -489,15 +593,24 @@ impl FmtNodeBuilder<'_> {
 
     fn append_end_decors(&mut self, exprs: &mut fmt::Exprs, end: usize) {
         if let Some(end_decors) = self.consume_decors_until(end) {
-            let end_node = fmt::Node::new(self.next_pos(), fmt::Kind::EndDecors);
+            let end_node = fmt::Node {
+                pos: self.next_pos(),
+                kind: fmt::Kind::EndDecors,
+                width: fmt::Width::NotFlat,
+            };
             self.store_decors_to(self.last_pos, end_node.pos, end_decors);
-            exprs.nodes.push(end_node);
+            exprs.append_node(end_node);
         }
     }
 
-    fn consume_and_store_decors_until(&mut self, pos: fmt::Pos, end: usize) {
+    #[must_use = "you need to check deocrs existence for flat width calculation"]
+    fn consume_and_store_decors_until(&mut self, pos: fmt::Pos, end: usize) -> bool {
         if let Some(decors) = self.consume_decors_until(end) {
+            let has_leading_decors = !decors.1.is_empty();
             self.store_decors_to(self.last_pos, pos, decors);
+            has_leading_decors
+        } else {
+            false
         }
     }
 
