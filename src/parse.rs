@@ -204,10 +204,17 @@ impl FmtNodeBuilder<'_> {
                 prism::Node::EmbeddedStatementsNode { .. } => {
                     let node = part.as_embedded_statements_node().unwrap();
                     let loc = node.location();
-                    let exprs_pos = self.next_pos();
-                    self.last_pos = exprs_pos;
+                    let embedded_pos = self.next_pos();
+                    self.last_pos = embedded_pos;
                     let exprs = self.visit_statements(node.statements(), Some(loc.end_offset()));
-                    parts.push(fmt::DynStrPart::Exprs(exprs_pos, exprs));
+                    let opening = Self::source_lossy_at(&node.opening_loc());
+                    let closing = Self::source_lossy_at(&node.closing_loc());
+                    parts.push(fmt::DynStrPart::Exprs(fmt::EmbeddedExprs {
+                        pos: embedded_pos,
+                        exprs,
+                        opening,
+                        closing,
+                    }));
                 }
                 _ => panic!("unexpected string interpolation node: {:?}", part),
             }
@@ -274,10 +281,17 @@ impl FmtNodeBuilder<'_> {
                             parts.push(fmt::HeredocPart::Str(str))
                         }
                     }
-                    let exprs_pos = self.next_pos();
-                    self.last_pos = exprs_pos;
+                    let embedded_pos = self.next_pos();
+                    self.last_pos = embedded_pos;
                     let exprs = self.visit_statements(node.statements(), Some(loc.end_offset()));
-                    parts.push(fmt::HeredocPart::Exprs(exprs_pos, exprs));
+                    let opening = Self::source_lossy_at(&node.opening_loc());
+                    let closing = Self::source_lossy_at(&node.closing_loc());
+                    parts.push(fmt::HeredocPart::Exprs(fmt::EmbeddedExprs {
+                        pos: embedded_pos,
+                        exprs,
+                        opening,
+                        closing,
+                    }));
                 }
                 _ => panic!("unexpected heredoc part: {:?}", part),
             }

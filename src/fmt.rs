@@ -54,7 +54,15 @@ pub(crate) struct DynStr {
 pub(crate) enum DynStrPart {
     Str(Str),
     DynStr(DynStr),
-    Exprs(Pos, Exprs),
+    Exprs(EmbeddedExprs),
+}
+
+#[derive(Debug)]
+pub(crate) struct EmbeddedExprs {
+    pub pos: Pos,
+    pub opening: String,
+    pub exprs: Exprs,
+    pub closing: String,
 }
 
 #[derive(Debug)]
@@ -94,7 +102,7 @@ impl HeredocIndentMode {
 #[derive(Debug)]
 pub(crate) enum HeredocPart {
     Str(Str),
-    Exprs(Pos, Exprs),
+    Exprs(EmbeddedExprs),
 }
 
 #[derive(Debug)]
@@ -328,8 +336,8 @@ impl Formatter {
                     divided = true;
                     self.format_dyn_str(dstr, ctx);
                 }
-                DynStrPart::Exprs(pos, exprs) => {
-                    self.format_embedded_exprs(pos, exprs, ctx);
+                DynStrPart::Exprs(embedded) => {
+                    self.format_embedded_exprs(embedded, ctx);
                 }
             }
         }
@@ -338,19 +346,18 @@ impl Formatter {
         }
     }
 
-    fn format_embedded_exprs(&mut self, pos: &Pos, exprs: &Exprs, ctx: &FormatContext) {
-        // XXX: We should use opening/closing of prism::EmbeddedStatementsNode.
-        self.buffer.push_str("#{");
-        if !exprs.0.is_empty() {
-            let decors = ctx.decor_store.get(pos);
+    fn format_embedded_exprs(&mut self, embedded: &EmbeddedExprs, ctx: &FormatContext) {
+        self.buffer.push_str(&embedded.opening);
+        if !embedded.exprs.0.is_empty() {
+            let decors = ctx.decor_store.get(&embedded.pos);
             self.write_trailing_comment(&decors.trailing);
             self.indent();
-            self.format_exprs(exprs, ctx);
+            self.format_exprs(&embedded.exprs, ctx);
             self.break_line(ctx);
             self.dedent();
             self.put_indent();
         }
-        self.buffer.push('}');
+        self.buffer.push_str(&embedded.closing);
     }
 
     fn format_heredoc_begin(&mut self, pos: Pos, ctx: &FormatContext) {
@@ -581,8 +588,8 @@ impl Formatter {
                             let value = String::from_utf8_lossy(&str.value);
                             self.buffer.push_str(&value);
                         }
-                        HeredocPart::Exprs(pos, exprs) => {
-                            self.format_embedded_exprs(pos, exprs, ctx);
+                        HeredocPart::Exprs(embedded) => {
+                            self.format_embedded_exprs(embedded, ctx);
                         }
                     }
                 }
@@ -599,8 +606,8 @@ impl Formatter {
                             let value = String::from_utf8_lossy(&str.value);
                             self.buffer.push_str(&value);
                         }
-                        HeredocPart::Exprs(pos, exprs) => {
-                            self.format_embedded_exprs(pos, exprs, ctx);
+                        HeredocPart::Exprs(embedded) => {
+                            self.format_embedded_exprs(embedded, ctx);
                         }
                     }
                 }
