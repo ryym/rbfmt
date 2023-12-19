@@ -125,7 +125,9 @@ pub(crate) enum HeredocPart {
 }
 
 #[derive(Debug)]
-pub(crate) struct Exprs(pub Vec<Node>);
+pub(crate) struct Exprs {
+    pub nodes: Vec<Node>,
+}
 
 #[derive(Debug)]
 pub(crate) struct IfExpr {
@@ -348,7 +350,7 @@ impl Formatter {
 
     fn format_embedded_exprs(&mut self, embedded: &EmbeddedExprs, ctx: &FormatContext) {
         self.buffer.push_str(&embedded.opening);
-        if !embedded.exprs.0.is_empty() {
+        if !embedded.exprs.nodes.is_empty() {
             let decors = ctx.decor_store.get(&embedded.pos);
             self.write_trailing_comment(&decors.trailing);
             self.indent();
@@ -368,11 +370,10 @@ impl Formatter {
     }
 
     fn format_exprs(&mut self, exprs: &Exprs, ctx: &FormatContext) {
-        let Exprs(nodes) = exprs;
-        if nodes.is_empty() {
+        if exprs.nodes.is_empty() {
             return;
         }
-        for (i, n) in nodes.iter().enumerate() {
+        for (i, n) in exprs.nodes.iter().enumerate() {
             let decors = ctx.decor_store.get(&n.pos);
             self.write_leading_decors(
                 &decors.leading,
@@ -500,7 +501,7 @@ impl Formatter {
                 self.buffer.push(')');
             }
             if let Some(block) = &call.block {
-                if block.body.0.is_empty() {
+                if block.body.nodes.is_empty() {
                     self.buffer.push_str(" {}");
                 } else {
                     let block_decors = ctx.decor_store.get(&block.pos);
