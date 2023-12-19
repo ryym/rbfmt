@@ -425,7 +425,6 @@ impl FmtNodeBuilder<'_> {
         };
         let name = String::from_utf8_lossy(call.name().as_slice()).to_string();
 
-        // XXX: We can just use call.call_operator_loc()
         let chain_type = if call.is_safe_navigation() {
             fmt::ChainType::SafeNav
         } else {
