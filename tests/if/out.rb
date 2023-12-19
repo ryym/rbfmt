@@ -23,7 +23,7 @@ elsif true
 else
 end
 
-if 1
+if 0 # 0
   # 0.9
   1.0
   # 1.1
@@ -56,22 +56,30 @@ elsif # elsif
 end
 
 # if-1
-# if-2
-# if-3
-if true # if-4
+if # if-2
+  # if-3
+  true # if-4
   # if-5
   nil # if-6
   # if-7
 end # if-8
 
-# if-1
-if true
+if # if-1
+  true
   nil
 end
 
-# if-1
-if true
+if
+  # if-1
+  true
   nil
+end
+
+if true
+  1
+elsif # 2
+  false
+  2
 end
 
 # --- unless ---

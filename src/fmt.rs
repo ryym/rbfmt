@@ -109,14 +109,14 @@ pub(crate) struct Exprs(pub Vec<Node>);
 #[derive(Debug)]
 pub(crate) struct IfExpr {
     pub is_unless: bool,
-    pub if_first: IfPart,
-    pub elsifs: Vec<Elsif>,
+    pub if_first: Conditional,
+    pub elsifs: Vec<Conditional>,
     pub if_last: Option<Else>,
     pub end_pos: Pos,
 }
 
 impl IfExpr {
-    pub(crate) fn new(is_unless: bool, if_first: IfPart) -> Self {
+    pub(crate) fn new(is_unless: bool, if_first: Conditional) -> Self {
         Self {
             is_unless,
             if_first,
@@ -128,30 +128,16 @@ impl IfExpr {
 }
 
 #[derive(Debug)]
-pub(crate) struct Elsif {
+pub(crate) struct Conditional {
     pub pos: Pos,
-    pub part: IfPart,
+    pub cond: Box<Node>,
+    pub body: Exprs,
 }
 
 #[derive(Debug)]
 pub(crate) struct Else {
     pub pos: Pos,
     pub body: Exprs,
-}
-
-#[derive(Debug)]
-pub(crate) struct IfPart {
-    pub cond: Box<Node>,
-    pub body: Exprs,
-}
-
-impl IfPart {
-    pub(crate) fn new(cond: Node, body: Exprs) -> Self {
-        Self {
-            cond: Box::new(cond),
-            body,
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -415,45 +401,28 @@ impl Formatter {
 
     fn format_if_expr(&mut self, expr: &IfExpr, ctx: &FormatContext) {
         if expr.is_unless {
-            self.buffer.push_str("unless ");
+            self.buffer.push_str("unless");
         } else {
-            self.buffer.push_str("if ");
+            self.buffer.push_str("if");
         }
+        let if_decors = ctx.decor_store.get(&expr.if_first.pos);
         let cond_decors = ctx.decor_store.get(&expr.if_first.cond.pos);
-        self.format(&expr.if_first.cond, ctx);
-        self.write_trailing_comment(&cond_decors.trailing);
-        self.indent();
+        self.format_decors_in_keyword_gap(ctx, if_decors, cond_decors, |self_| {
+            self_.format(&expr.if_first.cond, ctx);
+        });
         self.format_exprs(&expr.if_first.body, ctx);
 
         for elsif in &expr.elsifs {
-            let elsif_decors = ctx.decor_store.get(&elsif.pos);
             self.break_line(ctx);
             self.dedent();
             self.put_indent();
             self.buffer.push_str("elsif");
-            if elsif_decors.trailing.is_some() {
-                self.write_trailing_comment(&elsif_decors.trailing);
-            } else {
-                self.buffer.push(' ');
-            }
-            let cond_decors = ctx.decor_store.get(&elsif.part.cond.pos);
-            if cond_decors.leading.is_empty() {
-                self.format(&elsif.part.cond, ctx);
-                self.write_trailing_comment(&cond_decors.trailing);
-                self.indent();
-            } else {
-                self.indent();
-                self.write_leading_decors(
-                    &cond_decors.leading,
-                    ctx,
-                    EmptyLineHandling::trim_begin(),
-                );
-                self.break_line(ctx);
-                self.put_indent();
-                self.format(&elsif.part.cond, ctx);
-                self.write_trailing_comment(&cond_decors.trailing);
-            }
-            self.format_exprs(&elsif.part.body, ctx);
+            let elsif_decors = ctx.decor_store.get(&elsif.pos);
+            let cond_decors = ctx.decor_store.get(&elsif.cond.pos);
+            self.format_decors_in_keyword_gap(ctx, elsif_decors, cond_decors, |self_| {
+                self_.format(&elsif.cond, ctx);
+            });
+            self.format_exprs(&elsif.body, ctx);
         }
 
         if let Some(if_last) = &expr.if_last {
@@ -474,6 +443,30 @@ impl Formatter {
         self.put_indent();
         self.buffer.push_str("end");
         self.write_trailing_comment(&end_decors.trailing);
+    }
+
+    // Handle comments like "if # foo\n #bar\n predicate"
+    fn format_decors_in_keyword_gap(
+        &mut self,
+        ctx: &FormatContext,
+        keyword_decors: &DecorSet,
+        next_decors: &DecorSet,
+        next_node: impl FnOnce(&mut Self),
+    ) {
+        if keyword_decors.trailing.is_none() && next_decors.leading.is_empty() {
+            self.buffer.push(' ');
+            next_node(self);
+            self.write_trailing_comment(&next_decors.trailing);
+            self.indent();
+        } else {
+            self.write_trailing_comment(&keyword_decors.trailing);
+            self.indent();
+            self.write_leading_decors(&next_decors.leading, ctx, EmptyLineHandling::trim_begin());
+            self.break_line(ctx);
+            self.put_indent();
+            next_node(self);
+            self.write_trailing_comment(&next_decors.trailing);
+        }
     }
 
     fn format_method_chain(&mut self, chain: &MethodChain, ctx: &FormatContext) {

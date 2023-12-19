@@ -310,27 +310,10 @@ impl FmtNodeBuilder<'_> {
 
     fn visit_if_or_unless(&mut self, node: IfOrUnless) -> fmt::Node {
         let pos = self.next_pos();
-
-        // Consume decors above the if expression.
         self.consume_and_store_decors_until(pos, node.loc.start_offset());
 
-        // XXX: If we can move the responsibility of this decors merging to fmt.rs,
-        // visit_if and the logic inside of visit_ifelse could be unified.
-        //
-        // Consume decors between "if" and the condition expression.
-        // Then merge it to the decors of "if" itself.
-        let predicate_start = node.predicate.location().start_offset();
-        let decors_in_if_and_cond = self.consume_decors_until(predicate_start);
-        if let Some((if_trailing, cond_leading)) = decors_in_if_and_cond {
-            if let Some(c) = if_trailing {
-                self.decor_store
-                    .append_leading_decors(pos, vec![fmt::LineDecor::Comment(c)]);
-            }
-            if !cond_leading.is_empty() {
-                self.decor_store.append_leading_decors(pos, cond_leading);
-            }
-        }
-
+        let if_pos = self.next_pos();
+        self.last_pos = if_pos;
         let predicate = self.visit(node.predicate);
         let end_loc = node.end_loc.expect("end must exist in root if/unless");
 
@@ -339,8 +322,12 @@ impl FmtNodeBuilder<'_> {
             Some(conseq) => {
                 let else_start = conseq.location().start_offset();
                 let body = self.visit_statements(node.statements, Some(else_start));
-                let if_part = fmt::IfPart::new(predicate, body);
-                let mut ifexpr = fmt::IfExpr::new(!node.is_if, if_part);
+                let if_first = fmt::Conditional {
+                    pos: if_pos,
+                    cond: Box::new(predicate),
+                    body,
+                };
+                let mut ifexpr = fmt::IfExpr::new(!node.is_if, if_first);
                 self.visit_ifelse(conseq, &mut ifexpr);
                 ifexpr.end_pos = self.next_pos();
                 self.consume_and_store_decors_until(ifexpr.end_pos, end_loc.start_offset());
@@ -349,8 +336,12 @@ impl FmtNodeBuilder<'_> {
             // if...end
             None => {
                 let body = self.visit_statements(node.statements, Some(end_loc.start_offset()));
-                let if_part = fmt::IfPart::new(predicate, body);
-                fmt::IfExpr::new(!node.is_if, if_part)
+                let if_first = fmt::Conditional {
+                    pos: if_pos,
+                    cond: Box::new(predicate),
+                    body,
+                };
+                fmt::IfExpr::new(!node.is_if, if_first)
             }
         };
 
@@ -371,9 +362,10 @@ impl FmtNodeBuilder<'_> {
                 let body_end_loc = conseq.as_ref().map(|n| n.location().start_offset());
                 let body = self.visit_statements(node.statements(), body_end_loc);
 
-                ifexpr.elsifs.push(fmt::Elsif {
+                ifexpr.elsifs.push(fmt::Conditional {
                     pos: elsif_pos,
-                    part: fmt::IfPart::new(predicate, body),
+                    cond: Box::new(predicate),
+                    body,
                 });
                 if let Some(conseq) = conseq {
                     self.visit_ifelse(conseq, ifexpr);
