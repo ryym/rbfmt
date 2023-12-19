@@ -391,9 +391,7 @@ impl FmtNodeBuilder<'_> {
                 exprs.append_node(node);
             }
         }
-        if let Some(end) = end {
-            self.append_end_decors(&mut exprs, end);
-        }
+        self.consume_end_decors(&mut exprs, end);
         exprs
     }
 
@@ -584,21 +582,17 @@ impl FmtNodeBuilder<'_> {
                 }
             },
         };
-        if let Some(end) = end {
-            self.append_end_decors(&mut exprs, end);
-        }
+        self.consume_end_decors(&mut exprs, end);
         exprs
     }
 
-    fn append_end_decors(&mut self, exprs: &mut fmt::Exprs, end: usize) {
-        if let Some(end_decors) = self.consume_decors_until(end) {
-            let end_node = fmt::Node {
-                pos: self.next_pos(),
-                kind: fmt::Kind::EndDecors,
-                width: fmt::Width::NotFlat,
-            };
-            self.store_decors_to(self.last_pos, end_node.pos, end_decors);
-            exprs.append_node(end_node);
+    fn consume_end_decors(&mut self, exprs: &mut fmt::Exprs, end: Option<usize>) {
+        if let Some(end) = end {
+            if let Some(decors) = self.consume_decors_until(end) {
+                let end_pos = self.next_pos();
+                self.store_decors_to(self.last_pos, end_pos, decors);
+                exprs.set_end_decors_pos(end_pos);
+            }
         }
     }
 

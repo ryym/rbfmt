@@ -67,15 +67,8 @@ pub(crate) enum Kind {
     DynStr(DynStr),
     HeredocOpening,
     Exprs(Exprs),
-    EndDecors,
     IfExpr(IfExpr),
     MethodChain(MethodChain),
-}
-
-impl Kind {
-    fn is_end_decors(&self) -> bool {
-        matches!(self, Self::EndDecors)
-    }
 }
 
 #[derive(Debug)]
@@ -158,6 +151,7 @@ pub(crate) enum HeredocPart {
 pub(crate) struct Exprs {
     nodes: Vec<Node>,
     width: Width,
+    phantom_end_pos: Option<Pos>,
 }
 
 impl Exprs {
@@ -165,6 +159,7 @@ impl Exprs {
         Self {
             nodes: vec![],
             width: Width::Flat(0),
+            phantom_end_pos: None,
         }
     }
 
@@ -177,8 +172,20 @@ impl Exprs {
         self.nodes.push(node);
     }
 
+    pub(crate) fn set_end_decors_pos(&mut self, pos: Pos) {
+        self.phantom_end_pos = Some(pos);
+        self.width = Width::NotFlat;
+    }
+
     pub(crate) fn width(&self) -> Width {
         self.width
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        match self.width {
+            Width::Flat(w) => w == 0,
+            Width::NotFlat => false,
+        }
     }
 }
 
@@ -376,7 +383,6 @@ impl Formatter {
             Kind::DynStr(dstr) => self.format_dyn_str(dstr, ctx),
             Kind::HeredocOpening => self.format_heredoc_opening(node.pos, ctx),
             Kind::Exprs(exprs) => self.format_exprs(exprs, ctx),
-            Kind::EndDecors => unreachable!("end decors unexpectedly rendered"),
             Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
         }
@@ -424,7 +430,7 @@ impl Formatter {
 
     fn format_embedded_exprs(&mut self, embedded: &EmbeddedExprs, ctx: &FormatContext) {
         self.buffer.push_str(&embedded.opening);
-        if !embedded.exprs.nodes.is_empty() {
+        if !embedded.exprs.is_empty() {
             let decors = ctx.decor_store.get(&embedded.pos);
             self.write_trailing_comment(&decors.trailing);
             self.indent();
@@ -444,9 +450,6 @@ impl Formatter {
     }
 
     fn format_exprs(&mut self, exprs: &Exprs, ctx: &FormatContext) {
-        if exprs.nodes.is_empty() {
-            return;
-        }
         for (i, n) in exprs.nodes.iter().enumerate() {
             let decors = ctx.decor_store.get(&n.pos);
             self.write_leading_decors(
@@ -454,15 +457,26 @@ impl Formatter {
                 ctx,
                 EmptyLineHandling::Trim {
                     start: i == 0,
-                    end: n.kind.is_end_decors(),
+                    end: false,
                 },
             );
-            if !matches!(n.kind, Kind::EndDecors) {
-                self.break_line(ctx);
-                self.put_indent();
-                self.format(n, ctx);
-            }
+            self.break_line(ctx);
+            self.put_indent();
+            self.format(n, ctx);
             self.write_trailing_comment(&decors.trailing);
+        }
+        if let Some(end_pos) = &exprs.phantom_end_pos {
+            let end_decors = ctx.decor_store.get(end_pos);
+            if !end_decors.leading.is_empty() {
+                self.write_leading_decors(
+                    &end_decors.leading,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: exprs.nodes.is_empty(),
+                        end: true,
+                    },
+                );
+            }
         }
     }
 
@@ -575,10 +589,10 @@ impl Formatter {
                 self.buffer.push(')');
             }
             if let Some(block) = &call.block {
-                if block.body.nodes.is_empty() {
+                let block_decors = ctx.decor_store.get(&block.pos);
+                if block.body.nodes.is_empty() && block_decors.trailing.is_none() {
                     self.buffer.push_str(" {}");
                 } else {
-                    let block_decors = ctx.decor_store.get(&block.pos);
                     self.buffer.push_str(" do");
                     self.write_trailing_comment(&block_decors.trailing);
                     self.indent();
