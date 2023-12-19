@@ -117,7 +117,6 @@ impl HeredocIndentMode {
     }
 }
 
-#[allow(unused)]
 #[derive(Debug)]
 pub(crate) enum HeredocPart {
     Str(Str),
