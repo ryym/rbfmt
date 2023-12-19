@@ -3,6 +3,25 @@ use std::{
     mem,
 };
 
+pub(crate) fn format(node: Node, decor_store: DecorStore, heredoc_map: HeredocMap) -> String {
+    let ctx = FormatContext {
+        decor_store,
+        heredoc_map,
+    };
+    let mut formatter = Formatter {
+        buffer: String::new(),
+        heredoc_queue: VecDeque::new(),
+        indent: 0,
+    };
+    formatter.format(&node, &ctx);
+    if formatter.buffer.is_empty() {
+        formatter.buffer
+    } else {
+        formatter.break_line(&ctx);
+        formatter.buffer.trim_start().to_string()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Pos(pub usize);
 
@@ -264,25 +283,6 @@ pub(crate) type HeredocMap = HashMap<Pos, Heredoc>;
 struct FormatContext {
     decor_store: DecorStore,
     heredoc_map: HeredocMap,
-}
-
-pub(crate) fn format(node: Node, decor_store: DecorStore, heredoc_map: HeredocMap) -> String {
-    let ctx = FormatContext {
-        decor_store,
-        heredoc_map,
-    };
-    let mut formatter = Formatter {
-        buffer: String::new(),
-        heredoc_queue: VecDeque::new(),
-        indent: 0,
-    };
-    formatter.format(&node, &ctx);
-    if formatter.buffer.is_empty() {
-        formatter.buffer
-    } else {
-        formatter.break_line(&ctx);
-        formatter.buffer.trim_start().to_string()
-    }
 }
 
 #[derive(Debug)]
