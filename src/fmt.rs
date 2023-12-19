@@ -108,7 +108,7 @@ pub(crate) struct Exprs(pub Vec<Node>);
 
 #[derive(Debug)]
 pub(crate) struct IfExpr {
-    pub is_unless: bool,
+    pub is_if: bool,
     pub if_first: Conditional,
     pub elsifs: Vec<Conditional>,
     pub if_last: Option<Else>,
@@ -116,9 +116,9 @@ pub(crate) struct IfExpr {
 }
 
 impl IfExpr {
-    pub(crate) fn new(is_unless: bool, if_first: Conditional) -> Self {
+    pub(crate) fn new(is_if: bool, if_first: Conditional) -> Self {
         Self {
-            is_unless,
+            is_if,
             if_first,
             elsifs: vec![],
             if_last: None,
@@ -400,10 +400,10 @@ impl Formatter {
     }
 
     fn format_if_expr(&mut self, expr: &IfExpr, ctx: &FormatContext) {
-        if expr.is_unless {
-            self.buffer.push_str("unless");
-        } else {
+        if expr.is_if {
             self.buffer.push_str("if");
+        } else {
+            self.buffer.push_str("unless");
         }
         let if_decors = ctx.decor_store.get(&expr.if_first.pos);
         let cond_decors = ctx.decor_store.get(&expr.if_first.cond.pos);

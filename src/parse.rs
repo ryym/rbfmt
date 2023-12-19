@@ -327,7 +327,7 @@ impl FmtNodeBuilder<'_> {
                     cond: Box::new(predicate),
                     body,
                 };
-                let mut ifexpr = fmt::IfExpr::new(!node.is_if, if_first);
+                let mut ifexpr = fmt::IfExpr::new(node.is_if, if_first);
                 self.visit_ifelse(conseq, &mut ifexpr);
                 ifexpr.end_pos = self.next_pos();
                 self.consume_and_store_decors_until(ifexpr.end_pos, end_loc.start_offset());
@@ -341,7 +341,7 @@ impl FmtNodeBuilder<'_> {
                     cond: Box::new(predicate),
                     body,
                 };
-                fmt::IfExpr::new(!node.is_if, if_first)
+                fmt::IfExpr::new(node.is_if, if_first)
             }
         };
 
