@@ -50,11 +50,15 @@ struct IfOrUnless<'src> {
 
 struct LastVisitPoint {
     pos: fmt::Pos,
+    trailing_comment_allowed: bool,
 }
 
 impl LastVisitPoint {
     fn with_pos(pos: fmt::Pos) -> Self {
-        Self { pos }
+        Self {
+            pos,
+            trailing_comment_allowed: true,
+        }
     }
 }
 
@@ -281,14 +285,15 @@ impl FmtNodeBuilder<'_> {
                 prism::Node::EmbeddedStatementsNode { .. } => {
                     let node = part.as_embedded_statements_node().unwrap();
                     let loc = node.location();
-                    let embedded_pos = self.next_pos();
-                    self.last_visit = LastVisitPoint::with_pos(embedded_pos);
+                    self.last_visit = LastVisitPoint {
+                        pos: fmt::Pos::none(),
+                        trailing_comment_allowed: false,
+                    };
                     let exprs = self.visit_statements(node.statements(), Some(loc.end_offset()));
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
                     width.append(&exprs.width());
                     parts.push(fmt::DynStrPart::Exprs(fmt::EmbeddedExprs {
-                        pos: embedded_pos,
                         exprs,
                         opening,
                         closing,
@@ -365,13 +370,14 @@ impl FmtNodeBuilder<'_> {
                             parts.push(fmt::HeredocPart::Str(str))
                         }
                     }
-                    let embedded_pos = self.next_pos();
-                    self.last_visit = LastVisitPoint::with_pos(embedded_pos);
+                    self.last_visit = LastVisitPoint {
+                        pos: fmt::Pos::none(),
+                        trailing_comment_allowed: false,
+                    };
                     let exprs = self.visit_statements(node.statements(), Some(loc.end_offset()));
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
                     parts.push(fmt::HeredocPart::Exprs(fmt::EmbeddedExprs {
-                        pos: embedded_pos,
                         exprs,
                         opening,
                         closing,
@@ -637,11 +643,13 @@ impl FmtNodeBuilder<'_> {
             if (self.last_loc_end..=end).contains(&loc.start_offset()) {
                 let value = Self::source_lossy_at(&loc);
                 let fmt_comment = fmt::Comment { value };
-                if self.is_at_line_start(loc.start_offset()) {
+                if self.last_visit.trailing_comment_allowed
+                    && !self.is_at_line_start(loc.start_offset())
+                {
+                    trailing_comment = Some(fmt_comment);
+                } else {
                     self.consume_empty_lines_until(loc.start_offset(), &mut line_decors);
                     line_decors.push(fmt::LineDecor::Comment(fmt_comment));
-                } else {
-                    trailing_comment = Some(fmt_comment);
                 }
                 self.last_loc_end = loc.end_offset() - 1;
                 self.comments.next();

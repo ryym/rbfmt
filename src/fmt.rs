@@ -102,7 +102,6 @@ pub(crate) enum DynStrPart {
 
 #[derive(Debug)]
 pub(crate) struct EmbeddedExprs {
-    pub pos: Pos,
     pub opening: String,
     pub exprs: Exprs,
     pub closing: String,
@@ -431,8 +430,6 @@ impl Formatter {
     fn format_embedded_exprs(&mut self, embedded: &EmbeddedExprs, ctx: &FormatContext) {
         self.buffer.push_str(&embedded.opening);
         if !embedded.exprs.is_empty() {
-            let decors = ctx.decor_store.get(&embedded.pos);
-            self.write_trailing_comment(&decors.trailing);
             self.indent();
             self.format_exprs(&embedded.exprs, ctx);
             self.break_line(ctx);
