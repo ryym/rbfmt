@@ -124,27 +124,20 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_string_node().unwrap();
                 let pos = self.next_pos();
                 let loc = node.location();
-                let has_decors = self.retain_decors_until(pos, loc.start_offset());
+                let decors_width = self.retain_decors_until(pos, loc.start_offset());
                 if Self::is_heredoc(node.opening_loc().as_ref()) {
                     let opening_len = self.visit_simple_heredoc(pos, node);
-                    let width = if has_decors {
-                        fmt::Width::NotFlat
-                    } else {
-                        fmt::Width::Flat(opening_len)
-                    };
+                    let width = fmt::Width::Flat(opening_len).add(&decors_width);
                     fmt::Node {
                         pos,
                         width,
                         kind: fmt::Kind::HeredocOpening,
                     }
                 } else {
-                    let (str, mut width) = self.visit_string(node);
-                    if has_decors {
-                        width = fmt::Width::NotFlat
-                    }
+                    let (str, width) = self.visit_string(node);
                     fmt::Node {
                         pos,
-                        width,
+                        width: decors_width.add(&width),
                         kind: fmt::Kind::Str(str),
                     }
                 }
@@ -153,27 +146,20 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_interpolated_string_node().unwrap();
                 let pos = self.next_pos();
                 let loc = node.location();
-                let has_decors = self.retain_decors_until(pos, loc.start_offset());
+                let decors_width = self.retain_decors_until(pos, loc.start_offset());
                 if Self::is_heredoc(node.opening_loc().as_ref()) {
                     let opening_len = self.visit_complex_heredoc(pos, node);
-                    let width = if has_decors {
-                        fmt::Width::NotFlat
-                    } else {
-                        fmt::Width::Flat(opening_len)
-                    };
+                    let width = fmt::Width::Flat(opening_len).add(&decors_width);
                     fmt::Node {
                         pos,
                         width,
                         kind: fmt::Kind::HeredocOpening,
                     }
                 } else {
-                    let (str, mut width) = self.visit_interpolated_string(node);
-                    if has_decors {
-                        width = fmt::Width::NotFlat
-                    }
+                    let (str, width) = self.visit_interpolated_string(node);
                     fmt::Node {
                         pos,
-                        width,
+                        width: decors_width.add(&width),
                         kind: fmt::Kind::DynStr(str),
                     }
                 }
@@ -206,16 +192,11 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_call_node().unwrap();
                 let pos = self.next_pos();
                 let loc = node.location();
-                let has_decors = self.retain_decors_until(pos, loc.start_offset());
+                let decors_width = self.retain_decors_until(pos, loc.start_offset());
                 let chain = self.visit_call(node);
-                let width = if has_decors {
-                    fmt::Width::NotFlat
-                } else {
-                    chain.width()
-                };
                 fmt::Node {
                     pos,
-                    width,
+                    width: decors_width.add(&chain.width()),
                     kind: fmt::Kind::MethodChain(chain),
                 }
             }
@@ -231,17 +212,13 @@ impl FmtNodeBuilder<'_> {
     fn parse_atom(&mut self, node: prism::Node) -> fmt::Node {
         let pos = self.next_pos();
         let loc = node.location();
-        let has_decors = self.retain_decors_until(pos, loc.start_offset());
+        let decors_width = self.retain_decors_until(pos, loc.start_offset());
         let value = Self::source_lossy_at(&loc);
-        let flat_width = if has_decors {
-            fmt::Width::NotFlat
-        } else {
-            fmt::Width::Flat(value.len())
-        };
+        let width = fmt::Width::Flat(value.len());
         fmt::Node {
             pos,
+            width: decors_width.add(&width),
             kind: fmt::Kind::Atom(value),
-            width: flat_width,
         }
     }
 
@@ -520,10 +497,8 @@ impl FmtNodeBuilder<'_> {
 
         let call_pos = self.next_pos();
         if let Some(msg_loc) = call.message_loc() {
-            let has_decors = self.retain_decors_until(call_pos, msg_loc.start_offset());
-            if has_decors {
-                call_width = fmt::Width::NotFlat;
-            }
+            let decors_width = self.retain_decors_until(call_pos, msg_loc.start_offset());
+            call_width.append(&decors_width);
         } else {
             // foo.\n#hoge\n(2)
         }
@@ -617,13 +592,18 @@ impl FmtNodeBuilder<'_> {
     }
 
     #[must_use = "you need to check deocrs existence for flat width calculation"]
-    fn retain_decors_until(&mut self, pos: fmt::Pos, end: usize) -> bool {
-        if let Some(decors) = self.take_decors_until(end) {
+    fn retain_decors_until(&mut self, pos: fmt::Pos, end: usize) -> fmt::Width {
+        let has_leading_decors = if let Some(decors) = self.take_decors_until(end) {
             let has_leading_decors = !decors.1.is_empty();
             self.store_decors_to(self.last_visit.pos, pos, decors);
             has_leading_decors
         } else {
             false
+        };
+        if has_leading_decors {
+            fmt::Width::NotFlat
+        } else {
+            fmt::Width::Flat(0)
         }
     }
 

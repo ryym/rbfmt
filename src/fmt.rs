@@ -38,11 +38,15 @@ pub(crate) enum Width {
 }
 
 impl Width {
-    pub(crate) fn append(&mut self, other: &Self) {
-        let width = match (&self, other) {
+    pub(crate) fn add(self, other: &Self) -> Self {
+        match (&self, other) {
             (Self::Flat(w1), Self::Flat(w2)) => Self::Flat(*w1 + w2),
             _ => Self::NotFlat,
-        };
+        }
+    }
+
+    pub(crate) fn append(&mut self, other: &Self) {
+        let width = self.add(other);
         let _ = mem::replace(self, width);
     }
 
