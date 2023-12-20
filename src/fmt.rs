@@ -587,7 +587,7 @@ impl Formatter {
             }
             if let Some(block) = &call.block {
                 let block_decors = ctx.decor_store.get(&block.pos);
-                if block.body.nodes.is_empty() && block_decors.trailing.is_none() {
+                if block.body.is_empty() && block_decors.trailing.is_none() {
                     self.buffer.push_str(" {}");
                 } else {
                     self.buffer.push_str(" do");

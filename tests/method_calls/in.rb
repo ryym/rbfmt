@@ -38,6 +38,12 @@ end
 foo do # do
 end
 
+foo do
+
+  # foo
+
+end
+
 a {}.b(1)&.c(1, 2) { d(e {}) {} }.f
 
 foo.bar

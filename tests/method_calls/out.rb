@@ -37,6 +37,10 @@ end
 foo do # do
 end
 
+foo do
+  # foo
+end
+
 a {}.b(1)&.c(1, 2) do
   d(e {}) {}
 end.f
