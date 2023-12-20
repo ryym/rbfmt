@@ -175,9 +175,9 @@ impl Exprs {
         self.nodes.push(node);
     }
 
-    pub(crate) fn set_end_decors_pos(&mut self, pos: Pos) {
+    pub(crate) fn set_end_decors_pos(&mut self, pos: Pos, decors_width: Width) {
         self.phantom_end_pos = Some(pos);
-        self.width = Width::NotFlat;
+        self.width.append(&decors_width);
     }
 
     pub(crate) fn width(&self) -> Width {

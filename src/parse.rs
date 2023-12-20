@@ -37,7 +37,11 @@ pub(crate) struct ParserResult {
     pub heredoc_map: fmt::HeredocMap,
 }
 
-type MidDecors = (Option<fmt::Comment>, Vec<fmt::LineDecor>);
+struct MidDecors {
+    last_trailing: Option<fmt::Comment>,
+    leading: Vec<fmt::LineDecor>,
+    leading_width: fmt::Width,
+}
 
 struct IfOrUnless<'src> {
     is_if: bool,
@@ -585,35 +589,44 @@ impl FmtNodeBuilder<'_> {
         if let Some(end) = end {
             if let Some(decors) = self.take_decors_until(end) {
                 let end_pos = self.next_pos();
-                self.store_decors_to(self.last_visit.pos, end_pos, decors);
-                exprs.set_end_decors_pos(end_pos);
+                self.store_decors_to(
+                    self.last_visit.pos,
+                    decors.last_trailing,
+                    end_pos,
+                    decors.leading,
+                );
+                exprs.set_end_decors_pos(end_pos, decors.leading_width);
             }
         }
     }
 
     #[must_use = "you need to check deocrs existence for flat width calculation"]
     fn retain_decors_until(&mut self, pos: fmt::Pos, end: usize) -> fmt::Width {
-        let has_leading_decors = if let Some(decors) = self.take_decors_until(end) {
-            let has_leading_decors = !decors.1.is_empty();
-            self.store_decors_to(self.last_visit.pos, pos, decors);
-            has_leading_decors
-        } else {
-            false
-        };
-        if has_leading_decors {
-            fmt::Width::NotFlat
+        if let Some(decors) = self.take_decors_until(end) {
+            self.store_decors_to(
+                self.last_visit.pos,
+                decors.last_trailing,
+                pos,
+                decors.leading,
+            );
+            decors.leading_width
         } else {
             fmt::Width::Flat(0)
         }
     }
 
-    fn store_decors_to(&mut self, last_pos: fmt::Pos, pos: fmt::Pos, decors: MidDecors) {
-        let (trailing_comment, line_decors) = decors;
-        if let Some(comment) = trailing_comment {
+    fn store_decors_to(
+        &mut self,
+        last_pos: fmt::Pos,
+        last_trailing: Option<fmt::Comment>,
+        pos: fmt::Pos,
+        leading: Vec<fmt::LineDecor>,
+    ) {
+        if let Some(comment) = last_trailing {
             self.decor_store.set_trailing_comment(last_pos, comment);
         }
-        if !line_decors.is_empty() {
-            self.decor_store.append_leading_decors(pos, line_decors);
+        if !leading.is_empty() {
+            self.decor_store.append_leading_decors(pos, leading);
         }
     }
 
@@ -640,6 +653,8 @@ impl FmtNodeBuilder<'_> {
             }
         }
 
+        let mut has_leading_comments = !line_decors.is_empty();
+
         // Then find the other comments. They must not be a trailing comment.
         if !line_decors.is_empty() || trailing_comment.is_some() {
             while let Some(comment) = self.comments.peek() {
@@ -647,6 +662,7 @@ impl FmtNodeBuilder<'_> {
                 if !(self.last_loc_end..=end).contains(&loc.start_offset()) {
                     break;
                 };
+                has_leading_comments = true;
                 let value = Self::source_lossy_at(&loc);
                 let fmt_comment = fmt::Comment { value };
                 self.take_empty_lines_until(loc.start_offset(), &mut line_decors);
@@ -662,7 +678,16 @@ impl FmtNodeBuilder<'_> {
         if line_decors.is_empty() && trailing_comment.is_none() {
             None
         } else {
-            Some((trailing_comment, line_decors))
+            let leading_width = if has_leading_comments {
+                fmt::Width::NotFlat
+            } else {
+                fmt::Width::Flat(0)
+            };
+            Some(MidDecors {
+                last_trailing: trailing_comment,
+                leading: line_decors,
+                leading_width,
+            })
         }
     }
 
