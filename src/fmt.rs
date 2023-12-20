@@ -151,18 +151,24 @@ pub(crate) enum HeredocPart {
 }
 
 #[derive(Debug)]
+pub(crate) struct VirtualEnd {
+    pub pos: Pos,
+    pub width: Width,
+}
+
+#[derive(Debug)]
 pub(crate) struct Exprs {
     nodes: Vec<Node>,
+    virtual_end: Option<VirtualEnd>,
     width: Width,
-    phantom_end_pos: Option<Pos>,
 }
 
 impl Exprs {
     pub(crate) fn new() -> Self {
         Self {
             nodes: vec![],
+            virtual_end: None,
             width: Width::Flat(0),
-            phantom_end_pos: None,
         }
     }
 
@@ -174,10 +180,9 @@ impl Exprs {
         }
         self.nodes.push(node);
     }
-
-    pub(crate) fn set_end_decors_pos(&mut self, pos: Pos, decors_width: Width) {
-        self.phantom_end_pos = Some(pos);
-        self.width.append(&decors_width);
+    pub(crate) fn set_virtual_end(&mut self, end: VirtualEnd) {
+        self.width.append(&end.width);
+        self.virtual_end = Some(end);
     }
 
     pub(crate) fn width(&self) -> Width {
@@ -482,8 +487,8 @@ impl Formatter {
             self.format(n, ctx);
             self.write_trailing_comment(&decors.trailing);
         }
-        if let Some(end_pos) = &exprs.phantom_end_pos {
-            let end_decors = ctx.decor_store.get(end_pos);
+        if let Some(end) = &exprs.virtual_end {
+            let end_decors = ctx.decor_store.get(&end.pos);
             if !end_decors.leading.is_empty() {
                 self.write_leading_decors(
                     &end_decors.leading,

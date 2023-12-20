@@ -591,7 +591,10 @@ impl FmtNodeBuilder<'_> {
                 let end_pos = self.next_pos();
                 self.store_trailing_comment(self.last_visit.pos, decors.last_trailing);
                 self.store_leading_decors(end_pos, decors.leading);
-                exprs.set_end_decors_pos(end_pos, decors.leading_width);
+                exprs.set_virtual_end(fmt::VirtualEnd {
+                    pos: end_pos,
+                    width: decors.leading_width,
+                });
             }
         }
     }
