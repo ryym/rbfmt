@@ -180,6 +180,10 @@ impl Exprs {
         self.width
     }
 
+    pub(crate) fn can_be_flat(&self) -> bool {
+        matches!(self.width, Width::Flat(_))
+    }
+
     pub(crate) fn is_empty(&self) -> bool {
         match self.width {
             Width::Flat(w) => w == 0,
@@ -381,7 +385,9 @@ impl Formatter {
             Kind::Str(str) => self.format_str(str),
             Kind::DynStr(dstr) => self.format_dyn_str(dstr, ctx),
             Kind::HeredocOpening => self.format_heredoc_opening(node.pos, ctx),
-            Kind::Exprs(exprs) => self.format_exprs(exprs, ctx),
+            Kind::Exprs(exprs) => {
+                self.format_exprs(exprs, ctx, false);
+            }
             Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
         }
@@ -429,13 +435,17 @@ impl Formatter {
 
     fn format_embedded_exprs(&mut self, embedded: &EmbeddedExprs, ctx: &FormatContext) {
         self.buffer.push_str(&embedded.opening);
-        if !embedded.exprs.is_empty() {
-            self.indent();
-            self.format_exprs(&embedded.exprs, ctx);
+
+        self.indent();
+        let is_block = self.format_exprs(&embedded.exprs, ctx, false);
+        if is_block {
             self.break_line(ctx);
             self.dedent();
             self.put_indent();
+        } else {
+            self.dedent();
         }
+
         self.buffer.push_str(&embedded.closing);
     }
 
@@ -446,7 +456,13 @@ impl Formatter {
         self.heredoc_queue.push_back(pos);
     }
 
-    fn format_exprs(&mut self, exprs: &Exprs, ctx: &FormatContext) {
+    fn format_exprs(&mut self, exprs: &Exprs, ctx: &FormatContext, block_always: bool) -> bool {
+        if exprs.can_be_flat() && !block_always {
+            if let Some(node) = exprs.nodes.get(0) {
+                self.format(node, ctx);
+            }
+            return false;
+        }
         for (i, n) in exprs.nodes.iter().enumerate() {
             let decors = ctx.decor_store.get(&n.pos);
             self.write_leading_decors(
@@ -475,6 +491,7 @@ impl Formatter {
                 );
             }
         }
+        true
     }
 
     fn format_if_expr(&mut self, expr: &IfExpr, ctx: &FormatContext) {
@@ -488,7 +505,7 @@ impl Formatter {
         self.format_decors_in_keyword_gap(ctx, if_decors, cond_decors, |self_| {
             self_.format(&expr.if_first.cond, ctx);
         });
-        self.format_exprs(&expr.if_first.body, ctx);
+        self.format_exprs(&expr.if_first.body, ctx, true);
 
         for elsif in &expr.elsifs {
             self.break_line(ctx);
@@ -500,7 +517,7 @@ impl Formatter {
             self.format_decors_in_keyword_gap(ctx, elsif_decors, cond_decors, |self_| {
                 self_.format(&elsif.cond, ctx);
             });
-            self.format_exprs(&elsif.body, ctx);
+            self.format_exprs(&elsif.body, ctx, true);
         }
 
         if let Some(if_last) = &expr.if_last {
@@ -511,7 +528,7 @@ impl Formatter {
             self.buffer.push_str("else");
             self.write_trailing_comment(&else_decors.trailing);
             self.indent();
-            self.format_exprs(&if_last.body, ctx);
+            self.format_exprs(&if_last.body, ctx, true);
         }
 
         self.break_line(ctx);
@@ -593,7 +610,7 @@ impl Formatter {
                     self.buffer.push_str(" do");
                     self.write_trailing_comment(&block_decors.trailing);
                     self.indent();
-                    self.format_exprs(&block.body, ctx);
+                    self.format_exprs(&block.body, ctx, true);
                     self.dedent();
                     self.break_line(ctx);
                     self.put_indent();

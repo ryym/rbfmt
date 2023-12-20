@@ -40,6 +40,18 @@ HERE
   cc
 HERE
 
+<<HERE
+  aa
+  #{1; 2}
+  bb
+HERE
+
+<<~HERE
+  aa
+  #{1; 2}
+  cc
+HERE
+
 <<~HH
     
   aa

@@ -30,8 +30,21 @@ H2
 
 <<HERE
   aa
+  #{1}
+  bb
+HERE
+
+<<~HERE
+  aa
+  #{1}
+  cc
+HERE
+
+<<HERE
+  aa
   #{
   1
+  2
 }
   bb
 HERE
@@ -40,6 +53,7 @@ HERE
   aa
   #{
   1
+  2
 }
   cc
 HERE
