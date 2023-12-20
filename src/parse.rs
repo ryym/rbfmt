@@ -292,6 +292,8 @@ impl FmtNodeBuilder<'_> {
                     let exprs = self.visit_statements(node.statements(), Some(loc.end_offset()));
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
+                    width.append_value(opening.len());
+                    width.append_value(closing.len());
                     width.append(&exprs.width());
                     parts.push(fmt::DynStrPart::Exprs(fmt::EmbeddedExprs {
                         exprs,
@@ -304,6 +306,8 @@ impl FmtNodeBuilder<'_> {
         }
         let opening = itp_str.opening_loc().as_ref().map(Self::source_lossy_at);
         let closing = itp_str.closing_loc().as_ref().map(Self::source_lossy_at);
+        width.append_value(opening.as_ref().map_or(0, |s| s.len()));
+        width.append_value(closing.as_ref().map_or(0, |s| s.len()));
         let str = fmt::DynStr {
             opening,
             parts,
