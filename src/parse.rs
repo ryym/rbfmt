@@ -589,12 +589,8 @@ impl FmtNodeBuilder<'_> {
         if let Some(end) = end {
             if let Some(decors) = self.take_decors_until(end) {
                 let end_pos = self.next_pos();
-                self.store_decors_to(
-                    self.last_visit.pos,
-                    decors.last_trailing,
-                    end_pos,
-                    decors.leading,
-                );
+                self.store_trailing_comment(self.last_visit.pos, decors.last_trailing);
+                self.store_leading_decors(end_pos, decors.leading);
                 exprs.set_end_decors_pos(end_pos, decors.leading_width);
             }
         }
@@ -603,30 +599,23 @@ impl FmtNodeBuilder<'_> {
     #[must_use = "you need to check deocrs existence for flat width calculation"]
     fn retain_decors_until(&mut self, pos: fmt::Pos, end: usize) -> fmt::Width {
         if let Some(decors) = self.take_decors_until(end) {
-            self.store_decors_to(
-                self.last_visit.pos,
-                decors.last_trailing,
-                pos,
-                decors.leading,
-            );
+            self.store_trailing_comment(self.last_visit.pos, decors.last_trailing);
+            self.store_leading_decors(pos, decors.leading);
             decors.leading_width
         } else {
             fmt::Width::Flat(0)
         }
     }
 
-    fn store_decors_to(
-        &mut self,
-        last_pos: fmt::Pos,
-        last_trailing: Option<fmt::Comment>,
-        pos: fmt::Pos,
-        leading: Vec<fmt::LineDecor>,
-    ) {
-        if let Some(comment) = last_trailing {
-            self.decor_store.set_trailing_comment(last_pos, comment);
+    fn store_trailing_comment(&mut self, pos: fmt::Pos, comment: Option<fmt::Comment>) {
+        if let Some(comment) = comment {
+            self.decor_store.set_trailing_comment(pos, comment);
         }
-        if !leading.is_empty() {
-            self.decor_store.append_leading_decors(pos, leading);
+    }
+
+    fn store_leading_decors(&mut self, pos: fmt::Pos, decors: Vec<fmt::LineDecor>) {
+        if !decors.is_empty() {
+            self.decor_store.append_leading_decors(pos, decors);
         }
     }
 
