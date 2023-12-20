@@ -16,7 +16,7 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
         decor_store,
         heredoc_map,
         position_gen: 0,
-        last_pos: fmt::Pos(0),
+        last_visit: LastVisitPoint::with_pos(fmt::Pos::none()),
         last_loc_end: 0,
     };
     let fmt_node = builder.build_fmt_node(result.node());
@@ -48,13 +48,23 @@ struct IfOrUnless<'src> {
     end_loc: Option<prism::Location<'src>>,
 }
 
+struct LastVisitPoint {
+    pos: fmt::Pos,
+}
+
+impl LastVisitPoint {
+    fn with_pos(pos: fmt::Pos) -> Self {
+        Self { pos }
+    }
+}
+
 struct FmtNodeBuilder<'src> {
     src: &'src [u8],
     comments: Peekable<prism::Comments<'src>>,
     decor_store: fmt::DecorStore,
     heredoc_map: fmt::HeredocMap,
     position_gen: usize,
-    last_pos: fmt::Pos,
+    last_visit: LastVisitPoint,
     last_loc_end: usize,
 }
 
@@ -209,7 +219,7 @@ impl FmtNodeBuilder<'_> {
             _ => todo!("parse {:?}", node),
         };
 
-        self.last_pos = node.pos;
+        self.last_visit = LastVisitPoint::with_pos(node.pos);
         self.last_loc_end = loc_end;
         node
     }
@@ -272,7 +282,7 @@ impl FmtNodeBuilder<'_> {
                     let node = part.as_embedded_statements_node().unwrap();
                     let loc = node.location();
                     let embedded_pos = self.next_pos();
-                    self.last_pos = embedded_pos;
+                    self.last_visit = LastVisitPoint::with_pos(embedded_pos);
                     let exprs = self.visit_statements(node.statements(), Some(loc.end_offset()));
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
@@ -356,7 +366,7 @@ impl FmtNodeBuilder<'_> {
                         }
                     }
                     let embedded_pos = self.next_pos();
-                    self.last_pos = embedded_pos;
+                    self.last_visit = LastVisitPoint::with_pos(embedded_pos);
                     let exprs = self.visit_statements(node.statements(), Some(loc.end_offset()));
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
@@ -400,7 +410,7 @@ impl FmtNodeBuilder<'_> {
         let _ = self.retain_decors_until(pos, node.loc.start_offset());
 
         let if_pos = self.next_pos();
-        self.last_pos = if_pos;
+        self.last_visit = LastVisitPoint::with_pos(if_pos);
         let predicate = self.visit(node.predicate);
         let end_loc = node.end_loc.expect("end must exist in root if/unless");
 
@@ -443,7 +453,7 @@ impl FmtNodeBuilder<'_> {
             prism::Node::IfNode { .. } => {
                 let node = node.as_if_node().unwrap();
                 let elsif_pos = self.next_pos();
-                self.last_pos = elsif_pos;
+                self.last_visit = LastVisitPoint::with_pos(elsif_pos);
                 let predicate = self.visit(node.predicate());
                 let conseq = node.consequent();
 
@@ -466,7 +476,7 @@ impl FmtNodeBuilder<'_> {
             prism::Node::ElseNode { .. } => {
                 let node = node.as_else_node().unwrap();
                 let else_pos = self.next_pos();
-                self.last_pos = else_pos;
+                self.last_visit = LastVisitPoint::with_pos(else_pos);
 
                 let body_end_loc = node.end_keyword_loc().map(|l| l.end_offset());
                 let body = self.visit_statements(node.statements(), body_end_loc);
@@ -540,7 +550,7 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_block_node().unwrap();
                 let block_pos = self.next_pos();
 
-                self.last_pos = block_pos;
+                self.last_visit = LastVisitPoint::with_pos(block_pos);
                 let body = node.body().map(|n| self.visit(n));
                 let body_end_loc = node.closing_loc().start_offset();
                 let body = self.wrap_as_exprs(body, Some(body_end_loc));
@@ -565,7 +575,7 @@ impl FmtNodeBuilder<'_> {
             block,
         });
 
-        self.last_pos = call_pos;
+        self.last_visit = LastVisitPoint::with_pos(call_pos);
         self.last_loc_end = call.location().end_offset();
         chain
     }
@@ -590,7 +600,7 @@ impl FmtNodeBuilder<'_> {
         if let Some(end) = end {
             if let Some(decors) = self.take_decors_until(end) {
                 let end_pos = self.next_pos();
-                self.store_decors_to(self.last_pos, end_pos, decors);
+                self.store_decors_to(self.last_visit.pos, end_pos, decors);
                 exprs.set_end_decors_pos(end_pos);
             }
         }
@@ -600,7 +610,7 @@ impl FmtNodeBuilder<'_> {
     fn retain_decors_until(&mut self, pos: fmt::Pos, end: usize) -> bool {
         if let Some(decors) = self.take_decors_until(end) {
             let has_leading_decors = !decors.1.is_empty();
-            self.store_decors_to(self.last_pos, pos, decors);
+            self.store_decors_to(self.last_visit.pos, pos, decors);
             has_leading_decors
         } else {
             false
