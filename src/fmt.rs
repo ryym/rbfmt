@@ -10,8 +10,8 @@ pub(crate) fn format(node: Node, decor_store: DecorStore, heredoc_map: HeredocMa
     };
     let mut formatter = Formatter {
         buffer: String::new(),
-        heredoc_queue: VecDeque::new(),
         indent: 0,
+        heredoc_queue: VecDeque::new(),
     };
     formatter.format(&node, &ctx);
     if formatter.buffer.is_empty() {
@@ -374,14 +374,14 @@ struct FormatContext {
 #[derive(Debug)]
 struct Formatter {
     buffer: String,
-    heredoc_queue: VecDeque<Pos>,
     indent: usize,
+    heredoc_queue: VecDeque<Pos>,
 }
 
 impl Formatter {
     fn format(&mut self, node: &Node, ctx: &FormatContext) {
         match &node.kind {
-            Kind::Atom(value) => self.buffer.push_str(value),
+            Kind::Atom(value) => self.push_str(value),
             Kind::Str(str) => self.format_str(str),
             Kind::DynStr(dstr) => self.format_dyn_str(dstr, ctx),
             Kind::HeredocOpening => self.format_heredoc_opening(node.pos, ctx),
@@ -397,22 +397,22 @@ impl Formatter {
         // Ignore non-UTF8 source code for now.
         let value = String::from_utf8_lossy(&str.value);
         if let Some(opening) = &str.opening {
-            self.buffer.push_str(opening);
+            self.push_str(opening);
         }
-        self.buffer.push_str(&value);
+        self.push_str(&value);
         if let Some(closing) = &str.closing {
-            self.buffer.push_str(closing);
+            self.push_str(closing);
         }
     }
 
     fn format_dyn_str(&mut self, dstr: &DynStr, ctx: &FormatContext) {
         if let Some(opening) = &dstr.opening {
-            self.buffer.push_str(opening);
+            self.push_str(opening);
         }
         let mut divided = false;
         for part in &dstr.parts {
             if divided {
-                self.buffer.push(' ');
+                self.push(' ');
             }
             match part {
                 DynStrPart::Str(str) => {
@@ -429,12 +429,12 @@ impl Formatter {
             }
         }
         if let Some(closing) = &dstr.closing {
-            self.buffer.push_str(closing);
+            self.push_str(closing);
         }
     }
 
     fn format_embedded_exprs(&mut self, embedded: &EmbeddedExprs, ctx: &FormatContext) {
-        self.buffer.push_str(&embedded.opening);
+        self.push_str(&embedded.opening);
 
         self.indent();
         let is_block = self.format_exprs(&embedded.exprs, ctx, false);
@@ -446,13 +446,13 @@ impl Formatter {
             self.dedent();
         }
 
-        self.buffer.push_str(&embedded.closing);
+        self.push_str(&embedded.closing);
     }
 
     fn format_heredoc_opening(&mut self, pos: Pos, ctx: &FormatContext) {
         let heredoc = ctx.heredoc_map.get(&pos).expect("heredoc must exist");
-        self.buffer.push_str(heredoc.indent_mode.prefix_symbols());
-        self.buffer.push_str(&heredoc.id);
+        self.push_str(heredoc.indent_mode.prefix_symbols());
+        self.push_str(&heredoc.id);
         self.heredoc_queue.push_back(pos);
     }
 
@@ -496,9 +496,9 @@ impl Formatter {
 
     fn format_if_expr(&mut self, expr: &IfExpr, ctx: &FormatContext) {
         if expr.is_if {
-            self.buffer.push_str("if");
+            self.push_str("if");
         } else {
-            self.buffer.push_str("unless");
+            self.push_str("unless");
         }
         let if_decors = ctx.decor_store.get(&expr.if_first.pos);
         let cond_decors = ctx.decor_store.get(&expr.if_first.cond.pos);
@@ -511,7 +511,7 @@ impl Formatter {
             self.break_line(ctx);
             self.dedent();
             self.put_indent();
-            self.buffer.push_str("elsif");
+            self.push_str("elsif");
             let elsif_decors = ctx.decor_store.get(&elsif.pos);
             let cond_decors = ctx.decor_store.get(&elsif.cond.pos);
             self.format_decors_in_keyword_gap(ctx, elsif_decors, cond_decors, |self_| {
@@ -525,7 +525,7 @@ impl Formatter {
             self.break_line(ctx);
             self.dedent();
             self.put_indent();
-            self.buffer.push_str("else");
+            self.push_str("else");
             self.write_trailing_comment(&else_decors.trailing);
             self.indent();
             self.format_exprs(&if_last.body, ctx, true);
@@ -534,7 +534,7 @@ impl Formatter {
         self.break_line(ctx);
         self.dedent();
         self.put_indent();
-        self.buffer.push_str("end");
+        self.push_str("end");
     }
 
     // Handle comments like "if # foo\n #bar\n predicate"
@@ -546,7 +546,7 @@ impl Formatter {
         next_node: impl FnOnce(&mut Self),
     ) {
         if keyword_decors.trailing.is_none() && next_decors.leading.is_empty() {
-            self.buffer.push(' ');
+            self.push(' ');
             next_node(self);
             self.write_trailing_comment(&next_decors.trailing);
             self.indent();
@@ -588,33 +588,33 @@ impl Formatter {
             }
             has_receiver = has_receiver || i > 0;
             if has_receiver {
-                self.buffer.push_str(call.chain_type.dot());
+                self.push_str(call.chain_type.dot());
             }
-            self.buffer.push_str(&call.name);
+            self.push_str(&call.name);
 
             if !call.args.is_empty() {
-                self.buffer.push('(');
+                self.push('(');
                 for (i, arg) in call.args.iter().enumerate() {
                     if i > 0 {
-                        self.buffer.push_str(", ");
+                        self.push_str(", ");
                     }
                     self.format(arg, ctx);
                 }
-                self.buffer.push(')');
+                self.push(')');
             }
             if let Some(block) = &call.block {
                 let block_decors = ctx.decor_store.get(&block.pos);
                 if block.body.is_empty() && block_decors.trailing.is_none() {
-                    self.buffer.push_str(" {}");
+                    self.push_str(" {}");
                 } else {
-                    self.buffer.push_str(" do");
+                    self.push_str(" do");
                     self.write_trailing_comment(&block_decors.trailing);
                     self.indent();
                     self.format_exprs(&block.body, ctx, true);
                     self.dedent();
                     self.break_line(ctx);
                     self.put_indent();
-                    self.buffer.push_str("end");
+                    self.push_str("end");
                 }
             }
 
@@ -651,7 +651,7 @@ impl Formatter {
                 LineDecor::Comment(comment) => {
                     self.break_line(ctx);
                     self.put_indent();
-                    self.buffer.push_str(&comment.value);
+                    self.push_str(&comment.value);
                 }
             }
         }
@@ -659,9 +659,17 @@ impl Formatter {
 
     fn write_trailing_comment(&mut self, comment: &Option<Comment>) {
         if let Some(comment) = comment {
-            self.buffer.push(' ');
-            self.buffer.push_str(&comment.value);
+            self.push(' ');
+            self.push_str(&comment.value);
         }
+    }
+
+    fn push(&mut self, c: char) {
+        self.buffer.push(c);
+    }
+
+    fn push_str(&mut self, str: &str) {
+        self.buffer.push_str(str);
     }
 
     fn indent(&mut self) {
@@ -673,7 +681,7 @@ impl Formatter {
     }
 
     fn break_line(&mut self, ctx: &FormatContext) {
-        self.buffer.push('\n');
+        self.push('\n');
         let mut queue = mem::take(&mut self.heredoc_queue);
         while let Some(pos) = queue.pop_front() {
             self.write_heredoc_body(&pos, ctx);
@@ -689,7 +697,7 @@ impl Formatter {
                         HeredocPart::Str(str) => {
                             // Ignore non-UTF8 source code for now.
                             let value = String::from_utf8_lossy(&str.value);
-                            self.buffer.push_str(&value);
+                            self.push_str(&value);
                         }
                         HeredocPart::Exprs(embedded) => {
                             self.format_embedded_exprs(embedded, ctx);
@@ -699,7 +707,7 @@ impl Formatter {
                 if matches!(heredoc.indent_mode, HeredocIndentMode::EndIndented) {
                     self.put_indent();
                 }
-                self.buffer.push_str(&heredoc.id);
+                self.push_str(&heredoc.id);
             }
             HeredocIndentMode::AllIndented => {
                 for part in &heredoc.parts {
@@ -707,7 +715,7 @@ impl Formatter {
                         HeredocPart::Str(str) => {
                             // Ignore non-UTF8 source code for now.
                             let value = String::from_utf8_lossy(&str.value);
-                            self.buffer.push_str(&value);
+                            self.push_str(&value);
                         }
                         HeredocPart::Exprs(embedded) => {
                             self.format_embedded_exprs(embedded, ctx);
@@ -715,14 +723,14 @@ impl Formatter {
                     }
                 }
                 self.put_indent();
-                self.buffer.push_str(&heredoc.id);
+                self.push_str(&heredoc.id);
             }
         }
-        self.buffer.push('\n');
+        self.push('\n');
     }
 
     fn put_indent(&mut self) {
         let spaces = " ".repeat(self.indent);
-        self.buffer.push_str(&spaces);
+        self.push_str(&spaces);
     }
 }
