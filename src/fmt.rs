@@ -163,7 +163,7 @@ impl Exprs {
     }
 
     pub(crate) fn append_node(&mut self, node: Node) {
-        if self.nodes.is_empty() {
+        if self.nodes.is_empty() && !matches!(node.kind, Kind::HeredocOpening) {
             self.width = node.width;
         } else {
             self.width = Width::NotFlat;
