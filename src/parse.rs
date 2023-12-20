@@ -411,7 +411,7 @@ impl FmtNodeBuilder<'_> {
                 exprs.append_node(node);
             }
         }
-        self.consume_end_decors(&mut exprs, end);
+        self.retain_end_decors(&mut exprs, end);
         exprs
     }
 
@@ -602,11 +602,11 @@ impl FmtNodeBuilder<'_> {
                 }
             },
         };
-        self.consume_end_decors(&mut exprs, end);
+        self.retain_end_decors(&mut exprs, end);
         exprs
     }
 
-    fn consume_end_decors(&mut self, exprs: &mut fmt::Exprs, end: Option<usize>) {
+    fn retain_end_decors(&mut self, exprs: &mut fmt::Exprs, end: Option<usize>) {
         if let Some(end) = end {
             if let Some(decors) = self.take_decors_until(end) {
                 let end_pos = self.next_pos();
@@ -652,7 +652,7 @@ impl FmtNodeBuilder<'_> {
                 {
                     trailing_comment = Some(fmt_comment);
                 } else {
-                    self.consume_empty_lines_until(loc.start_offset(), &mut line_decors);
+                    self.take_empty_lines_until(loc.start_offset(), &mut line_decors);
                     line_decors.push(fmt::LineDecor::Comment(fmt_comment));
                 }
                 self.last_loc_end = loc.end_offset() - 1;
@@ -669,7 +669,7 @@ impl FmtNodeBuilder<'_> {
                 };
                 let value = Self::source_lossy_at(&loc);
                 let fmt_comment = fmt::Comment { value };
-                self.consume_empty_lines_until(loc.start_offset(), &mut line_decors);
+                self.take_empty_lines_until(loc.start_offset(), &mut line_decors);
                 line_decors.push(fmt::LineDecor::Comment(fmt_comment));
                 self.last_loc_end = loc.end_offset() - 1;
                 self.comments.next();
@@ -677,7 +677,7 @@ impl FmtNodeBuilder<'_> {
         }
 
         // Finally consume the remaining empty lines.
-        self.consume_empty_lines_until(end, &mut line_decors);
+        self.take_empty_lines_until(end, &mut line_decors);
 
         if line_decors.is_empty() && trailing_comment.is_none() {
             None
@@ -686,7 +686,7 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn consume_empty_lines_until(&mut self, end: usize, line_decors: &mut Vec<fmt::LineDecor>) {
+    fn take_empty_lines_until(&mut self, end: usize, line_decors: &mut Vec<fmt::LineDecor>) {
         let range = self.last_empty_line_range_within(self.last_loc_end, end);
         if let Some(range) = range {
             line_decors.push(fmt::LineDecor::EmptyLine);
