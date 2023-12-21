@@ -180,9 +180,12 @@ impl Exprs {
         }
         self.nodes.push(node);
     }
-    pub(crate) fn set_virtual_end(&mut self, end: VirtualEnd) {
-        self.width.append(&end.width);
-        self.virtual_end = Some(end);
+
+    pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
+        if let Some(end) = &end {
+            self.width.append(&end.width);
+        }
+        self.virtual_end = end;
     }
 
     pub(crate) fn width(&self) -> Width {
@@ -237,6 +240,7 @@ pub(crate) struct Else {
 pub(crate) struct Arguments {
     nodes: Vec<Node>,
     width: Width,
+    virtual_end: Option<VirtualEnd>,
 }
 
 impl Arguments {
@@ -244,6 +248,7 @@ impl Arguments {
         Self {
             nodes: vec![],
             width: Width::Flat(0),
+            virtual_end: None,
         }
     }
 
@@ -253,6 +258,13 @@ impl Arguments {
             self.width.append_value(", ".len());
         }
         self.nodes.push(node);
+    }
+
+    pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
+        if let Some(end) = &end {
+            self.width.append(&end.width);
+        }
+        self.virtual_end = end;
     }
 
     pub(crate) fn width(&self) -> Width {
@@ -515,20 +527,29 @@ impl Formatter {
             self.format(n, ctx);
             self.write_trailing_comment(&decors.trailing);
         }
-        if let Some(end) = &exprs.virtual_end {
+        self.write_decors_at_virtual_end(ctx, &exprs.virtual_end, exprs.nodes.is_empty());
+        true
+    }
+
+    fn write_decors_at_virtual_end(
+        &mut self,
+        ctx: &FormatContext,
+        end: &Option<VirtualEnd>,
+        trim_start: bool,
+    ) {
+        if let Some(end) = end {
             let end_decors = ctx.decor_store.get(&end.pos);
             if !end_decors.leading.is_empty() {
                 self.write_leading_decors(
                     &end_decors.leading,
                     ctx,
                     EmptyLineHandling::Trim {
-                        start: exprs.nodes.is_empty(),
+                        start: trim_start,
                         end: true,
                     },
                 );
             }
         }
-        true
     }
 
     fn format_if_expr(&mut self, expr: &IfExpr, ctx: &FormatContext) {
@@ -631,11 +652,35 @@ impl Formatter {
 
             if let Some(args) = &call.args {
                 self.push('(');
-                for (i, arg) in args.nodes.iter().enumerate() {
-                    if i > 0 {
-                        self.push_str(", ");
+                if matches!(args.width, Width::Flat(_)) {
+                    for (i, arg) in args.nodes.iter().enumerate() {
+                        if i > 0 {
+                            self.push_str(", ");
+                        }
+                        self.format(arg, ctx);
                     }
-                    self.format(arg, ctx);
+                } else {
+                    self.indent();
+                    for (i, arg) in args.nodes.iter().enumerate() {
+                        let decors = ctx.decor_store.get(&arg.pos);
+                        self.write_leading_decors(
+                            &decors.leading,
+                            ctx,
+                            EmptyLineHandling::Trim {
+                                start: i == 0,
+                                end: false,
+                            },
+                        );
+                        self.break_line(ctx);
+                        self.put_indent();
+                        self.format(arg, ctx);
+                        self.push(',');
+                        self.write_trailing_comment(&decors.trailing);
+                    }
+                    self.write_decors_at_virtual_end(ctx, &args.virtual_end, args.nodes.is_empty());
+                    self.dedent();
+                    self.break_line(ctx);
+                    self.put_indent();
                 }
                 self.push(')');
             }

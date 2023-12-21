@@ -392,7 +392,8 @@ impl FmtNodeBuilder<'_> {
                 exprs.append_node(node);
             }
         }
-        self.retain_end_decors(&mut exprs, end);
+        let virtual_end = self.take_end_decors_as_virtual_end(end);
+        exprs.set_virtual_end(virtual_end);
         exprs
     }
 
@@ -520,17 +521,39 @@ impl FmtNodeBuilder<'_> {
         }
         call_width.append_value(name.len());
 
-        let args = call.arguments().map(|args_node| {
-            let mut args = fmt::Arguments::new();
-            for arg in args_node.arguments().iter() {
-                let node = self.visit(arg);
-                args.append_node(node);
+        let args = match call.arguments() {
+            None => {
+                if let Some(closing_loc) = call.closing_loc().map(|l| l.start_offset()) {
+                    let virtual_end = self.take_end_decors_as_virtual_end(Some(closing_loc));
+                    virtual_end.map(|end| {
+                        let mut args = fmt::Arguments::new();
+                        args.set_virtual_end(Some(end));
+                        args
+                    })
+                } else {
+                    None
+                }
             }
-            // For now surround the arguments by parentheses always.
-            call_width.append_value("()".len());
-            call_width.append(&args.width());
-            args
-        });
+            Some(args_node) => {
+                self.last_visit = LastVisitPoint {
+                    pos: fmt::Pos::none(),
+                    trailing_comment_allowed: false,
+                };
+                let mut args = fmt::Arguments::new();
+                for arg in args_node.arguments().iter() {
+                    let node = self.visit(arg);
+                    args.append_node(node);
+                }
+                let closing_loc = call.closing_loc().as_ref().map(|l| l.start_offset());
+                let virtual_end = self.take_end_decors_as_virtual_end(closing_loc);
+                args.set_virtual_end(virtual_end);
+
+                // For now surround the arguments by parentheses always.
+                call_width.append_value("()".len());
+                call_width.append(&args.width());
+                Some(args)
+            }
+        };
 
         let block = call.block().map(|node| match node {
             prism::Node::BlockNode { .. } => {
@@ -579,22 +602,24 @@ impl FmtNodeBuilder<'_> {
                 }
             },
         };
-        self.retain_end_decors(&mut exprs, end);
+        let virtual_end = self.take_end_decors_as_virtual_end(end);
+        exprs.set_virtual_end(virtual_end);
         exprs
     }
 
-    fn retain_end_decors(&mut self, exprs: &mut fmt::Exprs, end: Option<usize>) {
+    fn take_end_decors_as_virtual_end(&mut self, end: Option<usize>) -> Option<fmt::VirtualEnd> {
         if let Some(end) = end {
             if let Some(decors) = self.take_decors_until(end) {
                 let end_pos = self.next_pos();
                 self.store_trailing_comment(self.last_visit.pos, decors.last_trailing);
                 self.store_leading_decors(end_pos, decors.leading);
-                exprs.set_virtual_end(fmt::VirtualEnd {
+                return Some(fmt::VirtualEnd {
                     pos: end_pos,
                     width: decors.leading_width,
                 });
             }
         }
+        None
     }
 
     #[must_use = "you need to check deocrs existence for flat width calculation"]

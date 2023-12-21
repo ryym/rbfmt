@@ -22,6 +22,25 @@ foo.call(2)
 
 foo(a(1, b.c(2.d)), e(f(g))).bar(h.i.j).baz
 
+foo(
+  # aa 
+)
+
+foo(
+  1,
+  # aa,
+)
+
+foo(
+  # aa
+  # bb
+  1, # cc
+
+  # dd
+  2,
+  # ee
+)
+
 # for now no special handling
 1.+(2).+(3)
 foo(bar)
