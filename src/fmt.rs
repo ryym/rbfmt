@@ -234,12 +234,40 @@ pub(crate) struct Else {
 }
 
 #[derive(Debug)]
+pub(crate) struct Arguments {
+    nodes: Vec<Node>,
+    width: Width,
+}
+
+impl Arguments {
+    pub(crate) fn new() -> Self {
+        Self {
+            nodes: vec![],
+            width: Width::Flat(0),
+        }
+    }
+
+    pub(crate) fn append_node(&mut self, node: Node) {
+        self.width.append(&node.width);
+        if !self.nodes.is_empty() {
+            self.width.append_value(", ".len());
+        }
+        self.nodes.push(node);
+    }
+
+    pub(crate) fn width(&self) -> Width {
+        self.width
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct MethodCall {
     pub pos: Pos,
     pub width: Width,
     pub chain_type: ChainType,
     pub name: String,
-    pub args: Vec<Node>,
+    // pub args: Vec<Node>,
+    pub args: Option<Arguments>,
     pub block: Option<MethodBlock>,
 }
 
@@ -601,9 +629,9 @@ impl Formatter {
             }
             self.push_str(&call.name);
 
-            if !call.args.is_empty() {
+            if let Some(args) = &call.args {
                 self.push('(');
-                for (i, arg) in call.args.iter().enumerate() {
+                for (i, arg) in args.nodes.iter().enumerate() {
                     if i > 0 {
                         self.push_str(", ");
                     }

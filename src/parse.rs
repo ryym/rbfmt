@@ -520,19 +520,17 @@ impl FmtNodeBuilder<'_> {
         }
         call_width.append_value(name.len());
 
-        let mut args = vec![];
-        if let Some(args_node) = call.arguments() {
+        let args = call.arguments().map(|args_node| {
+            let mut args = fmt::Arguments::new();
+            for arg in args_node.arguments().iter() {
+                let node = self.visit(arg);
+                args.append_node(node);
+            }
             // For now surround the arguments by parentheses always.
             call_width.append_value("()".len());
-            for (i, arg) in args_node.arguments().iter().enumerate() {
-                if i > 0 {
-                    call_width.append_value(", ".len());
-                }
-                let node = self.visit(arg);
-                call_width.append(&node.width);
-                args.push(node);
-            }
-        }
+            call_width.append(&args.width());
+            args
+        });
 
         let block = call.block().map(|node| match node {
             prism::Node::BlockNode { .. } => {
