@@ -307,27 +307,27 @@ pub(crate) struct MethodBlock {
 
 #[derive(Debug)]
 pub(crate) struct MethodChain {
-    width: Width,
     receiver: Option<Box<Node>>,
     calls: Vec<MethodCall>,
+    body_width: Width,
 }
 
 impl MethodChain {
     pub(crate) fn new(receiver: Option<Node>) -> Self {
         Self {
-            width: receiver.as_ref().map_or(Width::Flat(0), |r| r.width),
+            body_width: receiver.as_ref().map_or(Width::Flat(0), |r| r.width),
             receiver: receiver.map(Box::new),
             calls: vec![],
         }
     }
 
     pub(crate) fn append_call(&mut self, call: MethodCall) {
-        self.width.append(&call.width);
+        self.body_width.append(&call.width);
         self.calls.push(call);
     }
 
-    pub(crate) fn width(&self) -> Width {
-        self.width
+    pub(crate) fn body_width(&self) -> Width {
+        self.body_width
     }
 }
 
