@@ -1,5 +1,8 @@
 use similar_asserts::assert_eq;
 use std::{
+    collections::HashSet,
+    env,
+    ffi::OsString,
     fs,
     path::{Path, PathBuf},
 };
@@ -7,9 +10,17 @@ use std::{
 #[test]
 fn system_tests() {
     let dirs = get_test_dirs(Path::new("tests"));
+
+    let targets: HashSet<OsString> = match env::var("TEST") {
+        Ok(files) => files.split(',').map(OsString::from).collect(),
+        Err(_) => HashSet::new(),
+    };
+
     for dir_path in dirs {
-        println!("test: {:?}", dir_path);
-        compare_files(dir_path);
+        if targets.is_empty() || targets.contains(dir_path.as_os_str()) {
+            println!("test: {:?}", dir_path);
+            compare_files(dir_path);
+        }
     }
 }
 
