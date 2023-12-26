@@ -38,6 +38,10 @@ pub(crate) enum Width {
 }
 
 impl Width {
+    pub(crate) fn is_flat(&self) -> bool {
+        matches!(self, Self::Flat(_))
+    }
+
     pub(crate) fn add(self, other: &Self) -> Self {
         match (&self, other) {
             (Self::Flat(w1), Self::Flat(w2)) => Self::Flat(*w1 + w2),
@@ -303,6 +307,7 @@ pub(crate) struct MethodBlock {
     pub pos: Pos,
     // pub args
     pub body: Exprs,
+    pub was_flat: bool,
 }
 
 #[derive(Debug)]
@@ -626,84 +631,120 @@ impl Formatter {
             self.format(recv, ctx);
             if recv_decor.trailing.is_some() {
                 self.write_trailing_comment(&recv_decor.trailing);
-                self.break_line(ctx);
-                self.put_indent();
             }
             has_receiver = true;
         }
 
-        let mut is_flat = true;
-        for (i, call) in chain.calls.iter().enumerate() {
-            let call_decor = ctx.decor_store.get(&call.pos);
-            if !call_decor.leading.is_empty() {
-                if is_flat {
-                    self.indent();
-                    is_flat = false;
+        if chain.body_width.is_flat() {
+            for (i, call) in chain.calls.iter().enumerate() {
+                has_receiver = has_receiver || i > 0;
+                if has_receiver {
+                    self.push_str(call.chain_type.dot());
                 }
-                self.write_leading_decors(&call_decor.leading, ctx, EmptyLineHandling::Skip);
-                self.break_line(ctx);
-                self.put_indent();
-            }
-            has_receiver = has_receiver || i > 0;
-            if has_receiver {
-                self.push_str(call.chain_type.dot());
-            }
-            self.push_str(&call.name);
+                self.push_str(&call.name);
 
-            if let Some(args) = &call.args {
-                self.push('(');
-                if matches!(args.width, Width::Flat(_)) {
+                if let Some(args) = &call.args {
+                    self.push('(');
                     for (i, arg) in args.nodes.iter().enumerate() {
                         if i > 0 {
                             self.push_str(", ");
                         }
                         self.format(arg, ctx);
                     }
-                } else {
+                    self.push(')');
+                }
+                if let Some(block) = &call.block {
+                    if block.body.is_empty() {
+                        self.push_str(" {}");
+                    } else {
+                        self.push_str(" { ");
+                        self.format_exprs(&block.body, ctx, false);
+                        self.push_str(" }");
+                    }
+                }
+            }
+        } else {
+            let mut indented = false;
+            for (i, call) in chain.calls.iter().enumerate() {
+                has_receiver = has_receiver || i > 0;
+                if has_receiver && !indented {
                     self.indent();
-                    for (i, arg) in args.nodes.iter().enumerate() {
-                        let decors = ctx.decor_store.get(&arg.pos);
-                        self.write_leading_decors(
-                            &decors.leading,
+                    indented = true;
+                }
+                let call_decor = ctx.decor_store.get(&call.pos);
+                self.write_leading_decors(&call_decor.leading, ctx, EmptyLineHandling::Skip);
+                if has_receiver {
+                    self.break_line(ctx);
+                    self.put_indent();
+                    self.push_str(call.chain_type.dot());
+                }
+                self.push_str(&call.name);
+
+                if let Some(args) = &call.args {
+                    self.push('(');
+                    if args.width.is_flat() {
+                        for (i, arg) in args.nodes.iter().enumerate() {
+                            if i > 0 {
+                                self.push_str(", ");
+                            }
+                            self.format(arg, ctx);
+                        }
+                    } else {
+                        self.indent();
+                        for (i, arg) in args.nodes.iter().enumerate() {
+                            let decors = ctx.decor_store.get(&arg.pos);
+                            self.write_leading_decors(
+                                &decors.leading,
+                                ctx,
+                                EmptyLineHandling::Trim {
+                                    start: i == 0,
+                                    end: false,
+                                },
+                            );
+                            self.break_line(ctx);
+                            self.put_indent();
+                            self.format(arg, ctx);
+                            self.push(',');
+                            self.write_trailing_comment(&decors.trailing);
+                        }
+                        self.write_decors_at_virtual_end(
                             ctx,
-                            EmptyLineHandling::Trim {
-                                start: i == 0,
-                                end: false,
-                            },
+                            &args.virtual_end,
+                            args.nodes.is_empty(),
                         );
+                        self.dedent();
                         self.break_line(ctx);
                         self.put_indent();
-                        self.format(arg, ctx);
-                        self.push(',');
-                        self.write_trailing_comment(&decors.trailing);
                     }
-                    self.write_decors_at_virtual_end(ctx, &args.virtual_end, args.nodes.is_empty());
-                    self.dedent();
-                    self.break_line(ctx);
-                    self.put_indent();
+                    self.push(')');
                 }
-                self.push(')');
-            }
-            if let Some(block) = &call.block {
-                let block_decors = ctx.decor_store.get(&block.pos);
-                if block.body.is_empty() && block_decors.trailing.is_none() {
-                    self.push_str(" {}");
-                } else {
-                    self.push_str(" do");
-                    self.write_trailing_comment(&block_decors.trailing);
-                    self.indent();
-                    self.format_exprs(&block.body, ctx, true);
-                    self.dedent();
-                    self.break_line(ctx);
-                    self.put_indent();
-                    self.push_str("end");
+                if let Some(block) = &call.block {
+                    let block_decors = ctx.decor_store.get(&block.pos);
+                    if block_decors.trailing.is_some()
+                        || !block.body.width.is_flat()
+                        || !block.was_flat
+                    {
+                        self.push_str(" do");
+                        self.write_trailing_comment(&block_decors.trailing);
+                        self.indent();
+                        self.format_exprs(&block.body, ctx, true);
+                        self.dedent();
+                        self.break_line(ctx);
+                        self.put_indent();
+                        self.push_str("end");
+                    } else if block.body.is_empty() {
+                        self.push_str(" {}");
+                    } else {
+                        self.push_str(" { ");
+                        self.format_exprs(&block.body, ctx, false);
+                        self.push_str(" }");
+                    }
                 }
+                self.write_trailing_comment(&call_decor.trailing);
             }
-
-            self.write_trailing_comment(&call_decor.trailing);
-        }
-        if !is_flat {
-            self.dedent();
+            if indented {
+                self.dedent();
+            }
         }
     }
 

@@ -3,6 +3,9 @@ foo.bar
 1.foo.bar
 foo(1, 2, 3)
 foo { true }
+foo do
+  true
+end
 
 1.foo(2).bar().baz
 
@@ -71,3 +74,8 @@ foo.bar
   &.baz.a { 2 }.b.c
   # d
   .d {}.e {}
+
+# a
+foo # b
+  # c
+  .bar # d

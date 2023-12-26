@@ -681,12 +681,20 @@ impl FmtNodeBuilder<'_> {
                 // XXX: Is this necessary? I cannot find the case where the body is not a StatementNode.
                 let body = self.wrap_as_exprs(body, Some(body_end_loc));
 
-                call_width.append_value(" {  }".len());
-                call_width.append(&body.width());
+                let loc = node.location();
+                let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
+
+                if was_flat {
+                    call_width.append_value(" {  }".len());
+                    call_width.append(&body.width());
+                } else {
+                    call_width.append(&fmt::Width::NotFlat);
+                }
 
                 fmt::MethodBlock {
                     pos: block_pos,
                     body,
+                    was_flat,
                 }
             }
             _ => panic!("unexpected node for call block: {:?}", node),
@@ -839,5 +847,15 @@ impl FmtNodeBuilder<'_> {
             }
         }
         !has_char_between_last_newline
+    }
+
+    fn does_line_break_exist_in(&self, start: usize, end: usize) -> bool {
+        let end = end.min(self.src.len());
+        for i in start..end {
+            if self.src[i] == b'\n' {
+                return true;
+            }
+        }
+        false
     }
 }

@@ -2,6 +2,7 @@ foo
 foo.bar
 1.foo.bar
 foo(1, 2, 3)
+foo { true }
 foo do
   true
 end
@@ -60,14 +61,20 @@ foo do
   # foo
 end
 
-a {}.b(1)&.c(1, 2) do
-  d(e {}) {}
-end.f
+a {}.b(1)&.c(1, 2) { d(e {}) {} }.f
 
-foo.bar
+foo
+  .bar
   # baz
-  &.baz.a do
-    2
-  end.b.c
+  &.baz
+  .a { 2 }
+  .b
+  .c
   # d
-  .d {}.e {}
+  .d {}
+  .e {}
+
+# a
+foo # b
+  # c
+  .bar # d
