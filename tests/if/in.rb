@@ -119,3 +119,16 @@ else
 
   # b
 end
+
+1 if true # a
+
+1 if # a
+  true
+
+1 if # a
+  # b
+  true
+
+a do
+  1
+end if true # b

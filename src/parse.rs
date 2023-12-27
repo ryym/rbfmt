@@ -74,6 +74,14 @@ struct IfOrUnless<'src> {
     end_loc: Option<prism::Location<'src>>,
 }
 
+struct Postmodifier<'src> {
+    keyword: String,
+    loc: prism::Location<'src>,
+    keyword_loc: Option<prism::Location<'src>>,
+    predicate: prism::Node<'src>,
+    statements: Option<prism::StatementsNode<'src>>,
+}
+
 struct FmtNodeBuilder<'src> {
     src: &'src [u8],
     comments: Peekable<prism::Comments<'src>>,
@@ -205,17 +213,30 @@ impl FmtNodeBuilder<'_> {
 
             prism::Node::IfNode { .. } => {
                 let node = node.as_if_node().unwrap();
-                self.visit_if_or_unless(
-                    IfOrUnless {
-                        is_if: true,
+                if node.end_keyword_loc().is_some() {
+                    self.visit_if_or_unless(
+                        IfOrUnless {
+                            is_if: true,
+                            loc: node.location(),
+                            predicate: node.predicate(),
+                            statements: node.statements(),
+                            consequent: node.consequent(),
+                            end_loc: node.end_keyword_loc(),
+                        },
+                        next_loc_start,
+                    )
+                } else if node.then_keyword_loc().map(|l| l.as_slice()) == Some(b":") {
+                    todo!("ternery if: {:?}", node);
+                } else {
+                    let postmod = Postmodifier {
+                        keyword: "if".to_string(),
                         loc: node.location(),
+                        keyword_loc: node.if_keyword_loc(),
                         predicate: node.predicate(),
                         statements: node.statements(),
-                        consequent: node.consequent(),
-                        end_loc: node.end_keyword_loc(),
-                    },
-                    next_loc_start,
-                )
+                    };
+                    self.visit_if_modifier(postmod, next_loc_start)
+                }
             }
             prism::Node::UnlessNode { .. } => {
                 let node = node.as_unless_node().unwrap();
@@ -525,6 +546,7 @@ impl FmtNodeBuilder<'_> {
                 }
 
                 // XXX: We cannot find the case where the `end` keyword is None.
+                // => modifier
                 let conseq = node.consequent();
                 let next_loc_start = node
                     .statements()
@@ -576,6 +598,52 @@ impl FmtNodeBuilder<'_> {
             _ => {
                 panic!("unexpected node in IfNode: {:?}", node);
             }
+        }
+    }
+
+    fn visit_if_modifier(
+        &mut self,
+        node: Postmodifier,
+        next_loc_start: Option<usize>,
+    ) -> fmt::Node {
+        let pos = self.next_pos();
+        let mut decors = self.take_leading_decors(node.loc.start_offset());
+
+        let kwd_loc = node
+            .keyword_loc
+            .expect("postmodifier must have keyword loc");
+        let exprs = self.visit_statements(node.statements, Some(kwd_loc.start_offset()));
+
+        let kwd_pos = self.next_pos();
+        let mut width = exprs.width();
+        width.append_value(node.keyword.len() + 2); // keyword and spaces around it.
+
+        let pred_loc = node.predicate.location();
+        let mut kwd_decors = Decors::new();
+        kwd_decors.set_trailing(self.take_trailing_comment(pred_loc.start_offset()));
+        self.store_decors_to(kwd_pos, kwd_decors);
+
+        let predicate = self.visit(node.predicate, next_loc_start);
+        width.append(&predicate.width);
+
+        if let Some(next_loc_start) = next_loc_start {
+            decors.set_trailing(self.take_trailing_comment(next_loc_start));
+        }
+        width.append(&decors.width);
+        self.store_decors_to(pos, decors);
+
+        let if_modifier = fmt::IfModifier {
+            conditional: fmt::Conditional {
+                pos: kwd_pos,
+                cond: Box::new(predicate),
+                body: exprs,
+            },
+        };
+
+        fmt::Node {
+            pos,
+            width,
+            kind: fmt::Kind::IfModifier(if_modifier),
         }
     }
 

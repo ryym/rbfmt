@@ -74,6 +74,7 @@ pub(crate) enum Kind {
     HeredocOpening,
     Exprs(Exprs),
     IfExpr(IfExpr),
+    IfModifier(IfModifier),
     MethodChain(MethodChain),
 }
 
@@ -223,6 +224,11 @@ impl IfExpr {
             if_last: None,
         }
     }
+}
+
+#[derive(Debug)]
+pub(crate) struct IfModifier {
+    pub conditional: Conditional,
 }
 
 #[derive(Debug)]
@@ -439,6 +445,7 @@ impl Formatter {
             Kind::HeredocOpening => self.format_heredoc_opening(node.pos, ctx),
             Kind::Exprs(exprs) => self.format_exprs(exprs, ctx, false),
             Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
+            Kind::IfModifier(modifier) => self.format_if_modifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
         }
     }
@@ -640,6 +647,19 @@ impl Formatter {
         self.dedent();
         self.put_indent();
         self.push_str("end");
+    }
+
+    fn format_if_modifier(&mut self, modifier: &IfModifier, ctx: &FormatContext) {
+        self.format_exprs(&modifier.conditional.body, ctx, false);
+        self.push_str(" if");
+
+        let if_decors = ctx.decor_store.get(&modifier.conditional.pos);
+        let cond_decors = ctx.decor_store.get(&modifier.conditional.cond.pos);
+        self.format_decors_in_keyword_gap(ctx, if_decors, cond_decors, |self_| {
+            self_.put_indent();
+            self_.format(&modifier.conditional.cond, ctx);
+        });
+        self.dedent();
     }
 
     // Handle comments like "if # foo\n #bar\n predicate"
