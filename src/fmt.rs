@@ -74,7 +74,7 @@ pub(crate) enum Kind {
     HeredocOpening,
     Exprs(Exprs),
     IfExpr(IfExpr),
-    IfModifier(IfModifier),
+    Postmodifier(Postmodifier),
     MethodChain(MethodChain),
 }
 
@@ -227,7 +227,8 @@ impl IfExpr {
 }
 
 #[derive(Debug)]
-pub(crate) struct IfModifier {
+pub(crate) struct Postmodifier {
+    pub keyword: String,
     pub conditional: Conditional,
 }
 
@@ -445,7 +446,7 @@ impl Formatter {
             Kind::HeredocOpening => self.format_heredoc_opening(node.pos, ctx),
             Kind::Exprs(exprs) => self.format_exprs(exprs, ctx, false),
             Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
-            Kind::IfModifier(modifier) => self.format_if_modifier(modifier, ctx),
+            Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
         }
     }
@@ -649,9 +650,10 @@ impl Formatter {
         self.push_str("end");
     }
 
-    fn format_if_modifier(&mut self, modifier: &IfModifier, ctx: &FormatContext) {
+    fn format_postmodifier(&mut self, modifier: &Postmodifier, ctx: &FormatContext) {
         self.format_exprs(&modifier.conditional.body, ctx, false);
-        self.push_str(" if");
+        self.push(' ');
+        self.push_str(&modifier.keyword);
 
         let if_decors = ctx.decor_store.get(&modifier.conditional.pos);
         let cond_decors = ctx.decor_store.get(&modifier.conditional.cond.pos);

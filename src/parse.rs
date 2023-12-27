@@ -77,7 +77,7 @@ struct IfOrUnless<'src> {
 struct Postmodifier<'src> {
     keyword: String,
     loc: prism::Location<'src>,
-    keyword_loc: Option<prism::Location<'src>>,
+    keyword_loc: prism::Location<'src>,
     predicate: prism::Node<'src>,
     statements: Option<prism::StatementsNode<'src>>,
 }
@@ -231,26 +231,39 @@ impl FmtNodeBuilder<'_> {
                     let postmod = Postmodifier {
                         keyword: "if".to_string(),
                         loc: node.location(),
-                        keyword_loc: node.if_keyword_loc(),
+                        keyword_loc: node.if_keyword_loc().expect("if modifier must have if"),
                         predicate: node.predicate(),
                         statements: node.statements(),
                     };
-                    self.visit_if_modifier(postmod, next_loc_start)
+                    self.visit_postmodifier(postmod, next_loc_start)
                 }
             }
             prism::Node::UnlessNode { .. } => {
                 let node = node.as_unless_node().unwrap();
-                self.visit_if_or_unless(
-                    IfOrUnless {
-                        is_if: false,
+                if node.end_keyword_loc().is_some() {
+                    self.visit_if_or_unless(
+                        IfOrUnless {
+                            is_if: false,
+                            loc: node.location(),
+                            predicate: node.predicate(),
+                            statements: node.statements(),
+                            consequent: node.consequent().map(|n| n.as_node()),
+                            end_loc: node.end_keyword_loc(),
+                        },
+                        next_loc_start,
+                    )
+                } else if node.then_keyword_loc().map(|l| l.as_slice()) == Some(b":") {
+                    todo!("ternery if: {:?}", node);
+                } else {
+                    let postmod = Postmodifier {
+                        keyword: "unless".to_string(),
                         loc: node.location(),
+                        keyword_loc: node.keyword_loc(),
                         predicate: node.predicate(),
                         statements: node.statements(),
-                        consequent: node.consequent().map(|n| n.as_node()),
-                        end_loc: node.end_keyword_loc(),
-                    },
-                    next_loc_start,
-                )
+                    };
+                    self.visit_postmodifier(postmod, next_loc_start)
+                }
             }
 
             prism::Node::CallNode { .. } => {
@@ -601,29 +614,27 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn visit_if_modifier(
+    fn visit_postmodifier(
         &mut self,
-        node: Postmodifier,
+        postmod: Postmodifier,
         next_loc_start: Option<usize>,
     ) -> fmt::Node {
         let pos = self.next_pos();
-        let mut decors = self.take_leading_decors(node.loc.start_offset());
+        let mut decors = self.take_leading_decors(postmod.loc.start_offset());
 
-        let kwd_loc = node
-            .keyword_loc
-            .expect("postmodifier must have keyword loc");
-        let exprs = self.visit_statements(node.statements, Some(kwd_loc.start_offset()));
+        let kwd_loc = postmod.keyword_loc;
+        let exprs = self.visit_statements(postmod.statements, Some(kwd_loc.start_offset()));
 
         let kwd_pos = self.next_pos();
         let mut width = exprs.width();
-        width.append_value(node.keyword.len() + 2); // keyword and spaces around it.
+        width.append_value(postmod.keyword.len() + 2); // keyword and spaces around it.
 
-        let pred_loc = node.predicate.location();
+        let pred_loc = postmod.predicate.location();
         let mut kwd_decors = Decors::new();
         kwd_decors.set_trailing(self.take_trailing_comment(pred_loc.start_offset()));
         self.store_decors_to(kwd_pos, kwd_decors);
 
-        let predicate = self.visit(node.predicate, next_loc_start);
+        let predicate = self.visit(postmod.predicate, next_loc_start);
         width.append(&predicate.width);
 
         if let Some(next_loc_start) = next_loc_start {
@@ -632,7 +643,8 @@ impl FmtNodeBuilder<'_> {
         width.append(&decors.width);
         self.store_decors_to(pos, decors);
 
-        let if_modifier = fmt::IfModifier {
+        let if_modifier = fmt::Postmodifier {
+            keyword: postmod.keyword,
             conditional: fmt::Conditional {
                 pos: kwd_pos,
                 cond: Box::new(predicate),
@@ -643,7 +655,7 @@ impl FmtNodeBuilder<'_> {
         fmt::Node {
             pos,
             width,
-            kind: fmt::Kind::IfModifier(if_modifier),
+            kind: fmt::Kind::Postmodifier(if_modifier),
         }
     }
 

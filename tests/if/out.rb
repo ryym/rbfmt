@@ -117,13 +117,26 @@ end
 
 1 if true # a
 
-1 if # a
+foo.bar(2) if # a
   true
 
-1 if # a
+@foo if # a
   # b
   true
 
 a do
   1
 end if true # b
+
+1 unless true # a
+
+foo.bar(2) unless # a
+  true
+
+@foo unless # a
+  # b
+  true
+
+a do
+  1
+end unless true # b
