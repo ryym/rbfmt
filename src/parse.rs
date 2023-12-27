@@ -482,7 +482,7 @@ impl FmtNodeBuilder<'_> {
 
         let if_pos = self.next_pos();
 
-        let end_loc = node.end_loc.expect("end must exist in root if/unless");
+        let end_loc = node.end_loc.expect("if/unless expression must have end");
         let end_start = end_loc.start_offset();
 
         let if_next_loc = node.predicate.location().start_offset();
@@ -546,33 +546,32 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_if_node().unwrap();
                 let elsif_pos = self.next_pos();
 
+                let end_loc = node
+                    .end_keyword_loc()
+                    .expect("if/unless expression must have end");
+
                 let elsif_next_loc = node
                     .statements()
                     .as_ref()
-                    .map(|s| s.location())
-                    .or_else(|| node.end_keyword_loc())
-                    .map(|l| l.start_offset());
-                if let Some(elsif_next_loc) = elsif_next_loc {
-                    let mut decors = Decors::new();
-                    decors.set_trailing(self.take_trailing_comment(elsif_next_loc));
-                    self.store_decors_to(elsif_pos, decors);
-                }
+                    .map(|s| s.location().start_offset())
+                    .unwrap_or(end_loc.start_offset());
+                let mut decors = Decors::new();
+                decors.set_trailing(self.take_trailing_comment(elsif_next_loc));
+                self.store_decors_to(elsif_pos, decors);
 
-                // XXX: We cannot find the case where the `end` keyword is None.
-                // => modifier
                 let conseq = node.consequent();
                 let next_loc_start = node
                     .statements()
                     .map(|s| s.location())
                     .or_else(|| conseq.as_ref().map(|c| c.location()))
-                    .or_else(|| node.end_keyword_loc())
-                    .map(|l| l.start_offset());
+                    .map(|l| l.start_offset())
+                    .or(Some(end_loc.start_offset()));
                 let predicate = self.visit(node.predicate(), next_loc_start);
 
                 let body_end_loc = conseq
                     .as_ref()
                     .map(|n| n.location().start_offset())
-                    .or_else(|| node.end_keyword_loc().map(|l| l.start_offset()));
+                    .or(Some(end_loc.start_offset()));
                 let body = self.visit_statements(node.statements(), body_end_loc);
 
                 ifexpr.elsifs.push(fmt::Conditional {
@@ -589,20 +588,22 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_else_node().unwrap();
                 let else_pos = self.next_pos();
 
+                let end_loc = node
+                    .end_keyword_loc()
+                    .expect("if/unless expression must have end");
+
                 let else_next_loc = node
                     .statements()
                     .as_ref()
-                    .map(|s| s.location())
-                    .or_else(|| node.end_keyword_loc())
-                    .map(|l| l.start_offset());
+                    .map(|s| s.location().start_offset())
+                    .or(Some(end_loc.start_offset()));
                 if let Some(else_next_loc) = else_next_loc {
                     let mut decors = Decors::new();
                     decors.set_trailing(self.take_trailing_comment(else_next_loc));
                     self.store_decors_to(else_pos, decors);
                 }
 
-                let body_end_loc = node.end_keyword_loc().map(|l| l.end_offset());
-                let body = self.visit_statements(node.statements(), body_end_loc);
+                let body = self.visit_statements(node.statements(), Some(end_loc.start_offset()));
                 ifexpr.if_last = Some(fmt::Else {
                     pos: else_pos,
                     body,
