@@ -93,7 +93,7 @@ struct FmtNodeBuilder<'src> {
 
 impl FmtNodeBuilder<'_> {
     fn build_fmt_node(&mut self, node: prism::Node) -> fmt::Node {
-        self.visit(node, Some(self.src.len()))
+        self.visit(node, self.src.len())
     }
 
     fn next_pos(&mut self) -> fmt::Pos {
@@ -107,22 +107,20 @@ impl FmtNodeBuilder<'_> {
 
     fn each_node_with_next_start(
         mut nodes: prism::NodeListIter,
-        next_loc_start: Option<usize>,
-        mut f: impl FnMut(prism::Node, Option<usize>),
+        next_loc_start: usize,
+        mut f: impl FnMut(prism::Node, usize),
     ) {
         if let Some(node) = nodes.next() {
             let mut prev = node;
             for next in nodes {
-                let next_start = Some(next.location().start_offset());
-                f(prev, next_start);
+                f(prev, next.location().start_offset());
                 prev = next;
             }
             f(prev, next_loc_start);
         }
     }
 
-    // XXX: Probably `next_loc_start` should not be Option.
-    fn visit(&mut self, node: prism::Node, next_loc_start: Option<usize>) -> fmt::Node {
+    fn visit(&mut self, node: prism::Node, next_loc_start: usize) -> fmt::Node {
         let loc_end = node.location().end_offset();
         let node = match node {
             prism::Node::ProgramNode { .. } => {
@@ -175,9 +173,7 @@ impl FmtNodeBuilder<'_> {
                         kind: fmt::Kind::Str(str),
                     }
                 };
-                if let Some(next_loc_start) = next_loc_start {
-                    decors.set_trailing(self.take_trailing_comment(next_loc_start));
-                }
+                decors.set_trailing(self.take_trailing_comment(next_loc_start));
                 fmt_node.width.append(&decors.width);
                 self.store_decors_to(pos, decors);
                 fmt_node
@@ -203,9 +199,7 @@ impl FmtNodeBuilder<'_> {
                         kind: fmt::Kind::DynStr(str),
                     }
                 };
-                if let Some(next_loc_start) = next_loc_start {
-                    decors.set_trailing(self.take_trailing_comment(next_loc_start));
-                }
+                decors.set_trailing(self.take_trailing_comment(next_loc_start));
                 fmt_node.width.append(&decors.width);
                 self.store_decors_to(pos, decors);
                 fmt_node
@@ -271,10 +265,8 @@ impl FmtNodeBuilder<'_> {
                 let pos = self.next_pos();
                 let loc = node.location();
                 let mut decors = self.take_leading_decors(loc.start_offset());
-                let chain = self.visit_call(node, None);
-                if let Some(next_loc_start) = next_loc_start {
-                    decors.set_trailing(self.take_trailing_comment(next_loc_start))
-                }
+                let chain = self.visit_call(node, next_loc_start, None);
+                decors.set_trailing(self.take_trailing_comment(next_loc_start));
                 let whole_width = chain.body_width().add(&decors.width);
                 self.store_decors_to(pos, decors);
                 fmt::Node {
@@ -292,7 +284,7 @@ impl FmtNodeBuilder<'_> {
         node
     }
 
-    fn parse_atom(&mut self, node: prism::Node, next_loc_start: Option<usize>) -> fmt::Node {
+    fn parse_atom(&mut self, node: prism::Node, next_loc_start: usize) -> fmt::Node {
         let pos = self.next_pos();
         let loc = node.location();
         let mut decors = self.take_leading_decors(loc.start_offset());
@@ -302,9 +294,7 @@ impl FmtNodeBuilder<'_> {
             width: fmt::Width::Flat(value.len()),
             kind: fmt::Kind::Atom(value),
         };
-        if let Some(next_loc_start) = next_loc_start {
-            decors.set_trailing(self.take_trailing_comment(next_loc_start));
-        }
+        decors.set_trailing(self.take_trailing_comment(next_loc_start));
         node.width.append(&decors.width);
         self.store_decors_to(pos, decors);
         node
@@ -352,7 +342,7 @@ impl FmtNodeBuilder<'_> {
                     let loc = node.location();
                     self.last_loc_end = node.opening_loc().end_offset();
 
-                    let exprs = self.visit_statements(node.statements(), Some(loc.end_offset()));
+                    let exprs = self.visit_statements(node.statements(), loc.end_offset());
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
                     width.append_value(opening.len());
@@ -438,7 +428,7 @@ impl FmtNodeBuilder<'_> {
                         }
                     }
 
-                    let exprs = self.visit_statements(node.statements(), Some(loc.end_offset()));
+                    let exprs = self.visit_statements(node.statements(), loc.end_offset());
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
                     parts.push(fmt::HeredocPart::Exprs(fmt::EmbeddedExprs {
@@ -459,11 +449,7 @@ impl FmtNodeBuilder<'_> {
         open.len()
     }
 
-    fn visit_statements(
-        &mut self,
-        node: Option<prism::StatementsNode>,
-        end: Option<usize>,
-    ) -> fmt::Exprs {
+    fn visit_statements(&mut self, node: Option<prism::StatementsNode>, end: usize) -> fmt::Exprs {
         let mut exprs = fmt::Exprs::new();
         if let Some(node) = node {
             Self::each_node_with_next_start(node.body().iter(), end, |prev, next_start| {
@@ -471,12 +457,12 @@ impl FmtNodeBuilder<'_> {
                 exprs.append_node(fmt_node);
             });
         }
-        let virtual_end = self.take_end_decors_as_virtual_end(end);
+        let virtual_end = self.take_end_decors_as_virtual_end(Some(end));
         exprs.set_virtual_end(virtual_end);
         exprs
     }
 
-    fn visit_if_or_unless(&mut self, node: IfOrUnless, next_loc_start: Option<usize>) -> fmt::Node {
+    fn visit_if_or_unless(&mut self, node: IfOrUnless, next_loc_start: usize) -> fmt::Node {
         let pos = self.next_pos();
         let mut if_decors = self.take_leading_decors(node.loc.start_offset());
 
@@ -496,8 +482,8 @@ impl FmtNodeBuilder<'_> {
             .as_ref()
             .map(|s| s.location())
             .or_else(|| conseq.as_ref().map(|c| c.location()))
-            .or(Some(end_loc))
-            .map(|l| l.start_offset());
+            .map(|l| l.start_offset())
+            .unwrap_or(end_loc.start_offset());
         let predicate = self.visit(node.predicate, next_pred_loc_start);
 
         let ifexpr = match conseq {
@@ -505,7 +491,7 @@ impl FmtNodeBuilder<'_> {
             Some(conseq) => {
                 // take trailing of else/elsif
                 let else_start = conseq.location().start_offset();
-                let body = self.visit_statements(node.statements, Some(else_start));
+                let body = self.visit_statements(node.statements, else_start);
                 let if_first = fmt::Conditional {
                     pos: if_pos,
                     cond: Box::new(predicate),
@@ -517,7 +503,7 @@ impl FmtNodeBuilder<'_> {
             }
             // if...end
             None => {
-                let body = self.visit_statements(node.statements, Some(end_start));
+                let body = self.visit_statements(node.statements, end_start);
                 let if_first = fmt::Conditional {
                     pos: if_pos,
                     cond: Box::new(predicate),
@@ -527,9 +513,7 @@ impl FmtNodeBuilder<'_> {
             }
         };
 
-        if let Some(next_loc_start) = next_loc_start {
-            if_decors.set_trailing(self.take_trailing_comment(next_loc_start));
-        }
+        if_decors.set_trailing(self.take_trailing_comment(next_loc_start));
         self.store_decors_to(pos, if_decors);
 
         fmt::Node {
@@ -565,13 +549,13 @@ impl FmtNodeBuilder<'_> {
                     .map(|s| s.location())
                     .or_else(|| conseq.as_ref().map(|c| c.location()))
                     .map(|l| l.start_offset())
-                    .or(Some(end_loc.start_offset()));
+                    .unwrap_or(end_loc.start_offset());
                 let predicate = self.visit(node.predicate(), next_loc_start);
 
                 let body_end_loc = conseq
                     .as_ref()
                     .map(|n| n.location().start_offset())
-                    .or(Some(end_loc.start_offset()));
+                    .unwrap_or(end_loc.start_offset());
                 let body = self.visit_statements(node.statements(), body_end_loc);
 
                 ifexpr.elsifs.push(fmt::Conditional {
@@ -596,14 +580,12 @@ impl FmtNodeBuilder<'_> {
                     .statements()
                     .as_ref()
                     .map(|s| s.location().start_offset())
-                    .or(Some(end_loc.start_offset()));
-                if let Some(else_next_loc) = else_next_loc {
-                    let mut decors = Decors::new();
-                    decors.set_trailing(self.take_trailing_comment(else_next_loc));
-                    self.store_decors_to(else_pos, decors);
-                }
+                    .unwrap_or(end_loc.start_offset());
+                let mut decors = Decors::new();
+                decors.set_trailing(self.take_trailing_comment(else_next_loc));
+                self.store_decors_to(else_pos, decors);
 
-                let body = self.visit_statements(node.statements(), Some(end_loc.start_offset()));
+                let body = self.visit_statements(node.statements(), end_loc.start_offset());
                 ifexpr.if_last = Some(fmt::Else {
                     pos: else_pos,
                     body,
@@ -615,16 +597,12 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn visit_postmodifier(
-        &mut self,
-        postmod: Postmodifier,
-        next_loc_start: Option<usize>,
-    ) -> fmt::Node {
+    fn visit_postmodifier(&mut self, postmod: Postmodifier, next_loc_start: usize) -> fmt::Node {
         let pos = self.next_pos();
         let mut decors = self.take_leading_decors(postmod.loc.start_offset());
 
         let kwd_loc = postmod.keyword_loc;
-        let exprs = self.visit_statements(postmod.statements, Some(kwd_loc.start_offset()));
+        let exprs = self.visit_statements(postmod.statements, kwd_loc.start_offset());
 
         let kwd_pos = self.next_pos();
         let mut width = exprs.width();
@@ -638,9 +616,7 @@ impl FmtNodeBuilder<'_> {
         let predicate = self.visit(postmod.predicate, next_loc_start);
         width.append(&predicate.width);
 
-        if let Some(next_loc_start) = next_loc_start {
-            decors.set_trailing(self.take_trailing_comment(next_loc_start));
-        }
+        decors.set_trailing(self.take_trailing_comment(next_loc_start));
         width.append(&decors.width);
         self.store_decors_to(pos, decors);
 
@@ -663,6 +639,7 @@ impl FmtNodeBuilder<'_> {
     fn visit_call(
         &mut self,
         call: prism::CallNode,
+        next_loc_start: usize,
         next_msg_start: Option<usize>,
     ) -> fmt::MethodChain {
         let mut chain = match call.receiver() {
@@ -670,11 +647,17 @@ impl FmtNodeBuilder<'_> {
                 prism::Node::CallNode { .. } => {
                     let node = receiver.as_call_node().unwrap();
                     let msg_end = call.message_loc().as_ref().map(|l| l.start_offset());
-                    self.visit_call(node, msg_end)
+                    self.visit_call(node, next_loc_start, msg_end)
                 }
                 _ => {
-                    // XXX: message_loc || opening loc || args loc || block loc || next loc
-                    let next_loc_start = call.message_loc().map(|l| l.start_offset());
+                    let next_loc_start = call
+                        .message_loc()
+                        .or_else(|| call.opening_loc())
+                        .or_else(|| call.arguments().map(|a| a.location()))
+                        .or_else(|| call.block().map(|a| a.location()))
+                        .map(|l| l.start_offset())
+                        .or(next_msg_start)
+                        .unwrap_or(next_loc_start);
                     let recv = self.visit(receiver, next_loc_start);
                     fmt::MethodChain::new(Some(recv))
                 }
@@ -720,17 +703,21 @@ impl FmtNodeBuilder<'_> {
             }
             Some(args_node) => {
                 let mut args = fmt::Arguments::new();
-                let closing_loc = call.closing_loc().as_ref().map(|l| l.start_offset());
+                let closing_start = call.closing_loc().map(|l| l.start_offset());
+                let next_loc_start = closing_start
+                    .or_else(|| call.block().map(|a| a.location().start_offset()))
+                    .or(next_msg_start)
+                    .unwrap_or(next_loc_start);
                 Self::each_node_with_next_start(
                     args_node.arguments().iter(),
-                    closing_loc,
+                    next_loc_start,
                     |prev, next_start| {
                         let fmt_node = self.visit(prev, next_start);
                         args.append_node(fmt_node);
                     },
                 );
 
-                let virtual_end = self.take_end_decors_as_virtual_end(closing_loc);
+                let virtual_end = self.take_end_decors_as_virtual_end(closing_start);
                 args.set_virtual_end(virtual_end);
 
                 Some(args)
@@ -758,7 +745,7 @@ impl FmtNodeBuilder<'_> {
                 self.store_decors_to(block_pos, decors);
 
                 let body_end_loc = node.closing_loc().start_offset();
-                let body = node.body().map(|n| self.visit(n, Some(body_end_loc)));
+                let body = node.body().map(|n| self.visit(n, body_end_loc));
                 // XXX: Is this necessary? I cannot find the case where the body is not a StatementNode.
                 let body = self.wrap_as_exprs(body, Some(body_end_loc));
 
