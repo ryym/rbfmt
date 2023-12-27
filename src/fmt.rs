@@ -14,12 +14,10 @@ pub(crate) fn format(node: Node, decor_store: DecorStore, heredoc_map: HeredocMa
         heredoc_queue: VecDeque::new(),
     };
     formatter.format(&node, &ctx);
-    if formatter.buffer.is_empty() {
-        formatter.buffer
-    } else {
+    if !formatter.buffer.is_empty() {
         formatter.break_line(&ctx);
-        formatter.buffer.trim_start().to_string()
     }
+    formatter.buffer
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -439,9 +437,7 @@ impl Formatter {
             Kind::Str(str) => self.format_str(str),
             Kind::DynStr(dstr) => self.format_dyn_str(dstr, ctx),
             Kind::HeredocOpening => self.format_heredoc_opening(node.pos, ctx),
-            Kind::Exprs(exprs) => {
-                self.format_exprs(exprs, ctx, false);
-            }
+            Kind::Exprs(exprs) => self.format_exprs(exprs, ctx, false),
             Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
         }
@@ -490,13 +486,13 @@ impl Formatter {
     fn format_embedded_exprs(&mut self, embedded: &EmbeddedExprs, ctx: &FormatContext) {
         self.push_str(&embedded.opening);
 
-        self.indent();
-        let is_block = self.format_exprs(&embedded.exprs, ctx, false);
-        if is_block {
-            self.break_line(ctx);
-            self.dedent();
-            self.put_indent();
+        if embedded.exprs.width.is_flat() {
+            self.format_exprs(&embedded.exprs, ctx, false);
         } else {
+            self.break_line(ctx);
+            self.indent();
+            self.format_exprs(&embedded.exprs, ctx, false);
+            self.break_line(ctx);
             self.dedent();
         }
 
@@ -510,14 +506,17 @@ impl Formatter {
         self.heredoc_queue.push_back(pos);
     }
 
-    fn format_exprs(&mut self, exprs: &Exprs, ctx: &FormatContext, block_always: bool) -> bool {
+    fn format_exprs(&mut self, exprs: &Exprs, ctx: &FormatContext, block_always: bool) {
         if exprs.can_be_flat() && !block_always {
             if let Some(node) = exprs.nodes.get(0) {
                 self.format(node, ctx);
             }
-            return false;
+            return;
         }
         for (i, n) in exprs.nodes.iter().enumerate() {
+            if i > 0 {
+                self.break_line(ctx);
+            }
             let decors = ctx.decor_store.get(&n.pos);
             self.write_leading_decors(
                 &decors.leading,
@@ -527,32 +526,63 @@ impl Formatter {
                     end: false,
                 },
             );
-            self.break_line(ctx);
             self.put_indent();
             self.format(n, ctx);
             self.write_trailing_comment(&decors.trailing);
         }
-        self.write_decors_at_virtual_end(ctx, &exprs.virtual_end, exprs.nodes.is_empty());
-        true
+        self.write_decors_at_virtual_end(
+            ctx,
+            &exprs.virtual_end,
+            !exprs.nodes.is_empty(),
+            exprs.nodes.is_empty(),
+        );
     }
 
     fn write_decors_at_virtual_end(
         &mut self,
         ctx: &FormatContext,
         end: &Option<VirtualEnd>,
+        break_first: bool,
         trim_start: bool,
     ) {
         if let Some(end) = end {
             let end_decors = ctx.decor_store.get(&end.pos);
-            if !end_decors.leading.is_empty() {
-                self.write_leading_decors(
-                    &end_decors.leading,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: trim_start,
-                        end: true,
-                    },
-                );
+
+            let mut trailing_empty_lines = 0;
+            for decor in end_decors.leading.iter().rev() {
+                match decor {
+                    LineDecor::EmptyLine => {
+                        trailing_empty_lines += 1;
+                    }
+                    LineDecor::Comment(_) => {
+                        break;
+                    }
+                }
+            }
+            if trailing_empty_lines == end_decors.leading.len() {
+                return;
+            }
+
+            if break_first {
+                self.break_line(ctx);
+            }
+            let target_len = end_decors.leading.len() - trailing_empty_lines;
+            let last_idx = target_len - 1;
+            for (i, decor) in end_decors.leading.iter().take(target_len).enumerate() {
+                match decor {
+                    LineDecor::EmptyLine => {
+                        if !(trim_start && i == 0) || i == last_idx {
+                            self.break_line(ctx);
+                        }
+                    }
+                    LineDecor::Comment(comment) => {
+                        self.put_indent();
+                        self.push_str(&comment.value);
+                        if i < last_idx {
+                            self.break_line(ctx);
+                        }
+                    }
+                }
             }
         }
     }
@@ -563,12 +593,17 @@ impl Formatter {
         } else {
             self.push_str("unless");
         }
+
         let if_decors = ctx.decor_store.get(&expr.if_first.pos);
         let cond_decors = ctx.decor_store.get(&expr.if_first.cond.pos);
         self.format_decors_in_keyword_gap(ctx, if_decors, cond_decors, |self_| {
+            self_.put_indent();
             self_.format(&expr.if_first.cond, ctx);
         });
-        self.format_exprs(&expr.if_first.body, ctx, true);
+        if !expr.if_first.body.is_empty() {
+            self.break_line(ctx);
+            self.format_exprs(&expr.if_first.body, ctx, true);
+        }
 
         for elsif in &expr.elsifs {
             self.break_line(ctx);
@@ -578,9 +613,13 @@ impl Formatter {
             let elsif_decors = ctx.decor_store.get(&elsif.pos);
             let cond_decors = ctx.decor_store.get(&elsif.cond.pos);
             self.format_decors_in_keyword_gap(ctx, elsif_decors, cond_decors, |self_| {
+                self_.put_indent();
                 self_.format(&elsif.cond, ctx);
             });
-            self.format_exprs(&elsif.body, ctx, true);
+            if !elsif.body.is_empty() {
+                self.break_line(ctx);
+                self.format_exprs(&elsif.body, ctx, true);
+            }
         }
 
         if let Some(if_last) = &expr.if_last {
@@ -591,7 +630,10 @@ impl Formatter {
             self.push_str("else");
             self.write_trailing_comment(&else_decors.trailing);
             self.indent();
-            self.format_exprs(&if_last.body, ctx, true);
+            if !if_last.body.is_empty() {
+                self.break_line(ctx);
+                self.format_exprs(&if_last.body, ctx, true);
+            }
         }
 
         self.break_line(ctx);
@@ -616,9 +658,8 @@ impl Formatter {
         } else {
             self.write_trailing_comment(&keyword_decors.trailing);
             self.indent();
-            self.write_leading_decors(&next_decors.leading, ctx, EmptyLineHandling::trim_start());
             self.break_line(ctx);
-            self.put_indent();
+            self.write_leading_decors(&next_decors.leading, ctx, EmptyLineHandling::trim_start());
             next_node(self);
             self.write_trailing_comment(&next_decors.trailing);
         }
@@ -672,9 +713,9 @@ impl Formatter {
                     indented = true;
                 }
                 let call_decor = ctx.decor_store.get(&call.pos);
-                self.write_leading_decors(&call_decor.leading, ctx, EmptyLineHandling::Skip);
                 if has_receiver {
                     self.break_line(ctx);
+                    self.write_leading_decors(&call_decor.leading, ctx, EmptyLineHandling::Skip);
                     self.put_indent();
                     self.push_str(call.chain_type.dot());
                 }
@@ -693,6 +734,7 @@ impl Formatter {
                         self.indent();
                         for (i, arg) in args.nodes.iter().enumerate() {
                             let decors = ctx.decor_store.get(&arg.pos);
+                            self.break_line(ctx);
                             self.write_leading_decors(
                                 &decors.leading,
                                 ctx,
@@ -701,7 +743,6 @@ impl Formatter {
                                     end: false,
                                 },
                             );
-                            self.break_line(ctx);
                             self.put_indent();
                             self.format(arg, ctx);
                             self.push(',');
@@ -710,14 +751,16 @@ impl Formatter {
                         self.write_decors_at_virtual_end(
                             ctx,
                             &args.virtual_end,
+                            true,
                             args.nodes.is_empty(),
                         );
                         self.dedent();
                         self.break_line(ctx);
-                        self.put_indent();
                     }
+                    self.put_indent();
                     self.push(')');
                 }
+
                 if let Some(block) = &call.block {
                     let block_decors = ctx.decor_store.get(&block.pos);
                     if block_decors.trailing.is_some()
@@ -727,7 +770,10 @@ impl Formatter {
                         self.push_str(" do");
                         self.write_trailing_comment(&block_decors.trailing);
                         self.indent();
-                        self.format_exprs(&block.body, ctx, true);
+                        if !block.body.is_empty() {
+                            self.break_line(ctx);
+                            self.format_exprs(&block.body, ctx, true);
+                        }
                         self.dedent();
                         self.break_line(ctx);
                         self.put_indent();
@@ -772,9 +818,9 @@ impl Formatter {
                     }
                 }
                 LineDecor::Comment(comment) => {
-                    self.break_line(ctx);
                     self.put_indent();
                     self.push_str(&comment.value);
+                    self.break_line(ctx);
                 }
             }
         }
