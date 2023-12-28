@@ -71,7 +71,7 @@ pub(crate) enum Kind {
     Atom(String),
     Str(Str),
     DynStr(DynStr),
-    HeredocOpening,
+    HeredocOpening(HeredocOpening),
     Exprs(Exprs),
     IfExpr(IfExpr),
     Postmodifier(Postmodifier),
@@ -80,24 +80,50 @@ pub(crate) enum Kind {
 
 #[derive(Debug)]
 pub(crate) struct Str {
+    pub width: Width,
     pub opening: Option<String>,
     pub value: Vec<u8>,
     pub closing: Option<String>,
 }
 
 impl Str {
-    pub(crate) fn len(&self) -> usize {
-        let open = self.opening.as_ref().map_or(0, |s| s.len());
-        let close = self.closing.as_ref().map_or(0, |s| s.len());
-        self.value.len() + open + close
+    pub(crate) fn new(opening: Option<String>, value: Vec<u8>, closing: Option<String>) -> Self {
+        let opening_len = opening.as_ref().map_or(0, |s| s.len());
+        let closing_len = closing.as_ref().map_or(0, |s| s.len());
+        let len = value.len() + opening_len + closing_len;
+        Self {
+            width: Width::Flat(len),
+            opening,
+            value,
+            closing,
+        }
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct DynStr {
+    pub width: Width,
     pub opening: Option<String>,
     pub parts: Vec<DynStrPart>,
     pub closing: Option<String>,
+}
+
+impl DynStr {
+    pub(crate) fn new(opening: Option<String>, closing: Option<String>) -> Self {
+        let opening_len = opening.as_ref().map_or(0, |s| s.len());
+        let closing_len = closing.as_ref().map_or(0, |s| s.len());
+        Self {
+            width: Width::Flat(opening_len + closing_len),
+            opening,
+            parts: vec![],
+            closing,
+        }
+    }
+
+    pub(crate) fn append_part(&mut self, part: DynStrPart) {
+        self.width.append(part.width());
+        self.parts.push(part);
+    }
 }
 
 #[derive(Debug)]
@@ -107,11 +133,34 @@ pub(crate) enum DynStrPart {
     Exprs(EmbeddedExprs),
 }
 
+impl DynStrPart {
+    pub(crate) fn width(&self) -> &Width {
+        match self {
+            Self::Str(s) => &s.width,
+            Self::DynStr(s) => &s.width,
+            Self::Exprs(e) => &e.width,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct EmbeddedExprs {
+    pub width: Width,
     pub opening: String,
     pub exprs: Exprs,
     pub closing: String,
+}
+
+impl EmbeddedExprs {
+    pub(crate) fn new(opening: String, exprs: Exprs, closing: String) -> Self {
+        let width = Width::Flat(opening.len() + closing.len()).add(&exprs.width);
+        Self {
+            width,
+            opening,
+            exprs,
+            closing,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -121,7 +170,7 @@ pub(crate) struct Heredoc {
     pub parts: Vec<HeredocPart>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum HeredocIndentMode {
     None,
     EndIndented,
@@ -161,22 +210,22 @@ pub(crate) struct VirtualEnd {
 
 #[derive(Debug)]
 pub(crate) struct Exprs {
+    width: Width,
     nodes: Vec<Node>,
     virtual_end: Option<VirtualEnd>,
-    width: Width,
 }
 
 impl Exprs {
     pub(crate) fn new() -> Self {
         Self {
+            width: Width::Flat(0),
             nodes: vec![],
             virtual_end: None,
-            width: Width::Flat(0),
         }
     }
 
     pub(crate) fn append_node(&mut self, node: Node) {
-        if self.nodes.is_empty() && !matches!(node.kind, Kind::HeredocOpening) {
+        if self.nodes.is_empty() && !matches!(node.kind, Kind::HeredocOpening(_)) {
             self.width = node.width;
         } else {
             self.width = Width::NotFlat;
@@ -208,6 +257,28 @@ impl Exprs {
 }
 
 #[derive(Debug)]
+pub(crate) struct HeredocOpening {
+    width: Width,
+    id: String,
+    indent_mode: HeredocIndentMode,
+}
+
+impl HeredocOpening {
+    pub(crate) fn new(id: String, indent_mode: HeredocIndentMode) -> Self {
+        let width = Width::Flat(id.len() + indent_mode.prefix_symbols().len());
+        Self {
+            width,
+            id,
+            indent_mode,
+        }
+    }
+
+    pub(crate) fn width(&self) -> &Width {
+        &self.width
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct IfExpr {
     pub is_if: bool,
     pub if_first: Conditional,
@@ -228,15 +299,41 @@ impl IfExpr {
 
 #[derive(Debug)]
 pub(crate) struct Postmodifier {
+    pub width: Width,
     pub keyword: String,
     pub conditional: Conditional,
+}
+
+impl Postmodifier {
+    pub(crate) fn new(keyword: String, conditional: Conditional) -> Self {
+        let kwd_width = Width::Flat(keyword.len() + 2); // keyword and spaces around it.
+        let width = conditional.width.add(&kwd_width);
+        Self {
+            width,
+            keyword,
+            conditional,
+        }
+    }
 }
 
 #[derive(Debug)]
 pub(crate) struct Conditional {
     pub pos: Pos,
+    pub width: Width,
     pub cond: Box<Node>,
     pub body: Exprs,
+}
+
+impl Conditional {
+    pub(crate) fn new(pos: Pos, cond: Node, body: Exprs) -> Self {
+        let width = cond.width.add(&body.width);
+        Self {
+            pos,
+            width,
+            cond: Box::new(cond),
+            body,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -275,10 +372,6 @@ impl Arguments {
         }
         self.virtual_end = end;
     }
-
-    pub(crate) fn width(&self) -> Width {
-        self.width
-    }
 }
 
 #[derive(Debug)]
@@ -291,9 +384,36 @@ pub(crate) struct MethodCall {
     pub block: Option<MethodBlock>,
 }
 
+impl MethodCall {
+    pub(crate) fn new(pos: Pos, call_op: Option<String>, name: String) -> Self {
+        let width = Width::Flat(name.len() + call_op.as_ref().map_or(0, |s| s.len()));
+        Self {
+            pos,
+            call_op,
+            name,
+            args: None,
+            block: None,
+            width,
+        }
+    }
+
+    pub(crate) fn set_args(&mut self, args: Arguments) {
+        // For now surround the arguments by parentheses always.
+        self.width.append_value("()".len());
+        self.width.append(&args.width);
+        self.args = Some(args);
+    }
+
+    pub(crate) fn set_block(&mut self, block: MethodBlock) {
+        self.width.append(&block.width);
+        self.block = Some(block);
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct MethodBlock {
     pub pos: Pos,
+    pub width: Width,
     // pub args
     pub body: Exprs,
     pub was_flat: bool,
@@ -301,27 +421,27 @@ pub(crate) struct MethodBlock {
 
 #[derive(Debug)]
 pub(crate) struct MethodChain {
+    width: Width,
     receiver: Option<Box<Node>>,
     calls: Vec<MethodCall>,
-    body_width: Width,
 }
 
 impl MethodChain {
     pub(crate) fn new(receiver: Option<Node>) -> Self {
         Self {
-            body_width: receiver.as_ref().map_or(Width::Flat(0), |r| r.width),
+            width: receiver.as_ref().map_or(Width::Flat(0), |r| r.width),
             receiver: receiver.map(Box::new),
             calls: vec![],
         }
     }
 
     pub(crate) fn append_call(&mut self, call: MethodCall) {
-        self.body_width.append(&call.width);
+        self.width.append(&call.width);
         self.calls.push(call);
     }
 
     pub(crate) fn body_width(&self) -> Width {
-        self.body_width
+        self.width
     }
 }
 
@@ -427,7 +547,7 @@ impl Formatter {
             Kind::Atom(value) => self.push_str(value),
             Kind::Str(str) => self.format_str(str),
             Kind::DynStr(dstr) => self.format_dyn_str(dstr, ctx),
-            Kind::HeredocOpening => self.format_heredoc_opening(node.pos, ctx),
+            Kind::HeredocOpening(opening) => self.format_heredoc_opening(node.pos, opening),
             Kind::Exprs(exprs) => self.format_exprs(exprs, ctx, false),
             Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
@@ -491,10 +611,9 @@ impl Formatter {
         self.push_str(&embedded.closing);
     }
 
-    fn format_heredoc_opening(&mut self, pos: Pos, ctx: &FormatContext) {
-        let heredoc = ctx.heredoc_map.get(&pos).expect("heredoc must exist");
-        self.push_str(heredoc.indent_mode.prefix_symbols());
-        self.push_str(&heredoc.id);
+    fn format_heredoc_opening(&mut self, pos: Pos, opening: &HeredocOpening) {
+        self.push_str(opening.indent_mode.prefix_symbols());
+        self.push_str(&opening.id);
         self.heredoc_queue.push_back(pos);
     }
 
@@ -680,7 +799,7 @@ impl Formatter {
             }
         }
 
-        if chain.body_width.is_flat() {
+        if chain.width.is_flat() {
             for call in chain.calls.iter() {
                 if let Some(call_op) = &call.call_op {
                     self.push_str(call_op);

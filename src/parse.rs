@@ -159,17 +159,17 @@ impl FmtNodeBuilder<'_> {
                 let loc = node.location();
                 let mut decors = self.take_leading_decors(loc.start_offset());
                 let mut fmt_node = if Self::is_heredoc(node.opening_loc().as_ref()) {
-                    let opening_len = self.visit_simple_heredoc(pos, node);
+                    let heredoc_opening = self.visit_simple_heredoc(pos, node);
                     fmt::Node {
                         pos,
-                        width: fmt::Width::Flat(opening_len),
-                        kind: fmt::Kind::HeredocOpening,
+                        width: *heredoc_opening.width(),
+                        kind: fmt::Kind::HeredocOpening(heredoc_opening),
                     }
                 } else {
-                    let (str, width) = self.visit_string(node);
+                    let str = self.visit_string(node);
                     fmt::Node {
                         pos,
-                        width,
+                        width: str.width,
                         kind: fmt::Kind::Str(str),
                     }
                 };
@@ -184,18 +184,17 @@ impl FmtNodeBuilder<'_> {
                 let loc = node.location();
                 let mut decors = self.take_leading_decors(loc.start_offset());
                 let mut fmt_node = if Self::is_heredoc(node.opening_loc().as_ref()) {
-                    let opening_len = self.visit_complex_heredoc(pos, node);
-                    let width = fmt::Width::Flat(opening_len);
+                    let heredoc_opening = self.visit_complex_heredoc(pos, node);
                     fmt::Node {
                         pos,
-                        width,
-                        kind: fmt::Kind::HeredocOpening,
+                        width: *heredoc_opening.width(),
+                        kind: fmt::Kind::HeredocOpening(heredoc_opening),
                     }
                 } else {
-                    let (str, width) = self.visit_interpolated_string(node);
+                    let str = self.visit_interpolated_string(node);
                     fmt::Node {
                         pos,
-                        width,
+                        width: str.width,
                         kind: fmt::Kind::DynStr(str),
                     }
                 };
@@ -300,41 +299,31 @@ impl FmtNodeBuilder<'_> {
         node
     }
 
-    fn visit_string(&mut self, node: prism::StringNode) -> (fmt::Str, fmt::Width) {
+    fn visit_string(&mut self, node: prism::StringNode) -> fmt::Str {
         let value = Self::source_lossy_at(&node.content_loc());
         let opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
         let closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
-        let str = fmt::Str {
-            opening,
-            value: value.into(),
-            closing,
-        };
-        let width = fmt::Width::Flat(str.len());
-        (str, width)
+        fmt::Str::new(opening, value.into(), closing)
     }
 
-    fn visit_interpolated_string(
-        &mut self,
-        itp_str: prism::InterpolatedStringNode,
-    ) -> (fmt::DynStr, fmt::Width) {
-        let mut parts = vec![];
-        let mut width = fmt::Width::Flat(0);
+    fn visit_interpolated_string(&mut self, itp_str: prism::InterpolatedStringNode) -> fmt::DynStr {
+        let opening = itp_str.opening_loc().as_ref().map(Self::source_lossy_at);
+        let closing = itp_str.closing_loc().as_ref().map(Self::source_lossy_at);
+        let mut dstr = fmt::DynStr::new(opening, closing);
         for part in itp_str.parts().iter() {
             match part {
                 prism::Node::StringNode { .. } => {
                     let node = part.as_string_node().unwrap();
                     let node_end = node.location().end_offset();
-                    let (str, str_width) = self.visit_string(node);
-                    parts.push(fmt::DynStrPart::Str(str));
-                    width.append(&str_width);
+                    let str = self.visit_string(node);
+                    dstr.append_part(fmt::DynStrPart::Str(str));
                     self.last_loc_end = node_end;
                 }
                 prism::Node::InterpolatedStringNode { .. } => {
                     let node = part.as_interpolated_string_node().unwrap();
                     let node_end = node.location().end_offset();
-                    let (str, str_width) = self.visit_interpolated_string(node);
-                    parts.push(fmt::DynStrPart::DynStr(str));
-                    width.append(&str_width);
+                    let str = self.visit_interpolated_string(node);
+                    dstr.append_part(fmt::DynStrPart::DynStr(str));
                     self.last_loc_end = node_end;
                 }
                 prism::Node::EmbeddedStatementsNode { .. } => {
@@ -345,28 +334,13 @@ impl FmtNodeBuilder<'_> {
                     let exprs = self.visit_statements(node.statements(), loc.end_offset());
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
-                    width.append_value(opening.len());
-                    width.append_value(closing.len());
-                    width.append(&exprs.width());
-                    parts.push(fmt::DynStrPart::Exprs(fmt::EmbeddedExprs {
-                        exprs,
-                        opening,
-                        closing,
-                    }));
+                    let embedded_exprs = fmt::EmbeddedExprs::new(opening, exprs, closing);
+                    dstr.append_part(fmt::DynStrPart::Exprs(embedded_exprs));
                 }
                 _ => panic!("unexpected string interpolation node: {:?}", part),
             }
         }
-        let opening = itp_str.opening_loc().as_ref().map(Self::source_lossy_at);
-        let closing = itp_str.closing_loc().as_ref().map(Self::source_lossy_at);
-        width.append_value(opening.as_ref().map_or(0, |s| s.len()));
-        width.append_value(closing.as_ref().map_or(0, |s| s.len()));
-        let str = fmt::DynStr {
-            opening,
-            parts,
-            closing,
-        };
-        (str, width)
+        dstr
     }
 
     fn is_heredoc(str_opening_loc: Option<&prism::Location>) -> bool {
@@ -378,28 +352,32 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn visit_simple_heredoc(&mut self, pos: fmt::Pos, node: prism::StringNode) -> usize {
+    fn visit_simple_heredoc(
+        &mut self,
+        pos: fmt::Pos,
+        node: prism::StringNode,
+    ) -> fmt::HeredocOpening {
         let open = node.opening_loc().unwrap().as_slice();
         let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
-        let id = String::from_utf8_lossy(id).to_string();
-        let (str, _) = self.visit_string(node);
+        let opening_id = String::from_utf8_lossy(id).to_string();
+        let str = self.visit_string(node);
         let heredoc = fmt::Heredoc {
-            id,
+            id: opening_id.clone(),
             indent_mode,
             parts: vec![fmt::HeredocPart::Str(str)],
         };
         self.heredoc_map.insert(pos, heredoc);
-        open.len()
+        fmt::HeredocOpening::new(opening_id, indent_mode)
     }
 
     fn visit_complex_heredoc(
         &mut self,
         pos: fmt::Pos,
         node: prism::InterpolatedStringNode,
-    ) -> usize {
+    ) -> fmt::HeredocOpening {
         let open = node.opening_loc().unwrap().as_slice();
         let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
-        let id = String::from_utf8_lossy(id).to_string();
+        let opening_id = String::from_utf8_lossy(id).to_string();
         let mut parts = vec![];
         let mut last_str_end: Option<usize> = None;
         for part in node.parts().iter() {
@@ -407,7 +385,7 @@ impl FmtNodeBuilder<'_> {
                 prism::Node::StringNode { .. } => {
                     let node = part.as_string_node().unwrap();
                     let node_end = node.location().end_offset();
-                    let (str, _) = self.visit_string(node);
+                    let str = self.visit_string(node);
                     parts.push(fmt::HeredocPart::Str(str));
                     self.last_loc_end = node_end;
                     last_str_end = Some(node_end);
@@ -419,11 +397,7 @@ impl FmtNodeBuilder<'_> {
                         // I don't know why but ruby-prism ignores spaces before an interpolation in some cases.
                         if last_str_end < loc.start_offset() {
                             let value = self.src[last_str_end..loc.start_offset()].to_vec();
-                            let str = fmt::Str {
-                                opening: None,
-                                value,
-                                closing: None,
-                            };
+                            let str = fmt::Str::new(None, value, None);
                             parts.push(fmt::HeredocPart::Str(str))
                         }
                     }
@@ -431,22 +405,19 @@ impl FmtNodeBuilder<'_> {
                     let exprs = self.visit_statements(node.statements(), loc.end_offset());
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
-                    parts.push(fmt::HeredocPart::Exprs(fmt::EmbeddedExprs {
-                        exprs,
-                        opening,
-                        closing,
-                    }));
+                    let embedded = fmt::EmbeddedExprs::new(opening, exprs, closing);
+                    parts.push(fmt::HeredocPart::Exprs(embedded));
                 }
                 _ => panic!("unexpected heredoc part: {:?}", part),
             }
         }
         let heredoc = fmt::Heredoc {
-            id,
+            id: opening_id.clone(),
             indent_mode,
             parts,
         };
         self.heredoc_map.insert(pos, heredoc);
-        open.len()
+        fmt::HeredocOpening::new(opening_id, indent_mode)
     }
 
     fn visit_statements(&mut self, node: Option<prism::StatementsNode>, end: usize) -> fmt::Exprs {
@@ -492,11 +463,7 @@ impl FmtNodeBuilder<'_> {
                 // take trailing of else/elsif
                 let else_start = conseq.location().start_offset();
                 let body = self.visit_statements(node.statements, else_start);
-                let if_first = fmt::Conditional {
-                    pos: if_pos,
-                    cond: Box::new(predicate),
-                    body,
-                };
+                let if_first = fmt::Conditional::new(if_pos, predicate, body);
                 let mut ifexpr = fmt::IfExpr::new(node.is_if, if_first);
                 self.visit_ifelse(conseq, &mut ifexpr);
                 ifexpr
@@ -504,11 +471,7 @@ impl FmtNodeBuilder<'_> {
             // if...end
             None => {
                 let body = self.visit_statements(node.statements, end_start);
-                let if_first = fmt::Conditional {
-                    pos: if_pos,
-                    cond: Box::new(predicate),
-                    body,
-                };
+                let if_first = fmt::Conditional::new(if_pos, predicate, body);
                 fmt::IfExpr::new(node.is_if, if_first)
             }
         };
@@ -558,11 +521,8 @@ impl FmtNodeBuilder<'_> {
                     .unwrap_or(end_loc.start_offset());
                 let body = self.visit_statements(node.statements(), body_end_loc);
 
-                ifexpr.elsifs.push(fmt::Conditional {
-                    pos: elsif_pos,
-                    cond: Box::new(predicate),
-                    body,
-                });
+                let conditional = fmt::Conditional::new(elsif_pos, predicate, body);
+                ifexpr.elsifs.push(conditional);
                 if let Some(conseq) = conseq {
                     self.visit_ifelse(conseq, ifexpr);
                 }
@@ -605,8 +565,6 @@ impl FmtNodeBuilder<'_> {
         let exprs = self.visit_statements(postmod.statements, kwd_loc.start_offset());
 
         let kwd_pos = self.next_pos();
-        let mut width = exprs.width();
-        width.append_value(postmod.keyword.len() + 2); // keyword and spaces around it.
 
         let pred_loc = postmod.predicate.location();
         let mut kwd_decors = Decors::new();
@@ -614,25 +572,19 @@ impl FmtNodeBuilder<'_> {
         self.store_decors_to(kwd_pos, kwd_decors);
 
         let predicate = self.visit(postmod.predicate, next_loc_start);
-        width.append(&predicate.width);
 
+        let postmod = fmt::Postmodifier::new(
+            postmod.keyword,
+            fmt::Conditional::new(kwd_pos, predicate, exprs),
+        );
+        let width = postmod.width.add(&decors.width);
         decors.set_trailing(self.take_trailing_comment(next_loc_start));
-        width.append(&decors.width);
         self.store_decors_to(pos, decors);
-
-        let if_modifier = fmt::Postmodifier {
-            keyword: postmod.keyword,
-            conditional: fmt::Conditional {
-                pos: kwd_pos,
-                cond: Box::new(predicate),
-                body: exprs,
-            },
-        };
 
         fmt::Node {
             pos,
             width,
-            kind: fmt::Kind::Postmodifier(if_modifier),
+            kind: fmt::Kind::Postmodifier(postmod),
         }
     }
 
@@ -665,9 +617,6 @@ impl FmtNodeBuilder<'_> {
             None => fmt::MethodChain::new(None),
         };
 
-        let mut call_width = fmt::Width::Flat(0);
-
-        let call_pos = self.next_pos();
         let mut decors = if let Some(msg_loc) = call.message_loc() {
             self.take_leading_decors(msg_loc.start_offset())
         } else {
@@ -675,15 +624,10 @@ impl FmtNodeBuilder<'_> {
             // foo.\n#hoge\n(2)
         };
 
-        let name = String::from_utf8_lossy(call.name().as_slice()).to_string();
-
-        if let Some(loc) = call.call_operator_loc() {
-            let op_len = loc.end_offset() - loc.start_offset();
-            call_width.append_value(op_len);
-        }
-        call_width.append_value(name.len());
-
+        let call_pos = self.next_pos();
         let call_op = call.call_operator_loc().map(|l| Self::source_lossy_at(&l));
+        let name = String::from_utf8_lossy(call.name().as_slice()).to_string();
+        let mut method_call = fmt::MethodCall::new(call_pos, call_op, name);
 
         let args = match call.arguments() {
             None => {
@@ -720,10 +664,8 @@ impl FmtNodeBuilder<'_> {
                 Some(args)
             }
         };
-        if let Some(args) = &args {
-            // For now surround the arguments by parentheses always.
-            call_width.append_value("()".len());
-            call_width.append(&args.width());
+        if let Some(args) = args {
+            method_call.set_args(args);
         }
 
         let block = call.block().map(|node| match node {
@@ -738,7 +680,6 @@ impl FmtNodeBuilder<'_> {
                     .start_offset();
                 let mut decors = Decors::new();
                 decors.set_trailing(self.take_trailing_comment(block_next_loc));
-                call_width.append(&decors.width);
                 self.store_decors_to(block_pos, decors);
 
                 let body_end_loc = node.closing_loc().start_offset();
@@ -749,36 +690,32 @@ impl FmtNodeBuilder<'_> {
                 let loc = node.location();
                 let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
 
-                if was_flat {
-                    call_width.append_value(" {  }".len());
-                    call_width.append(&body.width());
+                let width = if was_flat {
+                    body.width().add(&fmt::Width::Flat(" {  }".len()))
                 } else {
-                    call_width.append(&fmt::Width::NotFlat);
-                }
+                    fmt::Width::NotFlat
+                };
 
                 fmt::MethodBlock {
                     pos: block_pos,
+                    width,
                     body,
                     was_flat,
                 }
             }
             _ => panic!("unexpected node for call block: {:?}", node),
         });
+        if let Some(block) = block {
+            method_call.set_block(block);
+        }
 
         if let Some(next_msg_start) = next_msg_start {
             decors.set_trailing(self.take_trailing_comment(next_msg_start));
         }
-        call_width.append(&decors.width);
-        self.store_decors_to(call_pos, decors);
 
-        chain.append_call(fmt::MethodCall {
-            pos: call_pos,
-            width: call_width,
-            call_op,
-            name,
-            args,
-            block,
-        });
+        method_call.width.append(&decors.width);
+        self.store_decors_to(call_pos, decors);
+        chain.append_call(method_call);
 
         self.last_loc_end = call.location().end_offset();
         chain
