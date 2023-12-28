@@ -62,8 +62,21 @@ impl Width {
 #[derive(Debug)]
 pub(crate) struct Node {
     pub pos: Pos,
+    pub decors: Decors,
     pub kind: Kind,
     pub width: Width,
+}
+
+impl Node {
+    pub(crate) fn new(pos: Pos, decors: Decors, kind: Kind) -> Self {
+        let width = decors.width.add(&kind.width());
+        Self {
+            pos,
+            decors,
+            kind,
+            width,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -76,6 +89,21 @@ pub(crate) enum Kind {
     IfExpr(IfExpr),
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
+}
+
+impl Kind {
+    pub(crate) fn width(&self) -> Width {
+        match self {
+            Self::Atom(s) => Width::Flat(s.len()),
+            Self::Str(s) => s.width,
+            Self::DynStr(s) => s.width,
+            Self::HeredocOpening(opening) => *opening.width(),
+            Self::Exprs(exprs) => exprs.width,
+            Self::IfExpr(_) => IfExpr::width(),
+            Self::Postmodifier(pmod) => pmod.width,
+            Self::MethodChain(chain) => chain.width,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -295,6 +323,10 @@ impl IfExpr {
             if_last: None,
         }
     }
+
+    pub(crate) fn width() -> Width {
+        Width::NotFlat
+    }
 }
 
 #[derive(Debug)]
@@ -444,10 +476,6 @@ impl MethodChain {
         self.width.append(&call.width);
         self.calls.push(call);
     }
-
-    pub(crate) fn body_width(&self) -> Width {
-        self.width
-    }
 }
 
 #[derive(Debug)]
@@ -456,6 +484,7 @@ pub(crate) struct DecorStore {
     empty_decors: DecorSet,
 }
 
+#[allow(unused)]
 impl DecorStore {
     pub(crate) fn new() -> Self {
         Self {
@@ -664,9 +693,8 @@ impl Formatter {
             if i > 0 {
                 self.break_line(ctx);
             }
-            let decors = ctx.decor_store.get(&n.pos);
             self.write_leading_decors(
-                &decors.leading,
+                &n.decors.leading,
                 ctx,
                 EmptyLineHandling::Trim {
                     start: i == 0,
@@ -675,7 +703,7 @@ impl Formatter {
             );
             self.put_indent();
             self.format(n, ctx);
-            self.write_trailing_comment(&decors.trailing);
+            self.write_trailing_comment(&n.decors.trailing);
         }
         self.write_decors_at_virtual_end(
             ctx,
@@ -740,8 +768,7 @@ impl Formatter {
         }
 
         let if_decors = &expr.if_first.decors;
-        let cond_decors = ctx.decor_store.get(&expr.if_first.cond.pos);
-        self.format_decors_in_keyword_gap(ctx, if_decors, cond_decors, |self_| {
+        self.format_decors_in_keyword_gap(ctx, if_decors, &expr.if_first.cond.decors, |self_| {
             self_.put_indent();
             self_.format(&expr.if_first.cond, ctx);
         });
@@ -756,8 +783,7 @@ impl Formatter {
             self.put_indent();
             self.push_str("elsif");
             let elsif_decors = &elsif.decors;
-            let cond_decors = ctx.decor_store.get(&elsif.cond.pos);
-            self.format_decors_in_keyword_gap(ctx, elsif_decors, cond_decors, |self_| {
+            self.format_decors_in_keyword_gap(ctx, elsif_decors, &elsif.cond.decors, |self_| {
                 self_.put_indent();
                 self_.format(&elsif.cond, ctx);
             });
@@ -792,11 +818,15 @@ impl Formatter {
         self.push_str(&modifier.keyword);
 
         let if_decors = &modifier.conditional.decors;
-        let cond_decors = ctx.decor_store.get(&modifier.conditional.cond.pos);
-        self.format_decors_in_keyword_gap(ctx, if_decors, cond_decors, |self_| {
-            self_.put_indent();
-            self_.format(&modifier.conditional.cond, ctx);
-        });
+        self.format_decors_in_keyword_gap(
+            ctx,
+            if_decors,
+            &modifier.conditional.cond.decors,
+            |self_| {
+                self_.put_indent();
+                self_.format(&modifier.conditional.cond, ctx);
+            },
+        );
         self.dedent();
     }
 
@@ -805,7 +835,7 @@ impl Formatter {
         &mut self,
         ctx: &FormatContext,
         keyword_decors: &Decors,
-        next_decors: &DecorSet,
+        next_decors: &Decors,
         next_node: impl FnOnce(&mut Self),
     ) {
         if keyword_decors.trailing.is_none() && next_decors.leading.is_empty() {
@@ -825,10 +855,9 @@ impl Formatter {
 
     fn format_method_chain(&mut self, chain: &MethodChain, ctx: &FormatContext) {
         if let Some(recv) = &chain.receiver {
-            let recv_decor = ctx.decor_store.get(&recv.pos);
             self.format(recv, ctx);
-            if recv_decor.trailing.is_some() {
-                self.write_trailing_comment(&recv_decor.trailing);
+            if recv.decors.trailing.is_some() {
+                self.write_trailing_comment(&recv.decors.trailing);
             }
         }
 
@@ -886,10 +915,9 @@ impl Formatter {
                     } else {
                         self.indent();
                         for (i, arg) in args.nodes.iter().enumerate() {
-                            let decors = ctx.decor_store.get(&arg.pos);
                             self.break_line(ctx);
                             self.write_leading_decors(
-                                &decors.leading,
+                                &arg.decors.leading,
                                 ctx,
                                 EmptyLineHandling::Trim {
                                     start: i == 0,
@@ -899,7 +927,7 @@ impl Formatter {
                             self.put_indent();
                             self.format(arg, ctx);
                             self.push(',');
-                            self.write_trailing_comment(&decors.trailing);
+                            self.write_trailing_comment(&arg.decors.trailing);
                         }
                         self.write_decors_at_virtual_end(
                             ctx,
