@@ -338,7 +338,7 @@ impl Conditional {
 
 #[derive(Debug)]
 pub(crate) struct Else {
-    pub pos: Pos,
+    pub decors: Decors,
     pub body: Exprs,
 }
 
@@ -768,12 +768,11 @@ impl Formatter {
         }
 
         if let Some(if_last) = &expr.if_last {
-            let else_decors = ctx.decor_store.get(&if_last.pos);
             self.break_line(ctx);
             self.dedent();
             self.put_indent();
             self.push_str("else");
-            self.write_trailing_comment(&else_decors.trailing);
+            self.write_trailing_comment(&if_last.decors.trailing);
             self.indent();
             if !if_last.body.is_empty() {
                 self.break_line(ctx);

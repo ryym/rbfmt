@@ -495,7 +495,6 @@ impl FmtNodeBuilder<'_> {
             // else
             prism::Node::ElseNode { .. } => {
                 let node = node.as_else_node().unwrap();
-                let else_pos = self.next_pos();
 
                 let end_loc = node
                     .end_keyword_loc()
@@ -508,13 +507,9 @@ impl FmtNodeBuilder<'_> {
                     .unwrap_or(end_loc.start_offset());
                 let mut decors = fmt::Decors::new();
                 decors.set_trailing(self.take_trailing_comment(else_next_loc));
-                self.store_decors_to(else_pos, decors);
 
                 let body = self.visit_statements(node.statements(), end_loc.start_offset());
-                ifexpr.if_last = Some(fmt::Else {
-                    pos: else_pos,
-                    body,
-                });
+                ifexpr.if_last = Some(fmt::Else { decors, body });
             }
             _ => {
                 panic!("unexpected node in IfNode: {:?}", node);
