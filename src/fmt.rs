@@ -417,8 +417,8 @@ impl MethodCall {
 
 #[derive(Debug)]
 pub(crate) struct MethodBlock {
-    pub pos: Pos,
     pub width: Width,
+    pub decors: Decors,
     // pub args
     pub body: Exprs,
     pub was_flat: bool,
@@ -918,13 +918,12 @@ impl Formatter {
                 }
 
                 if let Some(block) = &call.block {
-                    let block_decors = ctx.decor_store.get(&block.pos);
-                    if block_decors.trailing.is_some()
+                    if block.decors.trailing.is_some()
                         || !block.body.width.is_flat()
                         || !block.was_flat
                     {
                         self.push_str(" do");
-                        self.write_trailing_comment(&block_decors.trailing);
+                        self.write_trailing_comment(&block.decors.trailing);
                         self.indent();
                         if !block.body.is_empty() {
                             self.break_line(ctx);

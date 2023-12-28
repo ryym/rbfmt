@@ -640,7 +640,6 @@ impl FmtNodeBuilder<'_> {
         let block = call.block().map(|node| match node {
             prism::Node::BlockNode { .. } => {
                 let node = node.as_block_node().unwrap();
-                let block_pos = self.next_pos();
 
                 let block_next_loc = node
                     .body()
@@ -649,7 +648,6 @@ impl FmtNodeBuilder<'_> {
                     .start_offset();
                 let mut decors = fmt::Decors::new();
                 decors.set_trailing(self.take_trailing_comment(block_next_loc));
-                self.store_decors_to(block_pos, decors);
 
                 let body_end_loc = node.closing_loc().start_offset();
                 let body = node.body().map(|n| self.visit(n, body_end_loc));
@@ -666,7 +664,7 @@ impl FmtNodeBuilder<'_> {
                 };
 
                 fmt::MethodBlock {
-                    pos: block_pos,
+                    decors,
                     width,
                     body,
                     was_flat,
