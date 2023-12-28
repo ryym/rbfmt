@@ -204,8 +204,8 @@ pub(crate) enum HeredocPart {
 
 #[derive(Debug)]
 pub(crate) struct VirtualEnd {
-    pub pos: Pos,
     pub width: Width,
+    pub decors: Decors,
 }
 
 #[derive(Debug)]
@@ -693,10 +693,8 @@ impl Formatter {
         trim_start: bool,
     ) {
         if let Some(end) = end {
-            let end_decors = ctx.decor_store.get(&end.pos);
-
             let mut trailing_empty_lines = 0;
-            for decor in end_decors.leading.iter().rev() {
+            for decor in end.decors.leading.iter().rev() {
                 match decor {
                     LineDecor::EmptyLine => {
                         trailing_empty_lines += 1;
@@ -706,16 +704,16 @@ impl Formatter {
                     }
                 }
             }
-            if trailing_empty_lines == end_decors.leading.len() {
+            if trailing_empty_lines == end.decors.leading.len() {
                 return;
             }
 
             if break_first {
                 self.break_line(ctx);
             }
-            let target_len = end_decors.leading.len() - trailing_empty_lines;
+            let target_len = end.decors.leading.len() - trailing_empty_lines;
             let last_idx = target_len - 1;
-            for (i, decor) in end_decors.leading.iter().take(target_len).enumerate() {
+            for (i, decor) in end.decors.leading.iter().take(target_len).enumerate() {
                 match decor {
                     LineDecor::EmptyLine => {
                         if !(trim_start && i == 0) || i == last_idx {

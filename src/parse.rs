@@ -708,13 +708,8 @@ impl FmtNodeBuilder<'_> {
         if let Some(end) = end {
             let decors = self.take_leading_decors(end);
             if !decors.leading.is_empty() {
-                let end_pos = self.next_pos();
                 let width = decors.width;
-                self.store_decors_to(end_pos, decors);
-                return Some(fmt::VirtualEnd {
-                    pos: end_pos,
-                    width,
-                });
+                return Some(fmt::VirtualEnd { decors, width });
             }
         }
         None
