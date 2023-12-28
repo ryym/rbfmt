@@ -59,17 +59,17 @@ impl Width {
 #[derive(Debug)]
 pub(crate) struct Node {
     pub pos: Pos,
-    pub decors: Decors,
+    pub trivia: Trivia,
     pub kind: Kind,
     pub width: Width,
 }
 
 impl Node {
-    pub(crate) fn new(pos: Pos, decors: Decors, kind: Kind) -> Self {
-        let width = decors.width.add(&kind.width());
+    pub(crate) fn new(pos: Pos, trivia: Trivia, kind: Kind) -> Self {
+        let width = trivia.width.add(&kind.width());
         Self {
             pos,
-            decors,
+            trivia,
             kind,
             width,
         }
@@ -230,7 +230,7 @@ pub(crate) enum HeredocPart {
 #[derive(Debug)]
 pub(crate) struct VirtualEnd {
     pub width: Width,
-    pub decors: Decors,
+    pub trivia: Trivia,
 }
 
 #[derive(Debug)]
@@ -348,17 +348,17 @@ impl Postmodifier {
 #[derive(Debug)]
 pub(crate) struct Conditional {
     pub width: Width,
-    pub decors: Decors,
+    pub trivia: Trivia,
     pub cond: Box<Node>,
     pub body: Exprs,
 }
 
 impl Conditional {
-    pub(crate) fn new(decors: Decors, cond: Node, body: Exprs) -> Self {
-        let width = decors.width.add(&cond.width).add(&body.width);
+    pub(crate) fn new(trivia: Trivia, cond: Node, body: Exprs) -> Self {
+        let width = trivia.width.add(&cond.width).add(&body.width);
         Self {
             width,
-            decors,
+            trivia,
             cond: Box::new(cond),
             body,
         }
@@ -367,7 +367,7 @@ impl Conditional {
 
 #[derive(Debug)]
 pub(crate) struct Else {
-    pub decors: Decors,
+    pub trivia: Trivia,
     pub body: Exprs,
 }
 
@@ -406,7 +406,7 @@ impl Arguments {
 #[derive(Debug)]
 pub(crate) struct MethodCall {
     pub width: Width,
-    pub decors: Decors,
+    pub trivia: Trivia,
     pub call_op: Option<String>,
     pub name: String,
     pub args: Option<Arguments>,
@@ -418,7 +418,7 @@ impl MethodCall {
         let width = Width::Flat(name.len() + call_op.as_ref().map_or(0, |s| s.len()));
         Self {
             width,
-            decors: Decors::new(),
+            trivia: Trivia::new(),
             call_op,
             name,
             args: None,
@@ -426,9 +426,9 @@ impl MethodCall {
         }
     }
 
-    pub(crate) fn set_decors(&mut self, decors: Decors) {
-        self.width.append(&decors.width);
-        self.decors = decors;
+    pub(crate) fn set_trivia(&mut self, trivia: Trivia) {
+        self.width.append(&trivia.width);
+        self.trivia = trivia;
     }
 
     pub(crate) fn set_args(&mut self, args: Arguments) {
@@ -447,7 +447,7 @@ impl MethodCall {
 #[derive(Debug)]
 pub(crate) struct MethodBlock {
     pub width: Width,
-    pub decors: Decors,
+    pub trivia: Trivia,
     // pub args
     pub body: Exprs,
     pub was_flat: bool,
@@ -476,13 +476,13 @@ impl MethodChain {
 }
 
 #[derive(Debug)]
-pub(crate) struct Decors {
-    pub leading: Vec<LineDecor>,
+pub(crate) struct Trivia {
+    pub leading: Vec<LineTrivia>,
     pub trailing: Option<Comment>,
     pub width: Width,
 }
 
-impl Decors {
+impl Trivia {
     pub(crate) fn new() -> Self {
         Self {
             leading: vec![],
@@ -491,11 +491,11 @@ impl Decors {
         }
     }
 
-    pub(crate) fn append_leading(&mut self, decor: LineDecor) {
-        if matches!(decor, LineDecor::Comment(_)) {
+    pub(crate) fn append_leading(&mut self, trivia: LineTrivia) {
+        if matches!(trivia, LineTrivia::Comment(_)) {
             self.width = Width::NotFlat;
         }
-        self.leading.push(decor);
+        self.leading.push(trivia);
     }
 
     pub(crate) fn set_trailing(&mut self, comment: Option<Comment>) {
@@ -512,7 +512,7 @@ pub(crate) struct Comment {
 }
 
 #[derive(Debug)]
-pub(crate) enum LineDecor {
+pub(crate) enum LineTrivia {
     EmptyLine,
     Comment(Comment),
 }
@@ -633,8 +633,8 @@ impl Formatter {
             if i > 0 {
                 self.break_line(ctx);
             }
-            self.write_leading_decors(
-                &n.decors.leading,
+            self.write_leading_trivia(
+                &n.trivia.leading,
                 ctx,
                 EmptyLineHandling::Trim {
                     start: i == 0,
@@ -643,9 +643,9 @@ impl Formatter {
             );
             self.put_indent();
             self.format(n, ctx);
-            self.write_trailing_comment(&n.decors.trailing);
+            self.write_trailing_comment(&n.trivia.trailing);
         }
-        self.write_decors_at_virtual_end(
+        self.write_trivia_at_virtual_end(
             ctx,
             &exprs.virtual_end,
             !exprs.nodes.is_empty(),
@@ -653,7 +653,7 @@ impl Formatter {
         );
     }
 
-    fn write_decors_at_virtual_end(
+    fn write_trivia_at_virtual_end(
         &mut self,
         ctx: &FormatContext,
         end: &Option<VirtualEnd>,
@@ -662,33 +662,33 @@ impl Formatter {
     ) {
         if let Some(end) = end {
             let mut trailing_empty_lines = 0;
-            for decor in end.decors.leading.iter().rev() {
-                match decor {
-                    LineDecor::EmptyLine => {
+            for trivia in end.trivia.leading.iter().rev() {
+                match trivia {
+                    LineTrivia::EmptyLine => {
                         trailing_empty_lines += 1;
                     }
-                    LineDecor::Comment(_) => {
+                    LineTrivia::Comment(_) => {
                         break;
                     }
                 }
             }
-            if trailing_empty_lines == end.decors.leading.len() {
+            if trailing_empty_lines == end.trivia.leading.len() {
                 return;
             }
 
             if break_first {
                 self.break_line(ctx);
             }
-            let target_len = end.decors.leading.len() - trailing_empty_lines;
+            let target_len = end.trivia.leading.len() - trailing_empty_lines;
             let last_idx = target_len - 1;
-            for (i, decor) in end.decors.leading.iter().take(target_len).enumerate() {
-                match decor {
-                    LineDecor::EmptyLine => {
+            for (i, trivia) in end.trivia.leading.iter().take(target_len).enumerate() {
+                match trivia {
+                    LineTrivia::EmptyLine => {
                         if !(trim_start && i == 0) || i == last_idx {
                             self.break_line(ctx);
                         }
                     }
-                    LineDecor::Comment(comment) => {
+                    LineTrivia::Comment(comment) => {
                         self.put_indent();
                         self.push_str(&comment.value);
                         if i < last_idx {
@@ -707,8 +707,8 @@ impl Formatter {
             self.push_str("unless");
         }
 
-        let if_decors = &expr.if_first.decors;
-        self.format_decors_in_keyword_gap(ctx, if_decors, &expr.if_first.cond.decors, |self_| {
+        let if_trivia = &expr.if_first.trivia;
+        self.format_trivia_in_keyword_gap(ctx, if_trivia, &expr.if_first.cond.trivia, |self_| {
             self_.put_indent();
             self_.format(&expr.if_first.cond, ctx);
         });
@@ -722,8 +722,8 @@ impl Formatter {
             self.dedent();
             self.put_indent();
             self.push_str("elsif");
-            let elsif_decors = &elsif.decors;
-            self.format_decors_in_keyword_gap(ctx, elsif_decors, &elsif.cond.decors, |self_| {
+            let elsif_trivia = &elsif.trivia;
+            self.format_trivia_in_keyword_gap(ctx, elsif_trivia, &elsif.cond.trivia, |self_| {
                 self_.put_indent();
                 self_.format(&elsif.cond, ctx);
             });
@@ -738,7 +738,7 @@ impl Formatter {
             self.dedent();
             self.put_indent();
             self.push_str("else");
-            self.write_trailing_comment(&if_last.decors.trailing);
+            self.write_trailing_comment(&if_last.trivia.trailing);
             self.indent();
             if !if_last.body.is_empty() {
                 self.break_line(ctx);
@@ -757,11 +757,11 @@ impl Formatter {
         self.push(' ');
         self.push_str(&modifier.keyword);
 
-        let if_decors = &modifier.conditional.decors;
-        self.format_decors_in_keyword_gap(
+        let if_trivia = &modifier.conditional.trivia;
+        self.format_trivia_in_keyword_gap(
             ctx,
-            if_decors,
-            &modifier.conditional.cond.decors,
+            if_trivia,
+            &modifier.conditional.cond.trivia,
             |self_| {
                 self_.put_indent();
                 self_.format(&modifier.conditional.cond, ctx);
@@ -771,33 +771,33 @@ impl Formatter {
     }
 
     // Handle comments like "if # foo\n #bar\n predicate"
-    fn format_decors_in_keyword_gap(
+    fn format_trivia_in_keyword_gap(
         &mut self,
         ctx: &FormatContext,
-        keyword_decors: &Decors,
-        next_decors: &Decors,
+        keyword_trivia: &Trivia,
+        next_trivia: &Trivia,
         next_node: impl FnOnce(&mut Self),
     ) {
-        if keyword_decors.trailing.is_none() && next_decors.leading.is_empty() {
+        if keyword_trivia.trailing.is_none() && next_trivia.leading.is_empty() {
             self.push(' ');
             next_node(self);
-            self.write_trailing_comment(&next_decors.trailing);
+            self.write_trailing_comment(&next_trivia.trailing);
             self.indent();
         } else {
-            self.write_trailing_comment(&keyword_decors.trailing);
+            self.write_trailing_comment(&keyword_trivia.trailing);
             self.indent();
             self.break_line(ctx);
-            self.write_leading_decors(&next_decors.leading, ctx, EmptyLineHandling::trim_start());
+            self.write_leading_trivia(&next_trivia.leading, ctx, EmptyLineHandling::trim_start());
             next_node(self);
-            self.write_trailing_comment(&next_decors.trailing);
+            self.write_trailing_comment(&next_trivia.trailing);
         }
     }
 
     fn format_method_chain(&mut self, chain: &MethodChain, ctx: &FormatContext) {
         if let Some(recv) = &chain.receiver {
             self.format(recv, ctx);
-            if recv.decors.trailing.is_some() {
-                self.write_trailing_comment(&recv.decors.trailing);
+            if recv.trivia.trailing.is_some() {
+                self.write_trailing_comment(&recv.trivia.trailing);
             }
         }
 
@@ -837,7 +837,7 @@ impl Formatter {
                 }
                 if let Some(call_op) = &call.call_op {
                     self.break_line(ctx);
-                    self.write_leading_decors(&call.decors.leading, ctx, EmptyLineHandling::Skip);
+                    self.write_leading_trivia(&call.trivia.leading, ctx, EmptyLineHandling::Skip);
                     self.put_indent();
                     self.push_str(call_op);
                 }
@@ -856,8 +856,8 @@ impl Formatter {
                         self.indent();
                         for (i, arg) in args.nodes.iter().enumerate() {
                             self.break_line(ctx);
-                            self.write_leading_decors(
-                                &arg.decors.leading,
+                            self.write_leading_trivia(
+                                &arg.trivia.leading,
                                 ctx,
                                 EmptyLineHandling::Trim {
                                     start: i == 0,
@@ -867,9 +867,9 @@ impl Formatter {
                             self.put_indent();
                             self.format(arg, ctx);
                             self.push(',');
-                            self.write_trailing_comment(&arg.decors.trailing);
+                            self.write_trailing_comment(&arg.trivia.trailing);
                         }
-                        self.write_decors_at_virtual_end(
+                        self.write_trivia_at_virtual_end(
                             ctx,
                             &args.virtual_end,
                             true,
@@ -883,12 +883,12 @@ impl Formatter {
                 }
 
                 if let Some(block) = &call.block {
-                    if block.decors.trailing.is_some()
+                    if block.trivia.trailing.is_some()
                         || !block.body.width.is_flat()
                         || !block.was_flat
                     {
                         self.push_str(" do");
-                        self.write_trailing_comment(&block.decors.trailing);
+                        self.write_trailing_comment(&block.trivia.trailing);
                         self.indent();
                         if !block.body.is_empty() {
                             self.break_line(ctx);
@@ -906,7 +906,7 @@ impl Formatter {
                         self.push_str(" }");
                     }
                 }
-                self.write_trailing_comment(&call.decors.trailing);
+                self.write_trailing_comment(&call.trivia.trailing);
             }
             if indented {
                 self.dedent();
@@ -914,19 +914,19 @@ impl Formatter {
         }
     }
 
-    fn write_leading_decors(
+    fn write_leading_trivia(
         &mut self,
-        decors: &Vec<LineDecor>,
+        trivia: &Vec<LineTrivia>,
         ctx: &FormatContext,
         emp_line_handling: EmptyLineHandling,
     ) {
-        if decors.is_empty() {
+        if trivia.is_empty() {
             return;
         }
-        let last_idx = decors.len() - 1;
-        for (i, decor) in decors.iter().enumerate() {
-            match decor {
-                LineDecor::EmptyLine => {
+        let last_idx = trivia.len() - 1;
+        for (i, trivia) in trivia.iter().enumerate() {
+            match trivia {
+                LineTrivia::EmptyLine => {
                     let should_skip = match emp_line_handling {
                         EmptyLineHandling::Skip => true,
                         EmptyLineHandling::Trim { start, end } => {
@@ -937,7 +937,7 @@ impl Formatter {
                         self.break_line(ctx);
                     }
                 }
-                LineDecor::Comment(comment) => {
+                LineTrivia::Comment(comment) => {
                     self.put_indent();
                     self.push_str(&comment.value);
                     self.break_line(ctx);

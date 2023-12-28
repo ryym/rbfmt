@@ -92,7 +92,7 @@ impl FmtNodeBuilder<'_> {
                 let exprs = self.visit_statements(Some(node.statements()), next_loc_start);
                 fmt::Node {
                     pos: fmt::Pos::none(),
-                    decors: fmt::Decors::new(),
+                    trivia: fmt::Trivia::new(),
                     width: exprs.width(),
                     kind: fmt::Kind::Exprs(exprs),
                 }
@@ -102,7 +102,7 @@ impl FmtNodeBuilder<'_> {
                 let exprs = self.visit_statements(Some(node), next_loc_start);
                 fmt::Node {
                     pos: fmt::Pos::none(),
-                    decors: fmt::Decors::new(),
+                    trivia: fmt::Trivia::new(),
                     width: exprs.width(),
                     kind: fmt::Kind::Exprs(exprs),
                 }
@@ -123,7 +123,7 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_string_node().unwrap();
                 let pos = self.next_pos();
                 let loc = node.location();
-                let mut decors = self.take_leading_decors(loc.start_offset());
+                let mut trivia = self.take_leading_trivia(loc.start_offset());
                 let kind = if Self::is_heredoc(node.opening_loc().as_ref()) {
                     let heredoc_opening = self.visit_simple_heredoc(pos, node);
                     fmt::Kind::HeredocOpening(heredoc_opening)
@@ -131,14 +131,14 @@ impl FmtNodeBuilder<'_> {
                     let str = self.visit_string(node);
                     fmt::Kind::Str(str)
                 };
-                decors.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(pos, decors, kind)
+                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+                fmt::Node::new(pos, trivia, kind)
             }
             prism::Node::InterpolatedStringNode { .. } => {
                 let node = node.as_interpolated_string_node().unwrap();
                 let pos = self.next_pos();
                 let loc = node.location();
-                let mut decors = self.take_leading_decors(loc.start_offset());
+                let mut trivia = self.take_leading_trivia(loc.start_offset());
                 let kind = if Self::is_heredoc(node.opening_loc().as_ref()) {
                     let heredoc_opening = self.visit_complex_heredoc(pos, node);
                     fmt::Kind::HeredocOpening(heredoc_opening)
@@ -146,8 +146,8 @@ impl FmtNodeBuilder<'_> {
                     let str = self.visit_interpolated_string(node);
                     fmt::Kind::DynStr(str)
                 };
-                decors.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(pos, decors, kind)
+                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+                fmt::Node::new(pos, trivia, kind)
             }
 
             prism::Node::IfNode { .. } => {
@@ -213,10 +213,10 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_call_node().unwrap();
                 let pos = self.next_pos();
                 let loc = node.location();
-                let mut decors = self.take_leading_decors(loc.start_offset());
+                let mut trivia = self.take_leading_trivia(loc.start_offset());
                 let chain = self.visit_call(node, next_loc_start, None);
-                decors.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(pos, decors, fmt::Kind::MethodChain(chain))
+                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+                fmt::Node::new(pos, trivia, fmt::Kind::MethodChain(chain))
             }
 
             _ => todo!("parse {:?}", node),
@@ -230,10 +230,10 @@ impl FmtNodeBuilder<'_> {
     fn parse_atom(&mut self, node: prism::Node, next_loc_start: usize) -> fmt::Node {
         let pos = self.next_pos();
         let loc = node.location();
-        let mut decors = self.take_leading_decors(loc.start_offset());
+        let mut trivia = self.take_leading_trivia(loc.start_offset());
         let value = Self::source_lossy_at(&loc);
-        decors.set_trailing(self.take_trailing_comment(next_loc_start));
-        fmt::Node::new(pos, decors, fmt::Kind::Atom(value))
+        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+        fmt::Node::new(pos, trivia, fmt::Kind::Atom(value))
     }
 
     fn visit_string(&mut self, node: prism::StringNode) -> fmt::Str {
@@ -365,21 +365,21 @@ impl FmtNodeBuilder<'_> {
                 exprs.append_node(fmt_node);
             });
         }
-        let virtual_end = self.take_end_decors_as_virtual_end(Some(end));
+        let virtual_end = self.take_end_trivia_as_virtual_end(Some(end));
         exprs.set_virtual_end(virtual_end);
         exprs
     }
 
     fn visit_if_or_unless(&mut self, node: IfOrUnless, next_loc_start: usize) -> fmt::Node {
         let pos = self.next_pos();
-        let mut if_decors = self.take_leading_decors(node.loc.start_offset());
+        let mut if_trivia = self.take_leading_trivia(node.loc.start_offset());
 
         let end_loc = node.end_loc.expect("if/unless expression must have end");
         let end_start = end_loc.start_offset();
 
         let if_next_loc = node.predicate.location().start_offset();
-        let mut decors = fmt::Decors::new();
-        decors.set_trailing(self.take_trailing_comment(if_next_loc));
+        let mut trivia = fmt::Trivia::new();
+        trivia.set_trailing(self.take_trailing_comment(if_next_loc));
 
         let conseq = node.consequent;
         let next_pred_loc_start = node
@@ -397,7 +397,7 @@ impl FmtNodeBuilder<'_> {
                 // take trailing of else/elsif
                 let else_start = conseq.location().start_offset();
                 let body = self.visit_statements(node.statements, else_start);
-                let if_first = fmt::Conditional::new(decors, predicate, body);
+                let if_first = fmt::Conditional::new(trivia, predicate, body);
                 let mut ifexpr = fmt::IfExpr::new(node.is_if, if_first);
                 self.visit_ifelse(conseq, &mut ifexpr);
                 ifexpr
@@ -405,13 +405,13 @@ impl FmtNodeBuilder<'_> {
             // if...end
             None => {
                 let body = self.visit_statements(node.statements, end_start);
-                let if_first = fmt::Conditional::new(decors, predicate, body);
+                let if_first = fmt::Conditional::new(trivia, predicate, body);
                 fmt::IfExpr::new(node.is_if, if_first)
             }
         };
 
-        if_decors.set_trailing(self.take_trailing_comment(next_loc_start));
-        fmt::Node::new(pos, if_decors, fmt::Kind::IfExpr(ifexpr))
+        if_trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+        fmt::Node::new(pos, if_trivia, fmt::Kind::IfExpr(ifexpr))
     }
 
     fn visit_ifelse(&mut self, node: prism::Node, ifexpr: &mut fmt::IfExpr) {
@@ -429,8 +429,8 @@ impl FmtNodeBuilder<'_> {
                     .as_ref()
                     .map(|s| s.location().start_offset())
                     .unwrap_or(end_loc.start_offset());
-                let mut decors = fmt::Decors::new();
-                decors.set_trailing(self.take_trailing_comment(elsif_next_loc));
+                let mut trivia = fmt::Trivia::new();
+                trivia.set_trailing(self.take_trailing_comment(elsif_next_loc));
 
                 let conseq = node.consequent();
                 let next_loc_start = node
@@ -447,7 +447,7 @@ impl FmtNodeBuilder<'_> {
                     .unwrap_or(end_loc.start_offset());
                 let body = self.visit_statements(node.statements(), body_end_loc);
 
-                let conditional = fmt::Conditional::new(decors, predicate, body);
+                let conditional = fmt::Conditional::new(trivia, predicate, body);
                 ifexpr.elsifs.push(conditional);
                 if let Some(conseq) = conseq {
                     self.visit_ifelse(conseq, ifexpr);
@@ -466,11 +466,11 @@ impl FmtNodeBuilder<'_> {
                     .as_ref()
                     .map(|s| s.location().start_offset())
                     .unwrap_or(end_loc.start_offset());
-                let mut decors = fmt::Decors::new();
-                decors.set_trailing(self.take_trailing_comment(else_next_loc));
+                let mut trivia = fmt::Trivia::new();
+                trivia.set_trailing(self.take_trailing_comment(else_next_loc));
 
                 let body = self.visit_statements(node.statements(), end_loc.start_offset());
-                ifexpr.if_last = Some(fmt::Else { decors, body });
+                ifexpr.if_last = Some(fmt::Else { trivia, body });
             }
             _ => {
                 panic!("unexpected node in IfNode: {:?}", node);
@@ -480,24 +480,24 @@ impl FmtNodeBuilder<'_> {
 
     fn visit_postmodifier(&mut self, postmod: Postmodifier, next_loc_start: usize) -> fmt::Node {
         let pos = self.next_pos();
-        let mut decors = self.take_leading_decors(postmod.loc.start_offset());
+        let mut trivia = self.take_leading_trivia(postmod.loc.start_offset());
 
         let kwd_loc = postmod.keyword_loc;
         let exprs = self.visit_statements(postmod.statements, kwd_loc.start_offset());
 
         let pred_loc = postmod.predicate.location();
-        let mut kwd_decors = fmt::Decors::new();
-        kwd_decors.set_trailing(self.take_trailing_comment(pred_loc.start_offset()));
+        let mut kwd_trivia = fmt::Trivia::new();
+        kwd_trivia.set_trailing(self.take_trailing_comment(pred_loc.start_offset()));
 
         let predicate = self.visit(postmod.predicate, next_loc_start);
 
         let postmod = fmt::Postmodifier::new(
             postmod.keyword,
-            fmt::Conditional::new(kwd_decors, predicate, exprs),
+            fmt::Conditional::new(kwd_trivia, predicate, exprs),
         );
 
-        decors.set_trailing(self.take_trailing_comment(next_loc_start));
-        fmt::Node::new(pos, decors, fmt::Kind::Postmodifier(postmod))
+        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+        fmt::Node::new(pos, trivia, fmt::Kind::Postmodifier(postmod))
     }
 
     fn visit_call(
@@ -529,10 +529,10 @@ impl FmtNodeBuilder<'_> {
             None => fmt::MethodChain::new(None),
         };
 
-        let mut decors = if let Some(msg_loc) = call.message_loc() {
-            self.take_leading_decors(msg_loc.start_offset())
+        let mut trivia = if let Some(msg_loc) = call.message_loc() {
+            self.take_leading_trivia(msg_loc.start_offset())
         } else {
-            fmt::Decors::new()
+            fmt::Trivia::new()
             // foo.\n#hoge\n(2)
         };
 
@@ -543,7 +543,7 @@ impl FmtNodeBuilder<'_> {
         let args = match call.arguments() {
             None => {
                 if let Some(closing_loc) = call.closing_loc().map(|l| l.start_offset()) {
-                    let virtual_end = self.take_end_decors_as_virtual_end(Some(closing_loc));
+                    let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_loc));
                     virtual_end.map(|end| {
                         let mut args = fmt::Arguments::new();
                         args.set_virtual_end(Some(end));
@@ -569,7 +569,7 @@ impl FmtNodeBuilder<'_> {
                     },
                 );
 
-                let virtual_end = self.take_end_decors_as_virtual_end(closing_start);
+                let virtual_end = self.take_end_trivia_as_virtual_end(closing_start);
                 args.set_virtual_end(virtual_end);
 
                 Some(args)
@@ -588,8 +588,8 @@ impl FmtNodeBuilder<'_> {
                     .map(|b| b.location())
                     .unwrap_or(node.closing_loc())
                     .start_offset();
-                let mut decors = fmt::Decors::new();
-                decors.set_trailing(self.take_trailing_comment(block_next_loc));
+                let mut trivia = fmt::Trivia::new();
+                trivia.set_trailing(self.take_trailing_comment(block_next_loc));
 
                 let body_end_loc = node.closing_loc().start_offset();
                 let body = node.body().map(|n| self.visit(n, body_end_loc));
@@ -606,7 +606,7 @@ impl FmtNodeBuilder<'_> {
                 };
 
                 fmt::MethodBlock {
-                    decors,
+                    trivia,
                     width,
                     body,
                     was_flat,
@@ -619,10 +619,10 @@ impl FmtNodeBuilder<'_> {
         }
 
         if let Some(next_msg_start) = next_msg_start {
-            decors.set_trailing(self.take_trailing_comment(next_msg_start));
+            trivia.set_trailing(self.take_trailing_comment(next_msg_start));
         }
 
-        method_call.set_decors(decors);
+        method_call.set_trivia(trivia);
         chain.append_call(method_call);
 
         self.last_loc_end = call.location().end_offset();
@@ -641,24 +641,24 @@ impl FmtNodeBuilder<'_> {
                 }
             },
         };
-        let virtual_end = self.take_end_decors_as_virtual_end(end);
+        let virtual_end = self.take_end_trivia_as_virtual_end(end);
         exprs.set_virtual_end(virtual_end);
         exprs
     }
 
-    fn take_end_decors_as_virtual_end(&mut self, end: Option<usize>) -> Option<fmt::VirtualEnd> {
+    fn take_end_trivia_as_virtual_end(&mut self, end: Option<usize>) -> Option<fmt::VirtualEnd> {
         if let Some(end) = end {
-            let decors = self.take_leading_decors(end);
-            if !decors.leading.is_empty() {
-                let width = decors.width;
-                return Some(fmt::VirtualEnd { decors, width });
+            let trivia = self.take_leading_trivia(end);
+            if !trivia.leading.is_empty() {
+                let width = trivia.width;
+                return Some(fmt::VirtualEnd { trivia, width });
             }
         }
         None
     }
 
-    fn take_leading_decors(&mut self, loc_start: usize) -> fmt::Decors {
-        let mut decors = fmt::Decors::new();
+    fn take_leading_trivia(&mut self, loc_start: usize) -> fmt::Trivia {
+        let mut trivia = fmt::Trivia::new();
 
         while let Some(comment) = self.comments.peek() {
             let loc = comment.location();
@@ -668,20 +668,20 @@ impl FmtNodeBuilder<'_> {
             // We treat the found comment as line comment always.
             let value = Self::source_lossy_at(&loc);
             let fmt_comment = fmt::Comment { value };
-            self.take_empty_lines_until(loc.start_offset(), &mut decors);
-            decors.append_leading(fmt::LineDecor::Comment(fmt_comment));
+            self.take_empty_lines_until(loc.start_offset(), &mut trivia);
+            trivia.append_leading(fmt::LineTrivia::Comment(fmt_comment));
             self.last_loc_end = loc.end_offset() - 1;
             self.comments.next();
         }
 
-        self.take_empty_lines_until(loc_start, &mut decors);
-        decors
+        self.take_empty_lines_until(loc_start, &mut trivia);
+        trivia
     }
 
-    fn take_empty_lines_until(&mut self, end: usize, decors: &mut fmt::Decors) {
+    fn take_empty_lines_until(&mut self, end: usize, trivia: &mut fmt::Trivia) {
         let range = self.last_empty_line_range_within(self.last_loc_end, end);
         if let Some(range) = range {
-            decors.append_leading(fmt::LineDecor::EmptyLine);
+            trivia.append_leading(fmt::LineTrivia::EmptyLine);
             self.last_loc_end = range.end;
         }
     }
