@@ -318,18 +318,18 @@ impl Postmodifier {
 
 #[derive(Debug)]
 pub(crate) struct Conditional {
-    pub pos: Pos,
     pub width: Width,
+    pub decors: Decors,
     pub cond: Box<Node>,
     pub body: Exprs,
 }
 
 impl Conditional {
-    pub(crate) fn new(pos: Pos, cond: Node, body: Exprs) -> Self {
-        let width = cond.width.add(&body.width);
+    pub(crate) fn new(decors: Decors, cond: Node, body: Exprs) -> Self {
+        let width = decors.width.add(&cond.width).add(&body.width);
         Self {
-            pos,
             width,
+            decors,
             cond: Box::new(cond),
             body,
         }
@@ -739,7 +739,7 @@ impl Formatter {
             self.push_str("unless");
         }
 
-        let if_decors = ctx.decor_store.get(&expr.if_first.pos);
+        let if_decors = &expr.if_first.decors;
         let cond_decors = ctx.decor_store.get(&expr.if_first.cond.pos);
         self.format_decors_in_keyword_gap(ctx, if_decors, cond_decors, |self_| {
             self_.put_indent();
@@ -755,7 +755,7 @@ impl Formatter {
             self.dedent();
             self.put_indent();
             self.push_str("elsif");
-            let elsif_decors = ctx.decor_store.get(&elsif.pos);
+            let elsif_decors = &elsif.decors;
             let cond_decors = ctx.decor_store.get(&elsif.cond.pos);
             self.format_decors_in_keyword_gap(ctx, elsif_decors, cond_decors, |self_| {
                 self_.put_indent();
@@ -792,7 +792,7 @@ impl Formatter {
         self.push(' ');
         self.push_str(&modifier.keyword);
 
-        let if_decors = ctx.decor_store.get(&modifier.conditional.pos);
+        let if_decors = &modifier.conditional.decors;
         let cond_decors = ctx.decor_store.get(&modifier.conditional.cond.pos);
         self.format_decors_in_keyword_gap(ctx, if_decors, cond_decors, |self_| {
             self_.put_indent();
@@ -805,7 +805,7 @@ impl Formatter {
     fn format_decors_in_keyword_gap(
         &mut self,
         ctx: &FormatContext,
-        keyword_decors: &DecorSet,
+        keyword_decors: &Decors,
         next_decors: &DecorSet,
         next_node: impl FnOnce(&mut Self),
     ) {

@@ -407,15 +407,12 @@ impl FmtNodeBuilder<'_> {
         let pos = self.next_pos();
         let mut if_decors = self.take_leading_decors(node.loc.start_offset());
 
-        let if_pos = self.next_pos();
-
         let end_loc = node.end_loc.expect("if/unless expression must have end");
         let end_start = end_loc.start_offset();
 
         let if_next_loc = node.predicate.location().start_offset();
         let mut decors = fmt::Decors::new();
         decors.set_trailing(self.take_trailing_comment(if_next_loc));
-        self.store_decors_to(if_pos, decors);
 
         let conseq = node.consequent;
         let next_pred_loc_start = node
@@ -433,7 +430,7 @@ impl FmtNodeBuilder<'_> {
                 // take trailing of else/elsif
                 let else_start = conseq.location().start_offset();
                 let body = self.visit_statements(node.statements, else_start);
-                let if_first = fmt::Conditional::new(if_pos, predicate, body);
+                let if_first = fmt::Conditional::new(decors, predicate, body);
                 let mut ifexpr = fmt::IfExpr::new(node.is_if, if_first);
                 self.visit_ifelse(conseq, &mut ifexpr);
                 ifexpr
@@ -441,7 +438,7 @@ impl FmtNodeBuilder<'_> {
             // if...end
             None => {
                 let body = self.visit_statements(node.statements, end_start);
-                let if_first = fmt::Conditional::new(if_pos, predicate, body);
+                let if_first = fmt::Conditional::new(decors, predicate, body);
                 fmt::IfExpr::new(node.is_if, if_first)
             }
         };
@@ -461,7 +458,6 @@ impl FmtNodeBuilder<'_> {
             // elsif ("if" only, "unles...elsif" is syntax error)
             prism::Node::IfNode { .. } => {
                 let node = node.as_if_node().unwrap();
-                let elsif_pos = self.next_pos();
 
                 let end_loc = node
                     .end_keyword_loc()
@@ -474,7 +470,6 @@ impl FmtNodeBuilder<'_> {
                     .unwrap_or(end_loc.start_offset());
                 let mut decors = fmt::Decors::new();
                 decors.set_trailing(self.take_trailing_comment(elsif_next_loc));
-                self.store_decors_to(elsif_pos, decors);
 
                 let conseq = node.consequent();
                 let next_loc_start = node
@@ -491,7 +486,7 @@ impl FmtNodeBuilder<'_> {
                     .unwrap_or(end_loc.start_offset());
                 let body = self.visit_statements(node.statements(), body_end_loc);
 
-                let conditional = fmt::Conditional::new(elsif_pos, predicate, body);
+                let conditional = fmt::Conditional::new(decors, predicate, body);
                 ifexpr.elsifs.push(conditional);
                 if let Some(conseq) = conseq {
                     self.visit_ifelse(conseq, ifexpr);
@@ -534,18 +529,15 @@ impl FmtNodeBuilder<'_> {
         let kwd_loc = postmod.keyword_loc;
         let exprs = self.visit_statements(postmod.statements, kwd_loc.start_offset());
 
-        let kwd_pos = self.next_pos();
-
         let pred_loc = postmod.predicate.location();
         let mut kwd_decors = fmt::Decors::new();
         kwd_decors.set_trailing(self.take_trailing_comment(pred_loc.start_offset()));
-        self.store_decors_to(kwd_pos, kwd_decors);
 
         let predicate = self.visit(postmod.predicate, next_loc_start);
 
         let postmod = fmt::Postmodifier::new(
             postmod.keyword,
-            fmt::Conditional::new(kwd_pos, predicate, exprs),
+            fmt::Conditional::new(kwd_decors, predicate, exprs),
         );
         let width = postmod.width.add(&decors.width);
         decors.set_trailing(self.take_trailing_comment(next_loc_start));
