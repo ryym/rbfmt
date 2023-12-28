@@ -43,7 +43,7 @@ foo(
 )
 
 # for now no special handling
-1.+(2).+(3)
+1+(2)+(3)
 foo(bar)
 
 foo do

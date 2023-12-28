@@ -675,11 +675,6 @@ impl FmtNodeBuilder<'_> {
             // foo.\n#hoge\n(2)
         };
 
-        let chain_type = if call.is_safe_navigation() {
-            fmt::ChainType::SafeNav
-        } else {
-            fmt::ChainType::Normal
-        };
         let name = String::from_utf8_lossy(call.name().as_slice()).to_string();
 
         if let Some(loc) = call.call_operator_loc() {
@@ -687,6 +682,8 @@ impl FmtNodeBuilder<'_> {
             call_width.append_value(op_len);
         }
         call_width.append_value(name.len());
+
+        let call_op = call.call_operator_loc().map(|l| Self::source_lossy_at(&l));
 
         let args = match call.arguments() {
             None => {
@@ -777,7 +774,7 @@ impl FmtNodeBuilder<'_> {
         chain.append_call(fmt::MethodCall {
             pos: call_pos,
             width: call_width,
-            chain_type,
+            call_op,
             name,
             args,
             block,

@@ -285,26 +285,10 @@ impl Arguments {
 pub(crate) struct MethodCall {
     pub pos: Pos,
     pub width: Width,
-    pub chain_type: ChainType,
+    pub call_op: Option<String>,
     pub name: String,
-    // pub args: Vec<Node>,
     pub args: Option<Arguments>,
     pub block: Option<MethodBlock>,
-}
-
-#[derive(Debug)]
-pub(crate) enum ChainType {
-    Normal,
-    SafeNav,
-}
-
-impl ChainType {
-    pub fn dot(&self) -> &'static str {
-        match self {
-            Self::Normal => ".",
-            Self::SafeNav => "&.",
-        }
-    }
 }
 
 #[derive(Debug)]
@@ -688,21 +672,18 @@ impl Formatter {
     }
 
     fn format_method_chain(&mut self, chain: &MethodChain, ctx: &FormatContext) {
-        let mut has_receiver = false;
         if let Some(recv) = &chain.receiver {
             let recv_decor = ctx.decor_store.get(&recv.pos);
             self.format(recv, ctx);
             if recv_decor.trailing.is_some() {
                 self.write_trailing_comment(&recv_decor.trailing);
             }
-            has_receiver = true;
         }
 
         if chain.body_width.is_flat() {
-            for (i, call) in chain.calls.iter().enumerate() {
-                has_receiver = has_receiver || i > 0;
-                if has_receiver {
-                    self.push_str(call.chain_type.dot());
+            for call in chain.calls.iter() {
+                if let Some(call_op) = &call.call_op {
+                    self.push_str(call_op);
                 }
                 self.push_str(&call.name);
 
@@ -728,18 +709,17 @@ impl Formatter {
             }
         } else {
             let mut indented = false;
-            for (i, call) in chain.calls.iter().enumerate() {
-                has_receiver = has_receiver || i > 0;
-                if has_receiver && !indented {
+            for call in chain.calls.iter() {
+                if call.call_op.is_some() && !indented {
                     self.indent();
                     indented = true;
                 }
                 let call_decor = ctx.decor_store.get(&call.pos);
-                if has_receiver {
+                if let Some(call_op) = &call.call_op {
                     self.break_line(ctx);
                     self.write_leading_decors(&call_decor.leading, ctx, EmptyLineHandling::Skip);
                     self.put_indent();
-                    self.push_str(call.chain_type.dot());
+                    self.push_str(call_op);
                 }
                 self.push_str(&call.name);
 
