@@ -78,3 +78,8 @@ foo
 foo # b
   # c
   .bar # d
+
+a
+  &.foo(1, "abc") do
+    true
+  end

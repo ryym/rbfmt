@@ -778,8 +778,8 @@ impl Formatter {
                         );
                         self.dedent();
                         self.break_line(ctx);
+                        self.put_indent();
                     }
-                    self.put_indent();
                     self.push(')');
                 }
 
