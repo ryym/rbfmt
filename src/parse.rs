@@ -35,36 +35,6 @@ pub(crate) struct ParserResult {
     pub heredoc_map: fmt::HeredocMap,
 }
 
-#[derive(Debug)]
-struct Decors {
-    leading: Vec<fmt::LineDecor>,
-    trailing: Option<fmt::Comment>,
-    width: fmt::Width,
-}
-
-impl Decors {
-    fn new() -> Self {
-        Self {
-            leading: vec![],
-            trailing: None,
-            width: fmt::Width::Flat(0),
-        }
-    }
-
-    fn append_leading(&mut self, decor: fmt::LineDecor) {
-        if matches!(decor, fmt::LineDecor::Comment(_)) {
-            self.width = fmt::Width::NotFlat;
-        }
-        self.leading.push(decor);
-    }
-    fn set_trailing(&mut self, comment: Option<fmt::Comment>) {
-        if comment.is_some() {
-            self.width = fmt::Width::NotFlat;
-        }
-        self.trailing = comment;
-    }
-}
-
 struct IfOrUnless<'src> {
     is_if: bool,
     loc: prism::Location<'src>,
@@ -443,7 +413,7 @@ impl FmtNodeBuilder<'_> {
         let end_start = end_loc.start_offset();
 
         let if_next_loc = node.predicate.location().start_offset();
-        let mut decors = Decors::new();
+        let mut decors = fmt::Decors::new();
         decors.set_trailing(self.take_trailing_comment(if_next_loc));
         self.store_decors_to(if_pos, decors);
 
@@ -502,7 +472,7 @@ impl FmtNodeBuilder<'_> {
                     .as_ref()
                     .map(|s| s.location().start_offset())
                     .unwrap_or(end_loc.start_offset());
-                let mut decors = Decors::new();
+                let mut decors = fmt::Decors::new();
                 decors.set_trailing(self.take_trailing_comment(elsif_next_loc));
                 self.store_decors_to(elsif_pos, decors);
 
@@ -541,7 +511,7 @@ impl FmtNodeBuilder<'_> {
                     .as_ref()
                     .map(|s| s.location().start_offset())
                     .unwrap_or(end_loc.start_offset());
-                let mut decors = Decors::new();
+                let mut decors = fmt::Decors::new();
                 decors.set_trailing(self.take_trailing_comment(else_next_loc));
                 self.store_decors_to(else_pos, decors);
 
@@ -567,7 +537,7 @@ impl FmtNodeBuilder<'_> {
         let kwd_pos = self.next_pos();
 
         let pred_loc = postmod.predicate.location();
-        let mut kwd_decors = Decors::new();
+        let mut kwd_decors = fmt::Decors::new();
         kwd_decors.set_trailing(self.take_trailing_comment(pred_loc.start_offset()));
         self.store_decors_to(kwd_pos, kwd_decors);
 
@@ -620,7 +590,7 @@ impl FmtNodeBuilder<'_> {
         let mut decors = if let Some(msg_loc) = call.message_loc() {
             self.take_leading_decors(msg_loc.start_offset())
         } else {
-            Decors::new()
+            fmt::Decors::new()
             // foo.\n#hoge\n(2)
         };
 
@@ -678,7 +648,7 @@ impl FmtNodeBuilder<'_> {
                     .map(|b| b.location())
                     .unwrap_or(node.closing_loc())
                     .start_offset();
-                let mut decors = Decors::new();
+                let mut decors = fmt::Decors::new();
                 decors.set_trailing(self.take_trailing_comment(block_next_loc));
                 self.store_decors_to(block_pos, decors);
 
@@ -754,7 +724,7 @@ impl FmtNodeBuilder<'_> {
         None
     }
 
-    fn store_decors_to(&mut self, pos: fmt::Pos, decors: Decors) {
+    fn store_decors_to(&mut self, pos: fmt::Pos, decors: fmt::Decors) {
         if !decors.leading.is_empty() {
             self.decor_store.append_leading_decors(pos, decors.leading);
         }
@@ -763,8 +733,8 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn take_leading_decors(&mut self, loc_start: usize) -> Decors {
-        let mut decors = Decors::new();
+    fn take_leading_decors(&mut self, loc_start: usize) -> fmt::Decors {
+        let mut decors = fmt::Decors::new();
 
         while let Some(comment) = self.comments.peek() {
             let loc = comment.location();
@@ -784,7 +754,7 @@ impl FmtNodeBuilder<'_> {
         decors
     }
 
-    fn take_empty_lines_until(&mut self, end: usize, decors: &mut Decors) {
+    fn take_empty_lines_until(&mut self, end: usize, decors: &mut fmt::Decors) {
         let range = self.last_empty_line_range_within(self.last_loc_end, end);
         if let Some(range) = range {
             decors.append_leading(fmt::LineDecor::EmptyLine);

@@ -501,6 +501,37 @@ pub(crate) struct DecorSet {
 }
 
 #[derive(Debug)]
+pub(crate) struct Decors {
+    pub leading: Vec<LineDecor>,
+    pub trailing: Option<Comment>,
+    pub width: Width,
+}
+
+impl Decors {
+    pub(crate) fn new() -> Self {
+        Self {
+            leading: vec![],
+            trailing: None,
+            width: Width::Flat(0),
+        }
+    }
+
+    pub(crate) fn append_leading(&mut self, decor: LineDecor) {
+        if matches!(decor, LineDecor::Comment(_)) {
+            self.width = Width::NotFlat;
+        }
+        self.leading.push(decor);
+    }
+
+    pub(crate) fn set_trailing(&mut self, comment: Option<Comment>) {
+        if comment.is_some() {
+            self.width = Width::NotFlat;
+        }
+        self.trailing = comment;
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Comment {
     pub value: String,
 }
