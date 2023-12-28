@@ -594,10 +594,9 @@ impl FmtNodeBuilder<'_> {
             // foo.\n#hoge\n(2)
         };
 
-        let call_pos = self.next_pos();
         let call_op = call.call_operator_loc().map(|l| Self::source_lossy_at(&l));
         let name = String::from_utf8_lossy(call.name().as_slice()).to_string();
-        let mut method_call = fmt::MethodCall::new(call_pos, call_op, name);
+        let mut method_call = fmt::MethodCall::new(call_op, name);
 
         let args = match call.arguments() {
             None => {
@@ -683,8 +682,7 @@ impl FmtNodeBuilder<'_> {
             decors.set_trailing(self.take_trailing_comment(next_msg_start));
         }
 
-        method_call.width.append(&decors.width);
-        self.store_decors_to(call_pos, decors);
+        method_call.set_decors(decors);
         chain.append_call(method_call);
 
         self.last_loc_end = call.location().end_offset();

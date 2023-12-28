@@ -376,8 +376,8 @@ impl Arguments {
 
 #[derive(Debug)]
 pub(crate) struct MethodCall {
-    pub pos: Pos,
     pub width: Width,
+    pub decors: Decors,
     pub call_op: Option<String>,
     pub name: String,
     pub args: Option<Arguments>,
@@ -385,16 +385,21 @@ pub(crate) struct MethodCall {
 }
 
 impl MethodCall {
-    pub(crate) fn new(pos: Pos, call_op: Option<String>, name: String) -> Self {
+    pub(crate) fn new(call_op: Option<String>, name: String) -> Self {
         let width = Width::Flat(name.len() + call_op.as_ref().map_or(0, |s| s.len()));
         Self {
-            pos,
+            width,
+            decors: Decors::new(),
             call_op,
             name,
             args: None,
             block: None,
-            width,
         }
+    }
+
+    pub(crate) fn set_decors(&mut self, decors: Decors) {
+        self.width.append(&decors.width);
+        self.decors = decors;
     }
 
     pub(crate) fn set_args(&mut self, args: Arguments) {
@@ -864,10 +869,9 @@ impl Formatter {
                     self.indent();
                     indented = true;
                 }
-                let call_decor = ctx.decor_store.get(&call.pos);
                 if let Some(call_op) = &call.call_op {
                     self.break_line(ctx);
-                    self.write_leading_decors(&call_decor.leading, ctx, EmptyLineHandling::Skip);
+                    self.write_leading_decors(&call.decors.leading, ctx, EmptyLineHandling::Skip);
                     self.put_indent();
                     self.push_str(call_op);
                 }
@@ -938,7 +942,7 @@ impl Formatter {
                         self.push_str(" }");
                     }
                 }
-                self.write_trailing_comment(&call_decor.trailing);
+                self.write_trailing_comment(&call.decors.trailing);
             }
             if indented {
                 self.dedent();
