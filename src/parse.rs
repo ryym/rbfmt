@@ -231,6 +231,42 @@ impl FmtNodeBuilder<'_> {
                 );
                 fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
             }
+            prism::Node::LocalVariableAndWriteNode { .. } => {
+                let node = node.as_local_variable_and_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::LocalVariableOrWriteNode { .. } => {
+                let node = node.as_local_variable_or_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::LocalVariableOperatorWriteNode { .. } => {
+                let node = node.as_local_variable_operator_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
 
             _ => todo!("parse {:?}", node),
         };
