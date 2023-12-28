@@ -4,8 +4,11 @@ use std::{
 };
 
 pub(crate) fn format(node: Node, heredoc_map: HeredocMap) -> String {
+    let config = FormatConfig { line_width: 100 };
     let ctx = FormatContext { heredoc_map };
     let mut formatter = Formatter {
+        remaining_width: config.line_width,
+        config,
         buffer: String::new(),
         indent: 0,
         heredoc_queue: VecDeque::new(),
@@ -33,8 +36,11 @@ pub(crate) enum Width {
 }
 
 impl Width {
-    pub(crate) fn is_flat(&self) -> bool {
-        matches!(self, Self::Flat(_))
+    pub(crate) fn fits_in(&self, width: usize) -> bool {
+        match self {
+            Self::Flat(w) => *w <= width,
+            Self::NotFlat => false,
+        }
     }
 
     pub(crate) fn add(self, other: &Self) -> Self {
@@ -535,12 +541,19 @@ impl EmptyLineHandling {
 pub(crate) type HeredocMap = HashMap<Pos, Heredoc>;
 
 #[derive(Debug)]
+struct FormatConfig {
+    line_width: usize,
+}
+
+#[derive(Debug)]
 struct FormatContext {
     heredoc_map: HeredocMap,
 }
 
 #[derive(Debug)]
 struct Formatter {
+    config: FormatConfig,
+    remaining_width: usize,
     buffer: String,
     indent: usize,
     heredoc_queue: VecDeque<Pos>,
@@ -603,7 +616,7 @@ impl Formatter {
     fn format_embedded_exprs(&mut self, embedded: &EmbeddedExprs, ctx: &FormatContext) {
         self.push_str(&embedded.opening);
 
-        if embedded.exprs.width.is_flat() {
+        if embedded.exprs.width.fits_in(self.remaining_width) {
             self.format_exprs(&embedded.exprs, ctx, false);
         } else {
             self.break_line(ctx);
@@ -801,7 +814,7 @@ impl Formatter {
             }
         }
 
-        if chain.width.is_flat() {
+        if chain.width.fits_in(self.remaining_width) {
             for call in chain.calls.iter() {
                 if let Some(call_op) = &call.call_op {
                     self.push_str(call_op);
@@ -845,7 +858,7 @@ impl Formatter {
 
                 if let Some(args) = &call.args {
                     self.push('(');
-                    if args.width.is_flat() {
+                    if args.width.fits_in(self.remaining_width.saturating_sub(1)) {
                         for (i, arg) in args.nodes.iter().enumerate() {
                             if i > 0 {
                                 self.push_str(", ");
@@ -884,7 +897,7 @@ impl Formatter {
 
                 if let Some(block) = &call.block {
                     if block.trivia.trailing.is_some()
-                        || !block.body.width.is_flat()
+                        || !block.body.width.fits_in(self.remaining_width)
                         || !block.was_flat
                     {
                         self.push_str(" do");
@@ -955,10 +968,12 @@ impl Formatter {
 
     fn push(&mut self, c: char) {
         self.buffer.push(c);
+        self.remaining_width = self.remaining_width.saturating_sub(1);
     }
 
     fn push_str(&mut self, str: &str) {
         self.buffer.push_str(str);
+        self.remaining_width = self.remaining_width.saturating_sub(str.len());
     }
 
     fn indent(&mut self) {
@@ -971,6 +986,7 @@ impl Formatter {
 
     fn break_line(&mut self, ctx: &FormatContext) {
         self.push('\n');
+        self.remaining_width = self.config.line_width;
         let mut queue = mem::take(&mut self.heredoc_queue);
         while let Some(pos) = queue.pop_front() {
             self.write_heredoc_body(&pos, ctx);
