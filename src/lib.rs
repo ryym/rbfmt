@@ -9,5 +9,5 @@ pub fn format(source: Vec<u8>) -> String {
         None => return String::new(),
         Some(result) => result,
     };
-    fmt::format(result.node, result.decor_store, result.heredoc_map)
+    fmt::format(result.node, result.heredoc_map)
 }

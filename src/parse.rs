@@ -6,24 +6,20 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
     let result = prism::parse(&source);
 
     let comments = result.comments().peekable();
-    let decor_store = fmt::DecorStore::new();
     let heredoc_map = HashMap::new();
 
     let mut builder = FmtNodeBuilder {
         src: &source,
         comments,
-        decor_store,
         heredoc_map,
         position_gen: 0,
         last_loc_end: 0,
     };
     let fmt_node = builder.build_fmt_node(result.node());
     // dbg!(&fmt_node);
-    // dbg!(&builder.decor_store);
     // dbg!(&builder.heredoc_map);
     Some(ParserResult {
         node: fmt_node,
-        decor_store: builder.decor_store,
         heredoc_map: builder.heredoc_map,
     })
 }
@@ -31,7 +27,6 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
 #[derive(Debug)]
 pub(crate) struct ParserResult {
     pub node: fmt::Node,
-    pub decor_store: fmt::DecorStore,
     pub heredoc_map: fmt::HeredocMap,
 }
 
@@ -55,7 +50,6 @@ struct Postmodifier<'src> {
 struct FmtNodeBuilder<'src> {
     src: &'src [u8],
     comments: Peekable<prism::Comments<'src>>,
-    decor_store: fmt::DecorStore,
     heredoc_map: fmt::HeredocMap,
     position_gen: usize,
     last_loc_end: usize,

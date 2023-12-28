@@ -3,11 +3,8 @@ use std::{
     mem,
 };
 
-pub(crate) fn format(node: Node, decor_store: DecorStore, heredoc_map: HeredocMap) -> String {
-    let ctx = FormatContext {
-        decor_store,
-        heredoc_map,
-    };
+pub(crate) fn format(node: Node, heredoc_map: HeredocMap) -> String {
+    let ctx = FormatContext { heredoc_map };
     let mut formatter = Formatter {
         buffer: String::new(),
         indent: 0,
@@ -479,62 +476,6 @@ impl MethodChain {
 }
 
 #[derive(Debug)]
-pub(crate) struct DecorStore {
-    map: HashMap<Pos, DecorSet>,
-    empty_decors: DecorSet,
-}
-
-#[allow(unused)]
-impl DecorStore {
-    pub(crate) fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-            empty_decors: DecorSet::default(),
-        }
-    }
-
-    pub(crate) fn get(&self, pos: &Pos) -> &DecorSet {
-        self.map.get(pos).unwrap_or(&self.empty_decors)
-    }
-
-    pub(crate) fn append_leading_decors(&mut self, pos: Pos, mut decors: Vec<LineDecor>) {
-        match self.map.get_mut(&pos) {
-            Some(d) => {
-                d.leading.append(&mut decors);
-            }
-            None => {
-                let d = DecorSet {
-                    leading: decors,
-                    trailing: None,
-                };
-                self.map.insert(pos, d);
-            }
-        }
-    }
-
-    pub(crate) fn set_trailing_comment(&mut self, pos: Pos, comment: Comment) {
-        match self.map.get_mut(&pos) {
-            Some(d) => {
-                d.trailing = Some(comment);
-            }
-            None => {
-                let d = DecorSet {
-                    leading: vec![],
-                    trailing: Some(comment),
-                };
-                self.map.insert(pos, d);
-            }
-        }
-    }
-}
-
-#[derive(Debug, Default)]
-pub(crate) struct DecorSet {
-    pub leading: Vec<LineDecor>,
-    pub trailing: Option<Comment>,
-}
-
-#[derive(Debug)]
 pub(crate) struct Decors {
     pub leading: Vec<LineDecor>,
     pub trailing: Option<Comment>,
@@ -595,7 +536,6 @@ pub(crate) type HeredocMap = HashMap<Pos, Heredoc>;
 
 #[derive(Debug)]
 struct FormatContext {
-    decor_store: DecorStore,
     heredoc_map: HeredocMap,
 }
 
