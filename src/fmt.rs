@@ -92,6 +92,7 @@ pub(crate) enum Kind {
     IfExpr(IfExpr),
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
+    AtomAssign(AtomAssign),
 }
 
 impl Kind {
@@ -105,6 +106,7 @@ impl Kind {
             Self::IfExpr(_) => IfExpr::width(),
             Self::Postmodifier(pmod) => pmod.width,
             Self::MethodChain(chain) => chain.width,
+            Self::AtomAssign(assign) => assign.width,
         }
     }
 }
@@ -482,6 +484,26 @@ impl MethodChain {
 }
 
 #[derive(Debug)]
+pub(crate) struct AtomAssign {
+    width: Width,
+    name: String,
+    operator: String,
+    value: Box<Node>,
+}
+
+impl AtomAssign {
+    pub(crate) fn new(name: String, operator: String, value: Node) -> Self {
+        let width = value.width.add(&Width::Flat(name.len() + operator.len()));
+        Self {
+            width,
+            name,
+            operator,
+            value: Box::new(value),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Trivia {
     pub leading: Vec<LineTrivia>,
     pub trailing: Option<Comment>,
@@ -570,6 +592,7 @@ impl Formatter {
             Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
+            Kind::AtomAssign(assign) => self.format_atom_assign(assign, ctx),
         }
     }
 
@@ -624,6 +647,7 @@ impl Formatter {
             self.format_exprs(&embedded.exprs, ctx, false);
             self.break_line(ctx);
             self.dedent();
+            self.put_indent();
         }
 
         self.push_str(&embedded.closing);
@@ -722,7 +746,7 @@ impl Formatter {
 
         let if_trivia = &expr.if_first.trivia;
         self.format_trivia_in_keyword_gap(ctx, if_trivia, &expr.if_first.cond.trivia, |self_| {
-            self_.put_indent();
+            self_.put_indent(); // XXX: necessary only when trivia exists after keyword.
             self_.format(&expr.if_first.cond, ctx);
         });
         if !expr.if_first.body.is_empty() {
@@ -924,6 +948,32 @@ impl Formatter {
             if indented {
                 self.dedent();
             }
+        }
+    }
+
+    fn format_atom_assign(&mut self, assign: &AtomAssign, ctx: &FormatContext) {
+        self.push_str(&assign.name);
+        self.push(' ');
+        self.push_str(&assign.operator);
+
+        if assign.value.width.fits_in(self.remaining_width) {
+            self.push(' ');
+            self.format(&assign.value, ctx);
+        } else {
+            self.break_line(ctx);
+            self.indent();
+            self.write_leading_trivia(
+                &assign.value.trivia.leading,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: true,
+                    end: true,
+                },
+            );
+            self.put_indent();
+            self.format(&assign.value, ctx);
+            self.write_trailing_comment(&assign.value.trivia.trailing);
+            self.dedent();
         }
     }
 

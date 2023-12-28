@@ -219,6 +219,19 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(pos, trivia, fmt::Kind::MethodChain(chain))
             }
 
+            prism::Node::LocalVariableWriteNode { .. } => {
+                let node = node.as_local_variable_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+
             _ => todo!("parse {:?}", node),
         };
 
@@ -627,6 +640,22 @@ impl FmtNodeBuilder<'_> {
 
         self.last_loc_end = call.location().end_offset();
         chain
+    }
+
+    fn visit_variable_assign(
+        &mut self,
+        node_loc: prism::Location,
+        name_loc: prism::Location,
+        operator_loc: prism::Location,
+        value: prism::Node,
+        next_loc_start: usize,
+    ) -> (fmt::AtomAssign, fmt::Trivia) {
+        let mut trivia = self.take_leading_trivia(node_loc.start_offset());
+        let name = Self::source_lossy_at(&name_loc);
+        let operator = Self::source_lossy_at(&operator_loc);
+        let value = self.visit(value, next_loc_start);
+        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+        (fmt::AtomAssign::new(name, operator, value), trivia)
     }
 
     fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: Option<usize>) -> fmt::Exprs {
