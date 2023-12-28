@@ -268,6 +268,154 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
             }
 
+            prism::Node::InstanceVariableWriteNode { .. } => {
+                let node = node.as_instance_variable_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::InstanceVariableAndWriteNode { .. } => {
+                let node = node.as_instance_variable_and_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::InstanceVariableOrWriteNode { .. } => {
+                let node = node.as_instance_variable_or_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::InstanceVariableOperatorWriteNode { .. } => {
+                let node = node.as_instance_variable_operator_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+
+            prism::Node::ClassVariableWriteNode { .. } => {
+                let node = node.as_class_variable_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    // XXX: When does the operator becomes None?
+                    node.operator_loc().expect("must have operator"),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::ClassVariableAndWriteNode { .. } => {
+                let node = node.as_class_variable_and_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::ClassVariableOrWriteNode { .. } => {
+                let node = node.as_class_variable_or_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::ClassVariableOperatorWriteNode { .. } => {
+                let node = node.as_class_variable_operator_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+
+            prism::Node::GlobalVariableWriteNode { .. } => {
+                let node = node.as_global_variable_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::GlobalVariableAndWriteNode { .. } => {
+                let node = node.as_global_variable_and_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::GlobalVariableOrWriteNode { .. } => {
+                let node = node.as_global_variable_or_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::GlobalVariableOperatorWriteNode { .. } => {
+                let node = node.as_global_variable_operator_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+
             _ => todo!("parse {:?}", node),
         };
 

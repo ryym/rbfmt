@@ -20,3 +20,18 @@ foo =
 a  &&= 1
 b ||=  "2"
 c +=   three(3)
+
+@instance_var = 123
+@instance_var &&= nil
+@instance_var ||= true
+@instance_var /= 0.5
+
+@@class_var = 123
+@@class_var &&= nil
+@@class_var ||= true
+@@class_var /= 0.5
+
+$global_var = 123
+$global_var &&= nil
+$global_var ||= true
+$global_var /= 0.5
