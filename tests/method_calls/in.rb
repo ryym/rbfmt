@@ -84,3 +84,12 @@ a&.foo(1, "abc") do
   true
 end
 
+a[1] # a
+a[
+  # a
+  1, # b
+  2
+
+  # c
+]
+a[1, 2]

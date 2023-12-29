@@ -897,17 +897,22 @@ impl Formatter {
                 if let Some(call_op) = &call.call_op {
                     self.push_str(call_op);
                 }
-                self.push_str(&call.name);
+                let args_parens = if call.name == "[]" {
+                    ('[', ']')
+                } else {
+                    self.push_str(&call.name);
+                    ('(', ')')
+                };
 
                 if let Some(args) = &call.args {
-                    self.push('(');
+                    self.push(args_parens.0);
                     for (i, arg) in args.nodes.iter().enumerate() {
                         if i > 0 {
                             self.push_str(", ");
                         }
                         self.format(arg, ctx);
                     }
-                    self.push(')');
+                    self.push(args_parens.1);
                 }
                 if let Some(block) = &call.block {
                     if block.body.is_empty() {
@@ -932,10 +937,15 @@ impl Formatter {
                     self.put_indent();
                     self.push_str(call_op);
                 }
-                self.push_str(&call.name);
+                let args_parens = if call.name == "[]" {
+                    ('[', ']')
+                } else {
+                    self.push_str(&call.name);
+                    ('(', ')')
+                };
 
                 if let Some(args) = &call.args {
-                    self.push('(');
+                    self.push(args_parens.0);
                     if args.width.fits_in(self.remaining_width.saturating_sub(1)) {
                         for (i, arg) in args.nodes.iter().enumerate() {
                             if i > 0 {
@@ -970,7 +980,7 @@ impl Formatter {
                         self.break_line(ctx);
                         self.put_indent();
                     }
-                    self.push(')');
+                    self.push(args_parens.1);
                 }
 
                 if let Some(block) = &call.block {
