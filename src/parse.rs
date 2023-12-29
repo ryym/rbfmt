@@ -120,7 +120,11 @@ impl FmtNodeBuilder<'_> {
             prism::Node::ClassVariableReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::GlobalVariableReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ConstantReadNode { .. } => self.parse_atom(node, next_loc_start),
-            prism::Node::ConstantPathNode { .. } => self.visit_constant_path(node, next_loc_start),
+            prism::Node::ConstantPathNode { .. } => {
+                let pos = self.next_pos();
+                let (path, trivia) = self.visit_constant_path(node, next_loc_start);
+                fmt::Node::new(pos, trivia, fmt::Kind::Atom(path))
+            }
 
             prism::Node::StringNode { .. } => {
                 let node = node.as_string_node().unwrap();
@@ -485,8 +489,11 @@ impl FmtNodeBuilder<'_> {
         fmt::Node::new(pos, trivia, fmt::Kind::Atom(value))
     }
 
-    fn visit_constant_path(&mut self, node: prism::Node, next_loc_start: usize) -> fmt::Node {
-        let pos = self.next_pos();
+    fn visit_constant_path(
+        &mut self,
+        node: prism::Node,
+        next_loc_start: usize,
+    ) -> (String, fmt::Trivia) {
         let loc = node.location();
 
         // Use `end_offset` to treat any trivia inside the path as leading trivia for simplicity.
@@ -515,7 +522,7 @@ impl FmtNodeBuilder<'_> {
 
         let path = String::from_utf8_lossy(&parts).to_string();
         trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        fmt::Node::new(pos, trivia, fmt::Kind::Atom(path))
+        (path, trivia)
     }
 
     fn visit_string(&mut self, node: prism::StringNode) -> fmt::Str {
