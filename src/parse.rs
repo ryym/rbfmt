@@ -119,6 +119,7 @@ impl FmtNodeBuilder<'_> {
             prism::Node::ClassVariableReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::GlobalVariableReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ConstantReadNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::ConstantPathNode { .. } => self.visit_constant_path(node, next_loc_start),
 
             prism::Node::StringNode { .. } => {
                 let node = node.as_string_node().unwrap();
@@ -432,6 +433,39 @@ impl FmtNodeBuilder<'_> {
         let value = Self::source_lossy_at(&loc);
         trivia.set_trailing(self.take_trailing_comment(next_loc_start));
         fmt::Node::new(pos, trivia, fmt::Kind::Atom(value))
+    }
+
+    fn visit_constant_path(&mut self, node: prism::Node, next_loc_start: usize) -> fmt::Node {
+        let pos = self.next_pos();
+        let loc = node.location();
+
+        // Use `end_offset` to treat any trivia inside the path as leading trivia for simplicity.
+        // e.g. "Foo::\n#comment\nBar" -> "#comment\nFoo::Bar"
+        let mut trivia = self.take_leading_trivia(loc.end_offset());
+
+        fn rec(node: Option<prism::Node>, parts: &mut Vec<u8>) {
+            if let Some(node) = node {
+                match node {
+                    prism::Node::ConstantReadNode { .. } => {
+                        let node = node.as_constant_read_node().unwrap();
+                        parts.extend(node.location().as_slice());
+                    }
+                    prism::Node::ConstantPathNode { .. } => {
+                        let node = node.as_constant_path_node().unwrap();
+                        rec(node.parent(), parts);
+                        parts.extend_from_slice(node.delimiter_loc().as_slice());
+                        parts.extend_from_slice(node.child().location().as_slice());
+                    }
+                    _ => panic!("unexpected constant path part: {:?}", node),
+                }
+            }
+        }
+        let mut parts = vec![];
+        rec(Some(node), &mut parts);
+
+        let path = String::from_utf8_lossy(&parts).to_string();
+        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+        fmt::Node::new(pos, trivia, fmt::Kind::Atom(path))
     }
 
     fn visit_string(&mut self, node: prism::StringNode) -> fmt::Str {
