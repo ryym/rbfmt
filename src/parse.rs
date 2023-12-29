@@ -472,6 +472,51 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
             }
 
+            prism::Node::ConstantPathWriteNode { .. } => {
+                let node = node.as_constant_path_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_constant_path_assign(
+                    node.target(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::ConstantPathAndWriteNode { .. } => {
+                let node = node.as_constant_path_and_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_constant_path_assign(
+                    node.target(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::ConstantPathOrWriteNode { .. } => {
+                let node = node.as_constant_path_or_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_constant_path_assign(
+                    node.target(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+            prism::Node::ConstantPathOperatorWriteNode { .. } => {
+                let node = node.as_constant_path_operator_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_constant_path_assign(
+                    node.target(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+            }
+
             _ => todo!("parse {:?}", node),
         };
 
@@ -932,6 +977,21 @@ impl FmtNodeBuilder<'_> {
         let value = self.visit(value, next_loc_start);
         trivia.set_trailing(self.take_trailing_comment(next_loc_start));
         (fmt::AtomAssign::new(name, operator, value), trivia)
+    }
+
+    fn visit_constant_path_assign(
+        &mut self,
+        const_path: prism::ConstantPathNode,
+        operator_loc: prism::Location,
+        value: prism::Node,
+        next_loc_start: usize,
+    ) -> (fmt::AtomAssign, fmt::Trivia) {
+        let (path, mut trivia) =
+            self.visit_constant_path(const_path.as_node(), operator_loc.start_offset());
+        let operator = Self::source_lossy_at(&operator_loc);
+        let value = self.visit(value, next_loc_start);
+        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+        (fmt::AtomAssign::new(path, operator, value), trivia)
     }
 
     fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: Option<usize>) -> fmt::Exprs {

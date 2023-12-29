@@ -43,3 +43,8 @@ Const = 123
 Const &&= nil
 Const ||= true
 Const /= 0.5
+
+Const::Path = 123
+::Const::Path &&= nil
+Const::Path ||= true
+Const::Path /= 0.5
