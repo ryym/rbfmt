@@ -38,3 +38,8 @@ $global_var = 123
 $global_var &&= nil
 $global_var ||= true
 $global_var /= 0.5
+
+Const = 123
+Const &&= nil
+Const ||= true
+Const /= 0.5
