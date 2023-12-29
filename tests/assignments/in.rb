@@ -45,3 +45,19 @@ Const::Path = 123
 ::Const::Path &&= nil
 Const::Path ||= true
 Const::  Path /= 0.5
+
+foo.bar = 1
+foo(1,2,3)&.bar &&= 1
+foo.
+  # bar
+  bar ||= a.b {}
+foo.
+  # bar
+  bar.
+  # baz
+  baz ||= a.b {}
+
+a =
+  foo.
+    # bar
+    bar

@@ -93,6 +93,7 @@ pub(crate) enum Kind {
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
     AtomAssign(AtomAssign),
+    CallAssign(CallAssign),
 }
 
 impl Kind {
@@ -107,6 +108,7 @@ impl Kind {
             Self::Postmodifier(pmod) => pmod.width,
             Self::MethodChain(chain) => chain.width,
             Self::AtomAssign(assign) => assign.width,
+            Self::CallAssign(assign) => assign.width,
         }
     }
 }
@@ -504,6 +506,57 @@ impl AtomAssign {
 }
 
 #[derive(Debug)]
+pub(crate) struct CallAssign {
+    width: Width,
+    assignee: AssigneeCall,
+    operator: String,
+    value: Box<Node>,
+}
+
+#[derive(Debug)]
+pub(crate) struct AssigneeCall {
+    width: Width,
+    receiver: Box<Node>,
+    call_operator: String,
+    message: String,
+    message_trivia: Trivia,
+}
+
+impl AssigneeCall {
+    pub(crate) fn new(
+        receiver: Node,
+        call_operator: String,
+        message: String,
+        message_trivia: Trivia,
+    ) -> Self {
+        let msg_width = Width::Flat(call_operator.len() + message.len());
+        let width = receiver.width.add(&msg_width);
+        Self {
+            width,
+            receiver: Box::new(receiver),
+            call_operator,
+            message,
+            message_trivia,
+        }
+    }
+}
+
+impl CallAssign {
+    pub(crate) fn new(assignee: AssigneeCall, operator: String, value: Node) -> Self {
+        let width = value
+            .width
+            .add(&assignee.width)
+            .add(&Width::Flat(operator.len()));
+        Self {
+            width,
+            assignee,
+            operator,
+            value: Box::new(value),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Trivia {
     pub leading: Vec<LineTrivia>,
     pub trailing: Option<Comment>,
@@ -593,6 +646,7 @@ impl Formatter {
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
             Kind::AtomAssign(assign) => self.format_atom_assign(assign, ctx),
+            Kind::CallAssign(assign) => self.format_call_assign(assign, ctx),
         }
     }
 
@@ -955,15 +1009,45 @@ impl Formatter {
         self.push_str(&assign.name);
         self.push(' ');
         self.push_str(&assign.operator);
+        self.format_assign_right(&assign.value, ctx);
+    }
 
-        if assign.value.width.fits_in(self.remaining_width) {
+    fn format_call_assign(&mut self, assign: &CallAssign, ctx: &FormatContext) {
+        let assignee = &assign.assignee;
+        self.format(&assignee.receiver, ctx);
+        if assignee.message_trivia.leading.is_empty() {
+            self.push_str(&assignee.call_operator);
+            self.push_str(&assignee.message);
             self.push(' ');
-            self.format(&assign.value, ctx);
+            self.push_str(&assign.operator);
+            self.format_assign_right(&assign.value, ctx);
         } else {
             self.break_line(ctx);
             self.indent();
             self.write_leading_trivia(
-                &assign.value.trivia.leading,
+                &assignee.message_trivia.leading,
+                ctx,
+                EmptyLineHandling::Skip,
+            );
+            self.put_indent();
+            self.push_str(&assignee.call_operator);
+            self.push_str(&assignee.message);
+            self.push(' ');
+            self.push_str(&assign.operator);
+            self.format_assign_right(&assign.value, ctx);
+            self.dedent();
+        }
+    }
+
+    fn format_assign_right(&mut self, value: &Node, ctx: &FormatContext) {
+        if value.width.fits_in(self.remaining_width) {
+            self.push(' ');
+            self.format(value, ctx);
+        } else {
+            self.break_line(ctx);
+            self.indent();
+            self.write_leading_trivia(
+                &value.trivia.leading,
                 ctx,
                 EmptyLineHandling::Trim {
                     start: true,
@@ -971,8 +1055,8 @@ impl Formatter {
                 },
             );
             self.put_indent();
-            self.format(&assign.value, ctx);
-            self.write_trailing_comment(&assign.value.trivia.trailing);
+            self.format(value, ctx);
+            self.write_trailing_comment(&value.trivia.trailing);
             self.dedent();
         }
     }

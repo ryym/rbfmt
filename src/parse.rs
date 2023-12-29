@@ -517,6 +517,46 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
             }
 
+            prism::Node::CallAndWriteNode { .. } => {
+                let node = node.as_call_and_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_call_assign(
+                    node.receiver(),
+                    node.call_operator_loc(),
+                    node.message_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::CallAssign(assign))
+            }
+            prism::Node::CallOrWriteNode { .. } => {
+                let node = node.as_call_or_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_call_assign(
+                    node.receiver(),
+                    node.call_operator_loc(),
+                    node.message_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::CallAssign(assign))
+            }
+            prism::Node::CallOperatorWriteNode { .. } => {
+                let node = node.as_call_operator_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_call_assign(
+                    node.receiver(),
+                    node.call_operator_loc(),
+                    node.message_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::CallAssign(assign))
+            }
+
             _ => todo!("parse {:?}", node),
         };
 
@@ -992,6 +1032,38 @@ impl FmtNodeBuilder<'_> {
         let value = self.visit(value, next_loc_start);
         trivia.set_trailing(self.take_trailing_comment(next_loc_start));
         (fmt::AtomAssign::new(path, operator, value), trivia)
+    }
+
+    fn visit_call_assign(
+        &mut self,
+        receiver: Option<prism::Node>,
+        call_operator_loc: Option<prism::Location>,
+        message_loc: Option<prism::Location>,
+        operator_loc: prism::Location,
+        value: prism::Node,
+        next_loc_start: usize,
+    ) -> (fmt::CallAssign, fmt::Trivia) {
+        // XXX: I cannot find the case where these fields are None.
+        let (receiver, call_operator_loc, message_loc) =
+            match (receiver, call_operator_loc, message_loc) {
+                (Some(r), Some(co), Some(m)) => (r, co, m),
+                _ => panic!("call assign left must have message"),
+            };
+
+        let mut trivia = self.take_leading_trivia(receiver.location().start_offset());
+        let receiver = self.visit(receiver, call_operator_loc.start_offset());
+        let msg_trivia = self.take_leading_trivia(message_loc.start_offset());
+        let assignee = fmt::AssigneeCall::new(
+            receiver,
+            Self::source_lossy_at(&call_operator_loc),
+            Self::source_lossy_at(&message_loc),
+            msg_trivia,
+        );
+
+        let operator = Self::source_lossy_at(&operator_loc);
+        let value = self.visit(value, next_loc_start);
+        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+        (fmt::CallAssign::new(assignee, operator, value), trivia)
     }
 
     fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: Option<usize>) -> fmt::Exprs {
