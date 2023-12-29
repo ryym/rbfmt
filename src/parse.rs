@@ -115,6 +115,7 @@ impl FmtNodeBuilder<'_> {
             prism::Node::FloatNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::RationalNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ImaginaryNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::LocalVariableReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::InstanceVariableReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ClassVariableReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::GlobalVariableReadNode { .. } => self.parse_atom(node, next_loc_start),
