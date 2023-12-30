@@ -93,7 +93,6 @@ pub(crate) enum Kind {
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
     Assign(Assign),
-    CallAssign(CallAssign),
 }
 
 impl Kind {
@@ -108,7 +107,6 @@ impl Kind {
             Self::Postmodifier(pmod) => pmod.width,
             Self::MethodChain(chain) => chain.width,
             Self::Assign(assign) => assign.width,
-            Self::CallAssign(assign) => assign.width,
         }
     }
 }
@@ -511,7 +509,7 @@ impl Assign {
 #[derive(Debug)]
 pub(crate) enum AssignTarget {
     Atom(String),
-    // Call(MethodChain),
+    Call(MethodChain),
     // Multi(Vec<Node>),
 }
 
@@ -519,57 +517,7 @@ impl AssignTarget {
     pub(crate) fn width(&self) -> Width {
         match self {
             Self::Atom(s) => Width::Flat(s.len()),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct CallAssign {
-    width: Width,
-    assignee: AssigneeCall,
-    operator: String,
-    value: Box<Node>,
-}
-
-#[derive(Debug)]
-pub(crate) struct AssigneeCall {
-    width: Width,
-    receiver: Box<Node>,
-    call_operator: String,
-    message: String,
-    message_trivia: Trivia,
-}
-
-impl AssigneeCall {
-    pub(crate) fn new(
-        receiver: Node,
-        call_operator: String,
-        message: String,
-        message_trivia: Trivia,
-    ) -> Self {
-        let msg_width = Width::Flat(call_operator.len() + message.len());
-        let width = receiver.width.add(&msg_width);
-        Self {
-            width,
-            receiver: Box::new(receiver),
-            call_operator,
-            message,
-            message_trivia,
-        }
-    }
-}
-
-impl CallAssign {
-    pub(crate) fn new(assignee: AssigneeCall, operator: String, value: Node) -> Self {
-        let width = value
-            .width
-            .add(&assignee.width)
-            .add(&Width::Flat(operator.len()));
-        Self {
-            width,
-            assignee,
-            operator,
-            value: Box::new(value),
+            Self::Call(chain) => chain.width,
         }
     }
 }
@@ -664,7 +612,6 @@ impl Formatter {
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
             Kind::Assign(assign) => self.format_assign(assign, ctx),
-            Kind::CallAssign(assign) => self.format_call_assign(assign, ctx),
         }
     }
 
@@ -1038,42 +985,16 @@ impl Formatter {
     }
 
     fn format_assign(&mut self, assign: &Assign, ctx: &FormatContext) {
-        self.format_assign_target(&assign.target);
+        self.format_assign_target(&assign.target, ctx);
         self.push(' ');
         self.push_str(&assign.operator);
         self.format_assign_right(&assign.value, ctx);
     }
 
-    fn format_assign_target(&mut self, target: &AssignTarget) {
+    fn format_assign_target(&mut self, target: &AssignTarget, ctx: &FormatContext) {
         match target {
             AssignTarget::Atom(s) => self.format_atom(s),
-        }
-    }
-
-    fn format_call_assign(&mut self, assign: &CallAssign, ctx: &FormatContext) {
-        let assignee = &assign.assignee;
-        self.format(&assignee.receiver, ctx);
-        if assignee.message_trivia.leading.is_empty() {
-            self.push_str(&assignee.call_operator);
-            self.push_str(&assignee.message);
-            self.push(' ');
-            self.push_str(&assign.operator);
-            self.format_assign_right(&assign.value, ctx);
-        } else {
-            self.break_line(ctx);
-            self.indent();
-            self.write_leading_trivia(
-                &assignee.message_trivia.leading,
-                ctx,
-                EmptyLineHandling::Skip,
-            );
-            self.put_indent();
-            self.push_str(&assignee.call_operator);
-            self.push_str(&assignee.message);
-            self.push(' ');
-            self.push_str(&assign.operator);
-            self.format_assign_right(&assign.value, ctx);
-            self.dedent();
+            AssignTarget::Call(chain) => self.format_method_chain(chain, ctx),
         }
     }
 

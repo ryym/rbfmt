@@ -81,6 +81,94 @@ impl<'src> CallRoot for prism::CallNode<'src> {
     }
 }
 
+impl<'src> CallRoot for prism::CallAndWriteNode<'src> {
+    fn location(&self) -> prism::Location {
+        self.location()
+    }
+    fn receiver(&self) -> Option<prism::Node> {
+        self.receiver()
+    }
+    fn message_loc(&self) -> Option<prism::Location> {
+        self.message_loc()
+    }
+    fn call_operator_loc(&self) -> Option<prism::Location> {
+        self.call_operator_loc()
+    }
+    fn name(&self) -> &[u8] {
+        self.read_name().as_slice()
+    }
+    fn arguments(&self) -> Option<prism::ArgumentsNode> {
+        None
+    }
+    fn opening_loc(&self) -> Option<prism::Location> {
+        None
+    }
+    fn closing_loc(&self) -> Option<prism::Location> {
+        None
+    }
+    fn block(&self) -> Option<prism::Node> {
+        None
+    }
+}
+impl<'src> CallRoot for prism::CallOrWriteNode<'src> {
+    fn location(&self) -> prism::Location {
+        self.location()
+    }
+    fn receiver(&self) -> Option<prism::Node> {
+        self.receiver()
+    }
+    fn message_loc(&self) -> Option<prism::Location> {
+        self.message_loc()
+    }
+    fn call_operator_loc(&self) -> Option<prism::Location> {
+        self.call_operator_loc()
+    }
+    fn name(&self) -> &[u8] {
+        self.read_name().as_slice()
+    }
+    fn arguments(&self) -> Option<prism::ArgumentsNode> {
+        None
+    }
+    fn opening_loc(&self) -> Option<prism::Location> {
+        None
+    }
+    fn closing_loc(&self) -> Option<prism::Location> {
+        None
+    }
+    fn block(&self) -> Option<prism::Node> {
+        None
+    }
+}
+impl<'src> CallRoot for prism::CallOperatorWriteNode<'src> {
+    fn location(&self) -> prism::Location {
+        self.location()
+    }
+    fn receiver(&self) -> Option<prism::Node> {
+        self.receiver()
+    }
+    fn message_loc(&self) -> Option<prism::Location> {
+        self.message_loc()
+    }
+    fn call_operator_loc(&self) -> Option<prism::Location> {
+        self.call_operator_loc()
+    }
+    fn name(&self) -> &[u8] {
+        self.read_name().as_slice()
+    }
+    fn arguments(&self) -> Option<prism::ArgumentsNode> {
+        None
+    }
+    fn opening_loc(&self) -> Option<prism::Location> {
+        None
+    }
+    fn closing_loc(&self) -> Option<prism::Location> {
+        None
+    }
+    fn block(&self) -> Option<prism::Node> {
+        None
+    }
+}
+
 struct Postmodifier<'src> {
     keyword: String,
     loc: prism::Location<'src>,
@@ -563,40 +651,34 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_call_and_write_node().unwrap();
                 let pos = self.next_pos();
                 let (assign, trivia) = self.visit_call_assign(
-                    node.receiver(),
-                    node.call_operator_loc(),
-                    node.message_loc(),
+                    &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::CallAssign(assign))
+                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::CallOrWriteNode { .. } => {
                 let node = node.as_call_or_write_node().unwrap();
                 let pos = self.next_pos();
                 let (assign, trivia) = self.visit_call_assign(
-                    node.receiver(),
-                    node.call_operator_loc(),
-                    node.message_loc(),
+                    &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::CallAssign(assign))
+                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::CallOperatorWriteNode { .. } => {
                 let node = node.as_call_operator_write_node().unwrap();
                 let pos = self.next_pos();
                 let (assign, trivia) = self.visit_call_assign(
-                    node.receiver(),
-                    node.call_operator_loc(),
-                    node.message_loc(),
+                    &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::CallAssign(assign))
+                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
             }
 
             _ => todo!("parse {:?}", node),
@@ -1080,34 +1162,17 @@ impl FmtNodeBuilder<'_> {
 
     fn visit_call_assign(
         &mut self,
-        receiver: Option<prism::Node>,
-        call_operator_loc: Option<prism::Location>,
-        message_loc: Option<prism::Location>,
+        call: &impl CallRoot,
         operator_loc: prism::Location,
         value: prism::Node,
         next_loc_start: usize,
-    ) -> (fmt::CallAssign, fmt::Trivia) {
-        // XXX: I cannot find the case where these fields are None.
-        let (receiver, call_operator_loc, message_loc) =
-            match (receiver, call_operator_loc, message_loc) {
-                (Some(r), Some(co), Some(m)) => (r, co, m),
-                _ => panic!("call assign left must have message"),
-            };
-
-        let mut trivia = self.take_leading_trivia(receiver.location().start_offset());
-        let receiver = self.visit(receiver, call_operator_loc.start_offset());
-        let msg_trivia = self.take_leading_trivia(message_loc.start_offset());
-        let assignee = fmt::AssigneeCall::new(
-            receiver,
-            Self::source_lossy_at(&call_operator_loc),
-            Self::source_lossy_at(&message_loc),
-            msg_trivia,
-        );
-
+    ) -> (fmt::Assign, fmt::Trivia) {
+        let chain = self.visit_call_root(call, next_loc_start, None);
+        let target = fmt::AssignTarget::Call(chain);
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.visit(value, next_loc_start);
-        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        (fmt::CallAssign::new(assignee, operator, value), trivia)
+        let trivia = fmt::Trivia::new();
+        (fmt::Assign::new(target, operator, value), trivia)
     }
 
     fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: Option<usize>) -> fmt::Exprs {
