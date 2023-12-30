@@ -93,7 +93,6 @@ pub(crate) enum Kind {
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
     Assign(Assign),
-    AtomAssign(AtomAssign),
     CallAssign(CallAssign),
 }
 
@@ -109,7 +108,6 @@ impl Kind {
             Self::Postmodifier(pmod) => pmod.width,
             Self::MethodChain(chain) => chain.width,
             Self::Assign(assign) => assign.width,
-            Self::AtomAssign(assign) => assign.width,
             Self::CallAssign(assign) => assign.width,
         }
     }
@@ -526,26 +524,6 @@ impl AssignTarget {
 }
 
 #[derive(Debug)]
-pub(crate) struct AtomAssign {
-    width: Width,
-    name: String,
-    operator: String,
-    value: Box<Node>,
-}
-
-impl AtomAssign {
-    pub(crate) fn new(name: String, operator: String, value: Node) -> Self {
-        let width = value.width.add(&Width::Flat(name.len() + operator.len()));
-        Self {
-            width,
-            name,
-            operator,
-            value: Box::new(value),
-        }
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct CallAssign {
     width: Width,
     assignee: AssigneeCall,
@@ -686,7 +664,6 @@ impl Formatter {
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
             Kind::Assign(assign) => self.format_assign(assign, ctx),
-            Kind::AtomAssign(assign) => self.format_atom_assign(assign, ctx),
             Kind::CallAssign(assign) => self.format_call_assign(assign, ctx),
         }
     }
@@ -1071,13 +1048,6 @@ impl Formatter {
         match target {
             AssignTarget::Atom(s) => self.format_atom(s),
         }
-    }
-
-    fn format_atom_assign(&mut self, assign: &AtomAssign, ctx: &FormatContext) {
-        self.push_str(&assign.name);
-        self.push(' ');
-        self.push_str(&assign.operator);
-        self.format_assign_right(&assign.value, ctx);
     }
 
     fn format_call_assign(&mut self, assign: &CallAssign, ctx: &FormatContext) {

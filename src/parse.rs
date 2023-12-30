@@ -481,7 +481,7 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::ConstantPathAndWriteNode { .. } => {
                 let node = node.as_constant_path_and_write_node().unwrap();
@@ -492,7 +492,7 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::ConstantPathOrWriteNode { .. } => {
                 let node = node.as_constant_path_or_write_node().unwrap();
@@ -503,7 +503,7 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::ConstantPathOperatorWriteNode { .. } => {
                 let node = node.as_constant_path_operator_write_node().unwrap();
@@ -514,7 +514,7 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::AtomAssign(assign))
+                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
             }
 
             prism::Node::CallAndWriteNode { .. } => {
@@ -1026,13 +1026,14 @@ impl FmtNodeBuilder<'_> {
         operator_loc: prism::Location,
         value: prism::Node,
         next_loc_start: usize,
-    ) -> (fmt::AtomAssign, fmt::Trivia) {
+    ) -> (fmt::Assign, fmt::Trivia) {
         let (path, mut trivia) =
             self.visit_constant_path(const_path.as_node(), operator_loc.start_offset());
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.visit(value, next_loc_start);
         trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        (fmt::AtomAssign::new(path, operator, value), trivia)
+        let target = fmt::AssignTarget::Atom(path);
+        (fmt::Assign::new(target, operator, value), trivia)
     }
 
     fn visit_call_assign(
