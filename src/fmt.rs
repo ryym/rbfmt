@@ -92,6 +92,7 @@ pub(crate) enum Kind {
     IfExpr(IfExpr),
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
+    Assign(Assign),
     AtomAssign(AtomAssign),
     CallAssign(CallAssign),
 }
@@ -107,6 +108,7 @@ impl Kind {
             Self::IfExpr(_) => IfExpr::width(),
             Self::Postmodifier(pmod) => pmod.width,
             Self::MethodChain(chain) => chain.width,
+            Self::Assign(assign) => assign.width,
             Self::AtomAssign(assign) => assign.width,
             Self::CallAssign(assign) => assign.width,
         }
@@ -486,6 +488,44 @@ impl MethodChain {
 }
 
 #[derive(Debug)]
+pub(crate) struct Assign {
+    width: Width,
+    target: AssignTarget,
+    operator: String,
+    value: Box<Node>,
+}
+
+impl Assign {
+    pub(crate) fn new(target: AssignTarget, operator: String, value: Node) -> Self {
+        let width = target
+            .width()
+            .add(&value.width)
+            .add(&Width::Flat(operator.len()));
+        Self {
+            width,
+            target,
+            operator,
+            value: Box::new(value),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum AssignTarget {
+    Atom(String),
+    // Call(MethodChain),
+    // Multi(Vec<Node>),
+}
+
+impl AssignTarget {
+    pub(crate) fn width(&self) -> Width {
+        match self {
+            Self::Atom(s) => Width::Flat(s.len()),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct AtomAssign {
     width: Width,
     name: String,
@@ -637,7 +677,7 @@ struct Formatter {
 impl Formatter {
     fn format(&mut self, node: &Node, ctx: &FormatContext) {
         match &node.kind {
-            Kind::Atom(value) => self.push_str(value),
+            Kind::Atom(value) => self.format_atom(value),
             Kind::Str(str) => self.format_str(str),
             Kind::DynStr(dstr) => self.format_dyn_str(dstr, ctx),
             Kind::HeredocOpening(opening) => self.format_heredoc_opening(node.pos, opening),
@@ -645,9 +685,14 @@ impl Formatter {
             Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
+            Kind::Assign(assign) => self.format_assign(assign, ctx),
             Kind::AtomAssign(assign) => self.format_atom_assign(assign, ctx),
             Kind::CallAssign(assign) => self.format_call_assign(assign, ctx),
         }
+    }
+
+    fn format_atom(&mut self, value: &str) {
+        self.push_str(value);
     }
 
     fn format_str(&mut self, str: &Str) {
@@ -1012,6 +1057,19 @@ impl Formatter {
             if indented {
                 self.dedent();
             }
+        }
+    }
+
+    fn format_assign(&mut self, assign: &Assign, ctx: &FormatContext) {
+        self.format_assign_target(&assign.target);
+        self.push(' ');
+        self.push_str(&assign.operator);
+        self.format_assign_right(&assign.value, ctx);
+    }
+
+    fn format_assign_target(&mut self, target: &AssignTarget) {
+        match target {
+            AssignTarget::Atom(s) => self.format_atom(s),
         }
     }
 
