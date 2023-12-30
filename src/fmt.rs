@@ -291,15 +291,17 @@ impl Exprs {
 
 #[derive(Debug)]
 pub(crate) struct HeredocOpening {
+    pos: Pos,
     width: Width,
     id: String,
     indent_mode: HeredocIndentMode,
 }
 
 impl HeredocOpening {
-    pub(crate) fn new(id: String, indent_mode: HeredocIndentMode) -> Self {
+    pub(crate) fn new(pos: Pos, id: String, indent_mode: HeredocIndentMode) -> Self {
         let width = Width::Flat(id.len() + indent_mode.prefix_symbols().len());
         Self {
+            pos,
             width,
             id,
             indent_mode,
@@ -606,7 +608,7 @@ impl Formatter {
             Kind::Atom(value) => self.format_atom(value),
             Kind::Str(str) => self.format_str(str),
             Kind::DynStr(dstr) => self.format_dyn_str(dstr, ctx),
-            Kind::HeredocOpening(opening) => self.format_heredoc_opening(node.pos, opening),
+            Kind::HeredocOpening(opening) => self.format_heredoc_opening(opening),
             Kind::Exprs(exprs) => self.format_exprs(exprs, ctx, false),
             Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
@@ -676,10 +678,10 @@ impl Formatter {
         self.push_str(&embedded.closing);
     }
 
-    fn format_heredoc_opening(&mut self, pos: Pos, opening: &HeredocOpening) {
+    fn format_heredoc_opening(&mut self, opening: &HeredocOpening) {
         self.push_str(opening.indent_mode.prefix_symbols());
         self.push_str(&opening.id);
-        self.heredoc_queue.push_back(pos);
+        self.heredoc_queue.push_back(opening.pos);
     }
 
     fn format_exprs(&mut self, exprs: &Exprs, ctx: &FormatContext, block_always: bool) {

@@ -924,7 +924,7 @@ impl FmtNodeBuilder<'_> {
             parts: vec![fmt::HeredocPart::Str(str)],
         };
         self.heredoc_map.insert(pos, heredoc);
-        fmt::HeredocOpening::new(opening_id, indent_mode)
+        fmt::HeredocOpening::new(pos, opening_id, indent_mode)
     }
 
     fn visit_complex_heredoc(
@@ -974,7 +974,7 @@ impl FmtNodeBuilder<'_> {
             parts,
         };
         self.heredoc_map.insert(pos, heredoc);
-        fmt::HeredocOpening::new(opening_id, indent_mode)
+        fmt::HeredocOpening::new(pos, opening_id, indent_mode)
     }
 
     fn visit_statements(&mut self, node: Option<prism::StatementsNode>, end: usize) -> fmt::Exprs {
