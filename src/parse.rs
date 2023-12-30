@@ -761,6 +761,36 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
 
+            prism::Node::LocalVariableTargetNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::InstanceVariableTargetNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::ClassVariableTargetNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::GlobalVariableTargetNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::ConstantTargetNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::ConstantPathTargetNode { .. } => {
+                let (path, trivia) = self.visit_constant_path(node, next_loc_start);
+                fmt::Node::new(trivia, fmt::Kind::Atom(path))
+            }
+
+            prism::Node::MultiWriteNode { .. } => {
+                let node = node.as_multi_write_node().unwrap();
+                let (assign, trivia) = self.visit_multi_assign(node, next_loc_start);
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+            }
+            prism::Node::MultiTargetNode { .. } => {
+                let node = node.as_multi_target_node().unwrap();
+                let mut trivia = self.take_leading_trivia(node.location().start_offset());
+                let target = self.visit_multi_assign_target(
+                    node.lefts(),
+                    node.rest(),
+                    node.rights(),
+                    node.lparen_loc(),
+                    node.rparen_loc(),
+                    next_loc_start,
+                );
+                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+                fmt::Node::new(trivia, fmt::Kind::MultiAssignTarget(target))
+            }
+
             _ => todo!("parse {:?}", node),
         };
 
@@ -1248,6 +1278,73 @@ impl FmtNodeBuilder<'_> {
         trivia.set_trailing(self.take_trailing_comment(next_loc_start));
         let target = fmt::Node::new(fmt::Trivia::new(), fmt::Kind::MethodChain(chain));
         (fmt::Assign::new(target, operator, value), trivia)
+    }
+
+    fn visit_multi_assign(
+        &mut self,
+        node: prism::MultiWriteNode,
+        next_loc_start: usize,
+    ) -> (fmt::Assign, fmt::Trivia) {
+        let mut trivia = self.take_leading_trivia(node.location().start_offset());
+        let target = self.visit_multi_assign_target(
+            node.lefts(),
+            node.rest(),
+            node.rights(),
+            node.lparen_loc(),
+            node.rparen_loc(),
+            node.operator_loc().start_offset(),
+        );
+        let operator = Self::source_lossy_at(&node.operator_loc());
+        let value = self.visit(node.value(), next_loc_start);
+        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+
+        let target = fmt::Node::new(fmt::Trivia::new(), fmt::Kind::MultiAssignTarget(target));
+        (fmt::Assign::new(target, operator, value), trivia)
+    }
+
+    fn visit_multi_assign_target(
+        &mut self,
+        lefts: prism::NodeList,
+        rest: Option<prism::Node>,
+        rights: prism::NodeList,
+        lparen_loc: Option<prism::Location>,
+        rparen_loc: Option<prism::Location>,
+        next_loc_start: usize,
+    ) -> fmt::MultiAssignTarget {
+        let lparen = lparen_loc.as_ref().map(Self::source_lossy_at);
+        let rparen = rparen_loc.as_ref().map(Self::source_lossy_at);
+        let mut multi = fmt::MultiAssignTarget::new(lparen, rparen);
+
+        let left_next_start = rest
+            .as_ref()
+            .map(|r| r.location().start_offset())
+            .or_else(|| rights.iter().next().map(|n| n.location().start_offset()))
+            .or_else(|| rparen_loc.as_ref().map(|l| l.start_offset()))
+            .unwrap_or(next_loc_start);
+        Self::each_node_with_next_start(lefts.iter(), left_next_start, |node, next_start| {
+            let target = self.visit(node, next_start);
+            multi.append_target(target);
+        });
+
+        if rest.is_some() {
+            // handle SplatNode in multi assignment
+        }
+
+        let right_next_start = rparen_loc
+            .as_ref()
+            .map(|l| l.start_offset())
+            .unwrap_or(next_loc_start);
+        Self::each_node_with_next_start(rights.iter(), right_next_start, |node, next_start| {
+            let target = self.visit(node, next_start);
+            multi.append_target(target);
+        });
+
+        if let Some(rparen_loc) = rparen_loc {
+            let virtual_end = self.take_end_trivia_as_virtual_end(Some(rparen_loc.start_offset()));
+            multi.set_virtual_end(virtual_end);
+        }
+
+        multi
     }
 
     fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: Option<usize>) -> fmt::Exprs {

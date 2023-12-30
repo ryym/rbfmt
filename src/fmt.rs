@@ -85,6 +85,7 @@ pub(crate) enum Kind {
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
     Assign(Assign),
+    MultiAssignTarget(MultiAssignTarget),
 }
 
 impl Kind {
@@ -99,6 +100,7 @@ impl Kind {
             Self::Postmodifier(pmod) => pmod.width,
             Self::MethodChain(chain) => chain.width,
             Self::Assign(assign) => assign.width,
+            Self::MultiAssignTarget(multi) => multi.width,
         }
     }
 }
@@ -501,6 +503,43 @@ impl Assign {
 }
 
 #[derive(Debug)]
+pub(crate) struct MultiAssignTarget {
+    width: Width,
+    lparen: Option<String>,
+    rparen: Option<String>,
+    targets: Vec<Node>,
+    virtual_end: Option<VirtualEnd>,
+}
+
+impl MultiAssignTarget {
+    pub(crate) fn new(lparen: Option<String>, rparen: Option<String>) -> Self {
+        let parens_len = match (&lparen, &rparen) {
+            (Some(lp), Some(rp)) => lp.len() + rp.len(),
+            _ => 0,
+        };
+        Self {
+            width: Width::Flat(parens_len),
+            lparen,
+            rparen,
+            targets: vec![],
+            virtual_end: None,
+        }
+    }
+
+    pub(crate) fn append_target(&mut self, target: Node) {
+        self.width.append(&target.width);
+        self.targets.push(target);
+    }
+
+    pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
+        if let Some(end) = &end {
+            self.width.append(&end.width);
+        }
+        self.virtual_end = end;
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Trivia {
     pub leading: Vec<LineTrivia>,
     pub trailing: Option<Comment>,
@@ -590,6 +629,7 @@ impl Formatter {
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
             Kind::Assign(assign) => self.format_assign(assign, ctx),
+            Kind::MultiAssignTarget(multi) => self.format_multi_assign_target(multi, ctx),
         }
     }
 
@@ -988,6 +1028,30 @@ impl Formatter {
             self.format(value, ctx);
             self.write_trailing_comment(&value.trivia.trailing);
             self.dedent();
+        }
+    }
+
+    fn format_multi_assign_target(&mut self, multi: &MultiAssignTarget, ctx: &FormatContext) {
+        let is_inline = multi.width.fits_in(self.remaining_width);
+
+        if let Some(lparen) = &multi.lparen {
+            self.push_str(lparen);
+        }
+
+        let last_idx = multi.targets.len() - 1;
+        if is_inline {
+            for (i, target) in multi.targets.iter().enumerate() {
+                self.format(target, ctx);
+                if i < last_idx {
+                    self.push_str(", ");
+                }
+            }
+        } else {
+            todo!("multi")
+        }
+
+        if let Some(rparen) = &multi.rparen {
+            self.push_str(rparen);
         }
     }
 
