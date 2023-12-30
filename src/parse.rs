@@ -308,22 +308,14 @@ impl FmtNodeBuilder<'_> {
             prism::Node::ProgramNode { .. } => {
                 let node = node.as_program_node().unwrap();
                 let exprs = self.visit_statements(Some(node.statements()), next_loc_start);
-                fmt::Node {
-                    pos: fmt::Pos::none(),
-                    trivia: fmt::Trivia::new(),
-                    width: exprs.width(),
-                    kind: fmt::Kind::Exprs(exprs),
-                }
+                let kind = fmt::Kind::Exprs(exprs);
+                fmt::Node::new(fmt::Trivia::new(), kind)
             }
             prism::Node::StatementsNode { .. } => {
                 let node = node.as_statements_node().unwrap();
                 let exprs = self.visit_statements(Some(node), next_loc_start);
-                fmt::Node {
-                    pos: fmt::Pos::none(),
-                    trivia: fmt::Trivia::new(),
-                    width: exprs.width(),
-                    kind: fmt::Kind::Exprs(exprs),
-                }
+                let kind = fmt::Kind::Exprs(exprs);
+                fmt::Node::new(fmt::Trivia::new(), kind)
             }
 
             prism::Node::NilNode { .. } => self.parse_atom(node, next_loc_start),
@@ -339,40 +331,37 @@ impl FmtNodeBuilder<'_> {
             prism::Node::GlobalVariableReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ConstantReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ConstantPathNode { .. } => {
-                let pos = self.next_pos();
                 let (path, trivia) = self.visit_constant_path(node, next_loc_start);
-                fmt::Node::new(pos, trivia, fmt::Kind::Atom(path))
+                fmt::Node::new(trivia, fmt::Kind::Atom(path))
             }
 
             prism::Node::StringNode { .. } => {
                 let node = node.as_string_node().unwrap();
-                let pos = self.next_pos();
                 let loc = node.location();
                 let mut trivia = self.take_leading_trivia(loc.start_offset());
                 let kind = if Self::is_heredoc(node.opening_loc().as_ref()) {
-                    let heredoc_opening = self.visit_simple_heredoc(pos, node);
+                    let heredoc_opening = self.visit_simple_heredoc(node);
                     fmt::Kind::HeredocOpening(heredoc_opening)
                 } else {
                     let str = self.visit_string(node);
                     fmt::Kind::Str(str)
                 };
                 trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(pos, trivia, kind)
+                fmt::Node::new(trivia, kind)
             }
             prism::Node::InterpolatedStringNode { .. } => {
                 let node = node.as_interpolated_string_node().unwrap();
-                let pos = self.next_pos();
                 let loc = node.location();
                 let mut trivia = self.take_leading_trivia(loc.start_offset());
                 let kind = if Self::is_heredoc(node.opening_loc().as_ref()) {
-                    let heredoc_opening = self.visit_complex_heredoc(pos, node);
+                    let heredoc_opening = self.visit_complex_heredoc(node);
                     fmt::Kind::HeredocOpening(heredoc_opening)
                 } else {
                     let str = self.visit_interpolated_string(node);
                     fmt::Kind::DynStr(str)
                 };
                 trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(pos, trivia, kind)
+                fmt::Node::new(trivia, kind)
             }
 
             prism::Node::IfNode { .. } => {
@@ -436,17 +425,15 @@ impl FmtNodeBuilder<'_> {
 
             prism::Node::CallNode { .. } => {
                 let node = node.as_call_node().unwrap();
-                let pos = self.next_pos();
                 let loc = node.location();
                 let mut trivia = self.take_leading_trivia(loc.start_offset());
                 let chain = self.visit_call_root(&node, next_loc_start, None);
                 trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(pos, trivia, fmt::Kind::MethodChain(chain))
+                fmt::Node::new(trivia, fmt::Kind::MethodChain(chain))
             }
 
             prism::Node::LocalVariableWriteNode { .. } => {
                 let node = node.as_local_variable_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -454,11 +441,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::LocalVariableAndWriteNode { .. } => {
                 let node = node.as_local_variable_and_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -466,11 +452,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::LocalVariableOrWriteNode { .. } => {
                 let node = node.as_local_variable_or_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -478,11 +463,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::LocalVariableOperatorWriteNode { .. } => {
                 let node = node.as_local_variable_operator_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -490,12 +474,11 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
 
             prism::Node::InstanceVariableWriteNode { .. } => {
                 let node = node.as_instance_variable_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -503,11 +486,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::InstanceVariableAndWriteNode { .. } => {
                 let node = node.as_instance_variable_and_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -515,11 +497,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::InstanceVariableOrWriteNode { .. } => {
                 let node = node.as_instance_variable_or_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -527,11 +508,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::InstanceVariableOperatorWriteNode { .. } => {
                 let node = node.as_instance_variable_operator_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -539,12 +519,11 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
 
             prism::Node::ClassVariableWriteNode { .. } => {
                 let node = node.as_class_variable_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -553,11 +532,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::ClassVariableAndWriteNode { .. } => {
                 let node = node.as_class_variable_and_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -565,11 +543,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::ClassVariableOrWriteNode { .. } => {
                 let node = node.as_class_variable_or_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -577,11 +554,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::ClassVariableOperatorWriteNode { .. } => {
                 let node = node.as_class_variable_operator_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -589,12 +565,11 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
 
             prism::Node::GlobalVariableWriteNode { .. } => {
                 let node = node.as_global_variable_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -602,11 +577,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::GlobalVariableAndWriteNode { .. } => {
                 let node = node.as_global_variable_and_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -614,11 +588,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::GlobalVariableOrWriteNode { .. } => {
                 let node = node.as_global_variable_or_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -626,11 +599,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::GlobalVariableOperatorWriteNode { .. } => {
                 let node = node.as_global_variable_operator_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -638,12 +610,11 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
 
             prism::Node::ConstantWriteNode { .. } => {
                 let node = node.as_constant_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -651,11 +622,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::ConstantAndWriteNode { .. } => {
                 let node = node.as_constant_and_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -663,11 +633,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::ConstantOrWriteNode { .. } => {
                 let node = node.as_constant_or_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -675,11 +644,10 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::ConstantOperatorWriteNode { .. } => {
                 let node = node.as_constant_operator_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
@@ -687,120 +655,110 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
 
             prism::Node::ConstantPathWriteNode { .. } => {
                 let node = node.as_constant_path_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_constant_path_assign(
                     node.target(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::ConstantPathAndWriteNode { .. } => {
                 let node = node.as_constant_path_and_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_constant_path_assign(
                     node.target(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::ConstantPathOrWriteNode { .. } => {
                 let node = node.as_constant_path_or_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_constant_path_assign(
                     node.target(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::ConstantPathOperatorWriteNode { .. } => {
                 let node = node.as_constant_path_operator_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_constant_path_assign(
                     node.target(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
 
             prism::Node::CallAndWriteNode { .. } => {
                 let node = node.as_call_and_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_call_assign(
                     &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::CallOrWriteNode { .. } => {
                 let node = node.as_call_or_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_call_assign(
                     &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::CallOperatorWriteNode { .. } => {
                 let node = node.as_call_operator_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_call_assign(
                     &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
 
             prism::Node::IndexAndWriteNode { .. } => {
                 let node = node.as_index_and_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_call_assign(
                     &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::IndexOrWriteNode { .. } => {
                 let node = node.as_index_or_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_call_assign(
                     &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
             prism::Node::IndexOperatorWriteNode { .. } => {
                 let node = node.as_index_operator_write_node().unwrap();
-                let pos = self.next_pos();
                 let (assign, trivia) = self.visit_call_assign(
                     &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
             }
 
             _ => todo!("parse {:?}", node),
@@ -812,12 +770,11 @@ impl FmtNodeBuilder<'_> {
     }
 
     fn parse_atom(&mut self, node: prism::Node, next_loc_start: usize) -> fmt::Node {
-        let pos = self.next_pos();
         let loc = node.location();
         let mut trivia = self.take_leading_trivia(loc.start_offset());
         let value = Self::source_lossy_at(&loc);
         trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        fmt::Node::new(pos, trivia, fmt::Kind::Atom(value))
+        fmt::Node::new(trivia, fmt::Kind::Atom(value))
     }
 
     fn visit_constant_path(
@@ -909,11 +866,7 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn visit_simple_heredoc(
-        &mut self,
-        pos: fmt::Pos,
-        node: prism::StringNode,
-    ) -> fmt::HeredocOpening {
+    fn visit_simple_heredoc(&mut self, node: prism::StringNode) -> fmt::HeredocOpening {
         let open = node.opening_loc().unwrap().as_slice();
         let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
         let opening_id = String::from_utf8_lossy(id).to_string();
@@ -923,13 +876,13 @@ impl FmtNodeBuilder<'_> {
             indent_mode,
             parts: vec![fmt::HeredocPart::Str(str)],
         };
+        let pos = self.next_pos();
         self.heredoc_map.insert(pos, heredoc);
         fmt::HeredocOpening::new(pos, opening_id, indent_mode)
     }
 
     fn visit_complex_heredoc(
         &mut self,
-        pos: fmt::Pos,
         node: prism::InterpolatedStringNode,
     ) -> fmt::HeredocOpening {
         let open = node.opening_loc().unwrap().as_slice();
@@ -973,6 +926,7 @@ impl FmtNodeBuilder<'_> {
             indent_mode,
             parts,
         };
+        let pos = self.next_pos();
         self.heredoc_map.insert(pos, heredoc);
         fmt::HeredocOpening::new(pos, opening_id, indent_mode)
     }
@@ -991,7 +945,6 @@ impl FmtNodeBuilder<'_> {
     }
 
     fn visit_if_or_unless(&mut self, node: IfOrUnless, next_loc_start: usize) -> fmt::Node {
-        let pos = self.next_pos();
         let mut if_trivia = self.take_leading_trivia(node.loc.start_offset());
 
         let end_loc = node.end_loc.expect("if/unless expression must have end");
@@ -1031,7 +984,7 @@ impl FmtNodeBuilder<'_> {
         };
 
         if_trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        fmt::Node::new(pos, if_trivia, fmt::Kind::IfExpr(ifexpr))
+        fmt::Node::new(if_trivia, fmt::Kind::IfExpr(ifexpr))
     }
 
     fn visit_ifelse(&mut self, node: prism::Node, ifexpr: &mut fmt::IfExpr) {
@@ -1099,7 +1052,6 @@ impl FmtNodeBuilder<'_> {
     }
 
     fn visit_postmodifier(&mut self, postmod: Postmodifier, next_loc_start: usize) -> fmt::Node {
-        let pos = self.next_pos();
         let mut trivia = self.take_leading_trivia(postmod.loc.start_offset());
 
         let kwd_loc = postmod.keyword_loc;
@@ -1117,7 +1069,7 @@ impl FmtNodeBuilder<'_> {
         );
 
         trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        fmt::Node::new(pos, trivia, fmt::Kind::Postmodifier(postmod))
+        fmt::Node::new(trivia, fmt::Kind::Postmodifier(postmod))
     }
 
     fn visit_call_root<C: CallRoot>(

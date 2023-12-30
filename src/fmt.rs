@@ -23,12 +23,6 @@ pub(crate) fn format(node: Node, heredoc_map: HeredocMap) -> String {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Pos(pub usize);
 
-impl Pos {
-    pub(crate) fn none() -> Self {
-        Self(0)
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum Width {
     Flat(usize),
@@ -64,17 +58,15 @@ impl Width {
 
 #[derive(Debug)]
 pub(crate) struct Node {
-    pub pos: Pos,
     pub trivia: Trivia,
     pub kind: Kind,
     pub width: Width,
 }
 
 impl Node {
-    pub(crate) fn new(pos: Pos, trivia: Trivia, kind: Kind) -> Self {
+    pub(crate) fn new(trivia: Trivia, kind: Kind) -> Self {
         let width = trivia.width.add(&kind.width());
         Self {
-            pos,
             trivia,
             kind,
             width,
