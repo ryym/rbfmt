@@ -61,3 +61,11 @@ a =
   foo.
     # bar
     bar
+
+foo[1] &&= 1
+foo(bar).baz[true, nil] ||= a.b
+foo[
+  # a
+  1,
+  # b
+] += 3

@@ -169,6 +169,94 @@ impl<'src> CallRoot for prism::CallOperatorWriteNode<'src> {
     }
 }
 
+impl<'src> CallRoot for prism::IndexAndWriteNode<'src> {
+    fn location(&self) -> prism::Location {
+        self.location()
+    }
+    fn receiver(&self) -> Option<prism::Node> {
+        self.receiver()
+    }
+    fn message_loc(&self) -> Option<prism::Location> {
+        Some(self.location())
+    }
+    fn call_operator_loc(&self) -> Option<prism::Location> {
+        self.call_operator_loc()
+    }
+    fn name(&self) -> &[u8] {
+        b"[]"
+    }
+    fn arguments(&self) -> Option<prism::ArgumentsNode> {
+        self.arguments()
+    }
+    fn opening_loc(&self) -> Option<prism::Location> {
+        Some(self.opening_loc())
+    }
+    fn closing_loc(&self) -> Option<prism::Location> {
+        Some(self.closing_loc())
+    }
+    fn block(&self) -> Option<prism::Node> {
+        None
+    }
+}
+impl<'src> CallRoot for prism::IndexOrWriteNode<'src> {
+    fn location(&self) -> prism::Location {
+        self.location()
+    }
+    fn receiver(&self) -> Option<prism::Node> {
+        self.receiver()
+    }
+    fn message_loc(&self) -> Option<prism::Location> {
+        Some(self.location())
+    }
+    fn call_operator_loc(&self) -> Option<prism::Location> {
+        self.call_operator_loc()
+    }
+    fn name(&self) -> &[u8] {
+        b"[]"
+    }
+    fn arguments(&self) -> Option<prism::ArgumentsNode> {
+        self.arguments()
+    }
+    fn opening_loc(&self) -> Option<prism::Location> {
+        Some(self.opening_loc())
+    }
+    fn closing_loc(&self) -> Option<prism::Location> {
+        Some(self.closing_loc())
+    }
+    fn block(&self) -> Option<prism::Node> {
+        None
+    }
+}
+impl<'src> CallRoot for prism::IndexOperatorWriteNode<'src> {
+    fn location(&self) -> prism::Location {
+        self.location()
+    }
+    fn receiver(&self) -> Option<prism::Node> {
+        self.receiver()
+    }
+    fn message_loc(&self) -> Option<prism::Location> {
+        Some(self.location())
+    }
+    fn call_operator_loc(&self) -> Option<prism::Location> {
+        self.call_operator_loc()
+    }
+    fn name(&self) -> &[u8] {
+        b"[]"
+    }
+    fn arguments(&self) -> Option<prism::ArgumentsNode> {
+        self.arguments()
+    }
+    fn opening_loc(&self) -> Option<prism::Location> {
+        Some(self.opening_loc())
+    }
+    fn closing_loc(&self) -> Option<prism::Location> {
+        Some(self.closing_loc())
+    }
+    fn block(&self) -> Option<prism::Node> {
+        None
+    }
+}
+
 struct Postmodifier<'src> {
     keyword: String,
     loc: prism::Location<'src>,
@@ -681,6 +769,40 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
             }
 
+            prism::Node::IndexAndWriteNode { .. } => {
+                let node = node.as_index_and_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_call_assign(
+                    &node,
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+            }
+            prism::Node::IndexOrWriteNode { .. } => {
+                let node = node.as_index_or_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_call_assign(
+                    &node,
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+            }
+            prism::Node::IndexOperatorWriteNode { .. } => {
+                let node = node.as_index_operator_write_node().unwrap();
+                let pos = self.next_pos();
+                let (assign, trivia) = self.visit_call_assign(
+                    &node,
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(pos, trivia, fmt::Kind::Assign(assign))
+            }
+
             _ => todo!("parse {:?}", node),
         };
 
@@ -1167,11 +1289,12 @@ impl FmtNodeBuilder<'_> {
         value: prism::Node,
         next_loc_start: usize,
     ) -> (fmt::Assign, fmt::Trivia) {
+        let mut trivia = self.take_leading_trivia(call.location().start_offset());
         let chain = self.visit_call_root(call, next_loc_start, None);
         let target = fmt::AssignTarget::Call(chain);
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.visit(value, next_loc_start);
-        let trivia = fmt::Trivia::new();
+        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
         (fmt::Assign::new(target, operator, value), trivia)
     }
 
