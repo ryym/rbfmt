@@ -39,6 +39,48 @@ struct IfOrUnless<'src> {
     end_loc: Option<prism::Location<'src>>,
 }
 
+trait CallRoot {
+    fn location(&self) -> prism::Location;
+    fn receiver(&self) -> Option<prism::Node>;
+    fn message_loc(&self) -> Option<prism::Location>;
+    fn call_operator_loc(&self) -> Option<prism::Location>;
+    fn name(&self) -> &[u8];
+    fn arguments(&self) -> Option<prism::ArgumentsNode>;
+    fn opening_loc(&self) -> Option<prism::Location>;
+    fn closing_loc(&self) -> Option<prism::Location>;
+    fn block(&self) -> Option<prism::Node>;
+}
+
+impl<'src> CallRoot for prism::CallNode<'src> {
+    fn location(&self) -> prism::Location {
+        self.location()
+    }
+    fn receiver(&self) -> Option<prism::Node> {
+        self.receiver()
+    }
+    fn message_loc(&self) -> Option<prism::Location> {
+        self.message_loc()
+    }
+    fn call_operator_loc(&self) -> Option<prism::Location> {
+        self.call_operator_loc()
+    }
+    fn name(&self) -> &[u8] {
+        self.name().as_slice()
+    }
+    fn arguments(&self) -> Option<prism::ArgumentsNode> {
+        self.arguments()
+    }
+    fn opening_loc(&self) -> Option<prism::Location> {
+        self.opening_loc()
+    }
+    fn closing_loc(&self) -> Option<prism::Location> {
+        self.closing_loc()
+    }
+    fn block(&self) -> Option<prism::Node> {
+        self.block()
+    }
+}
+
 struct Postmodifier<'src> {
     keyword: String,
     loc: prism::Location<'src>,
@@ -221,7 +263,7 @@ impl FmtNodeBuilder<'_> {
                 let pos = self.next_pos();
                 let loc = node.location();
                 let mut trivia = self.take_leading_trivia(loc.start_offset());
-                let chain = self.visit_call(node, next_loc_start, None);
+                let chain = self.visit_call_root(&node, next_loc_start, None);
                 trivia.set_trailing(self.take_trailing_comment(next_loc_start));
                 fmt::Node::new(pos, trivia, fmt::Kind::MethodChain(chain))
             }
@@ -874,9 +916,9 @@ impl FmtNodeBuilder<'_> {
         fmt::Node::new(pos, trivia, fmt::Kind::Postmodifier(postmod))
     }
 
-    fn visit_call(
+    fn visit_call_root<C: CallRoot>(
         &mut self,
-        call: prism::CallNode,
+        call: &C,
         next_loc_start: usize,
         next_msg_start: Option<usize>,
     ) -> fmt::MethodChain {
@@ -885,7 +927,7 @@ impl FmtNodeBuilder<'_> {
                 prism::Node::CallNode { .. } => {
                     let node = receiver.as_call_node().unwrap();
                     let msg_end = call.message_loc().as_ref().map(|l| l.start_offset());
-                    self.visit_call(node, next_loc_start, msg_end)
+                    self.visit_call_root(&node, next_loc_start, msg_end)
                 }
                 _ => {
                     let next_loc_start = call
@@ -911,7 +953,7 @@ impl FmtNodeBuilder<'_> {
         };
 
         let call_op = call.call_operator_loc().map(|l| Self::source_lossy_at(&l));
-        let name = String::from_utf8_lossy(call.name().as_slice()).to_string();
+        let name = String::from_utf8_lossy(call.name()).to_string();
         let mut method_call = fmt::MethodCall::new(call_op, name);
 
         let args = match call.arguments() {
