@@ -480,38 +480,22 @@ impl MethodChain {
 #[derive(Debug)]
 pub(crate) struct Assign {
     width: Width,
-    target: AssignTarget,
+    target: Box<Node>,
     operator: String,
     value: Box<Node>,
 }
 
 impl Assign {
-    pub(crate) fn new(target: AssignTarget, operator: String, value: Node) -> Self {
+    pub(crate) fn new(target: Node, operator: String, value: Node) -> Self {
         let width = target
-            .width()
+            .width
             .add(&value.width)
             .add(&Width::Flat(operator.len()));
         Self {
             width,
-            target,
+            target: Box::new(target),
             operator,
             value: Box::new(value),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) enum AssignTarget {
-    Atom(String),
-    Call(MethodChain),
-    // Multi(Vec<Node>),
-}
-
-impl AssignTarget {
-    pub(crate) fn width(&self) -> Width {
-        match self {
-            Self::Atom(s) => Width::Flat(s.len()),
-            Self::Call(chain) => chain.width,
         }
     }
 }
@@ -979,17 +963,10 @@ impl Formatter {
     }
 
     fn format_assign(&mut self, assign: &Assign, ctx: &FormatContext) {
-        self.format_assign_target(&assign.target, ctx);
+        self.format(&assign.target, ctx);
         self.push(' ');
         self.push_str(&assign.operator);
         self.format_assign_right(&assign.value, ctx);
-    }
-
-    fn format_assign_target(&mut self, target: &AssignTarget, ctx: &FormatContext) {
-        match target {
-            AssignTarget::Atom(s) => self.format_atom(s),
-            AssignTarget::Call(chain) => self.format_method_chain(chain, ctx),
-        }
     }
 
     fn format_assign_right(&mut self, value: &Node, ctx: &FormatContext) {

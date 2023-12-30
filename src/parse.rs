@@ -1214,7 +1214,7 @@ impl FmtNodeBuilder<'_> {
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.visit(value, next_loc_start);
         trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        let target = fmt::AssignTarget::Atom(name);
+        let target = fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Atom(name));
         (fmt::Assign::new(target, operator, value), trivia)
     }
 
@@ -1230,7 +1230,7 @@ impl FmtNodeBuilder<'_> {
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.visit(value, next_loc_start);
         trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        let target = fmt::AssignTarget::Atom(path);
+        let target = fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Atom(path));
         (fmt::Assign::new(target, operator, value), trivia)
     }
 
@@ -1243,10 +1243,10 @@ impl FmtNodeBuilder<'_> {
     ) -> (fmt::Assign, fmt::Trivia) {
         let mut trivia = self.take_leading_trivia(call.location().start_offset());
         let chain = self.visit_call_root(call, next_loc_start, None);
-        let target = fmt::AssignTarget::Call(chain);
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.visit(value, next_loc_start);
         trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+        let target = fmt::Node::new(fmt::Trivia::new(), fmt::Kind::MethodChain(chain));
         (fmt::Assign::new(target, operator, value), trivia)
     }
 
