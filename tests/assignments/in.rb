@@ -98,3 +98,12 @@ a[1], b[2, c.d, e], foo.bar = xs
 a[1], b[2,
         # c
         c.d, e], foo.bar = xs
+
+a, *b, c = xs
+*a, *b, *c = xs
+
+a, *foo(1, 2).bar = xs
+
+a, *b
+  # 1
+  .c, d = xs

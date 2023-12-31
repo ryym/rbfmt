@@ -867,6 +867,13 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Atom("".to_string()))
             }
 
+            prism::Node::SplatNode { .. } => {
+                let node = node.as_splat_node().unwrap();
+                let target = node.expression().expect("SplatNode must have expression");
+                let target = self.visit(target, next_loc_start);
+                fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Splat(Box::new(target)))
+            }
+
             _ => todo!("parse {:?}", node),
         };
 

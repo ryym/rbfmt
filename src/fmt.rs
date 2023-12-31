@@ -86,6 +86,7 @@ pub(crate) enum Kind {
     MethodChain(MethodChain),
     Assign(Assign),
     MultiAssignTarget(MultiAssignTarget),
+    Splat(Box<Node>),
 }
 
 impl Kind {
@@ -101,6 +102,7 @@ impl Kind {
             Self::MethodChain(chain) => chain.width,
             Self::Assign(assign) => assign.width,
             Self::MultiAssignTarget(multi) => multi.width,
+            Self::Splat(node) => node.width.add(&Width::Flat(1)),
         }
     }
 }
@@ -639,6 +641,7 @@ impl Formatter {
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
             Kind::Assign(assign) => self.format_assign(assign, ctx),
             Kind::MultiAssignTarget(multi) => self.format_multi_assign_target(multi, ctx),
+            Kind::Splat(node) => self.format_splat(node, ctx),
         }
     }
 
@@ -1084,6 +1087,11 @@ impl Formatter {
             self.put_indent();
             self.push(')');
         }
+    }
+
+    fn format_splat(&mut self, target: &Node, ctx: &FormatContext) {
+        self.push('*');
+        self.format(target, ctx);
     }
 
     fn write_leading_trivia(
