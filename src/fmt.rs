@@ -508,6 +508,7 @@ pub(crate) struct MultiAssignTarget {
     lparen: Option<String>,
     rparen: Option<String>,
     targets: Vec<Node>,
+    with_implicit_rest: bool,
     virtual_end: Option<VirtualEnd>,
 }
 
@@ -522,6 +523,7 @@ impl MultiAssignTarget {
             lparen,
             rparen,
             targets: vec![],
+            with_implicit_rest: false,
             virtual_end: None,
         }
     }
@@ -529,6 +531,13 @@ impl MultiAssignTarget {
     pub(crate) fn append_target(&mut self, target: Node) {
         self.width.append(&target.width);
         self.targets.push(target);
+    }
+
+    pub(crate) fn set_implicit_rest(&mut self, yes: bool) {
+        if yes {
+            self.width.append_value(",".len());
+        }
+        self.with_implicit_rest = yes;
     }
 
     pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
@@ -1032,26 +1041,48 @@ impl Formatter {
     }
 
     fn format_multi_assign_target(&mut self, multi: &MultiAssignTarget, ctx: &FormatContext) {
-        let is_inline = multi.width.fits_in(self.remaining_width);
-
-        if let Some(lparen) = &multi.lparen {
-            self.push_str(lparen);
-        }
-
-        let last_idx = multi.targets.len() - 1;
-        if is_inline {
+        if multi.width.fits_in(self.remaining_width) {
+            if let Some(lparen) = &multi.lparen {
+                self.push_str(lparen);
+            }
             for (i, target) in multi.targets.iter().enumerate() {
-                self.format(target, ctx);
-                if i < last_idx {
+                if i > 0 {
                     self.push_str(", ");
                 }
+                self.format(target, ctx);
+            }
+            if multi.with_implicit_rest {
+                self.push(',');
+            }
+            if let Some(rparen) = &multi.rparen {
+                self.push_str(rparen);
             }
         } else {
-            todo!("multi")
-        }
-
-        if let Some(rparen) = &multi.rparen {
-            self.push_str(rparen);
+            self.push('(');
+            self.indent();
+            let last_idx = multi.targets.len() - 1;
+            for (i, target) in multi.targets.iter().enumerate() {
+                self.break_line(ctx);
+                self.write_leading_trivia(
+                    &target.trivia.leading,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: i == 0,
+                        end: false,
+                    },
+                );
+                self.put_indent();
+                self.format(target, ctx);
+                if i < last_idx || multi.with_implicit_rest {
+                    self.push(',');
+                }
+                self.write_trailing_comment(&target.trivia.trailing);
+            }
+            self.write_trivia_at_virtual_end(ctx, &multi.virtual_end, true, false);
+            self.dedent();
+            self.break_line(ctx);
+            self.put_indent();
+            self.push(')');
         }
     }
 

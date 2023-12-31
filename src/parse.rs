@@ -790,6 +790,9 @@ impl FmtNodeBuilder<'_> {
                 trivia.set_trailing(self.take_trailing_comment(next_loc_start));
                 fmt::Node::new(trivia, fmt::Kind::MultiAssignTarget(target))
             }
+            prism::Node::ImplicitRestNode { .. } => {
+                fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Atom("".to_string()))
+            }
 
             _ => todo!("parse {:?}", node),
         };
@@ -1315,25 +1318,39 @@ impl FmtNodeBuilder<'_> {
         let rparen = rparen_loc.as_ref().map(Self::source_lossy_at);
         let mut multi = fmt::MultiAssignTarget::new(lparen, rparen);
 
-        let left_next_start = rest
+        let implicit_rest = rest
             .as_ref()
-            .map(|r| r.location().start_offset())
-            .or_else(|| rights.iter().next().map(|n| n.location().start_offset()))
-            .or_else(|| rparen_loc.as_ref().map(|l| l.start_offset()))
+            .map_or(false, |r| matches!(r, prism::Node::ImplicitRestNode { .. }));
+        multi.set_implicit_rest(implicit_rest);
+
+        let rest_start = if implicit_rest {
+            None
+        } else {
+            rest.as_ref().map(|r| r.location().start_offset())
+        };
+        let rights_first_start = rights.iter().next().map(|n| n.location().start_offset());
+        let rparen_start = rparen_loc.as_ref().map(|l| l.start_offset());
+
+        let left_next_start = rest_start
+            .or(rights_first_start)
+            .or(rparen_start)
             .unwrap_or(next_loc_start);
         Self::each_node_with_next_start(lefts.iter(), left_next_start, |node, next_start| {
             let target = self.visit(node, next_start);
             multi.append_target(target);
         });
 
-        if rest.is_some() {
-            // handle SplatNode in multi assignment
+        if !implicit_rest {
+            if let Some(rest) = rest {
+                let rest_next_start = rights_first_start
+                    .or(rparen_start)
+                    .unwrap_or(next_loc_start);
+                let target = self.visit(rest, rest_next_start);
+                multi.append_target(target);
+            }
         }
 
-        let right_next_start = rparen_loc
-            .as_ref()
-            .map(|l| l.start_offset())
-            .unwrap_or(next_loc_start);
+        let right_next_start = rparen_start.unwrap_or(next_loc_start);
         Self::each_node_with_next_start(rights.iter(), right_next_start, |node, next_start| {
             let target = self.visit(node, next_start);
             multi.append_target(target);
