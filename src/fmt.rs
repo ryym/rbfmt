@@ -77,8 +77,8 @@ impl Node {
 #[derive(Debug)]
 pub(crate) enum Kind {
     Atom(String),
-    Str(Str),
-    DynStr(DynStr),
+    StringLike(StringLike),
+    DynStringLike(DynStringLike),
     HeredocOpening(HeredocOpening),
     Exprs(Exprs),
     IfExpr(IfExpr),
@@ -93,8 +93,8 @@ impl Kind {
     pub(crate) fn width(&self) -> Width {
         match self {
             Self::Atom(s) => Width::Flat(s.len()),
-            Self::Str(s) => s.width,
-            Self::DynStr(s) => s.width,
+            Self::StringLike(s) => s.width,
+            Self::DynStringLike(s) => s.width,
             Self::HeredocOpening(opening) => *opening.width(),
             Self::Exprs(exprs) => exprs.width,
             Self::IfExpr(_) => IfExpr::width(),
@@ -108,14 +108,14 @@ impl Kind {
 }
 
 #[derive(Debug)]
-pub(crate) struct Str {
+pub(crate) struct StringLike {
     pub width: Width,
     pub opening: Option<String>,
     pub value: Vec<u8>,
     pub closing: Option<String>,
 }
 
-impl Str {
+impl StringLike {
     pub(crate) fn new(opening: Option<String>, value: Vec<u8>, closing: Option<String>) -> Self {
         let opening_len = opening.as_ref().map_or(0, |s| s.len());
         let closing_len = closing.as_ref().map_or(0, |s| s.len());
@@ -130,14 +130,14 @@ impl Str {
 }
 
 #[derive(Debug)]
-pub(crate) struct DynStr {
+pub(crate) struct DynStringLike {
     pub width: Width,
     pub opening: Option<String>,
     pub parts: Vec<DynStrPart>,
     pub closing: Option<String>,
 }
 
-impl DynStr {
+impl DynStringLike {
     pub(crate) fn new(opening: Option<String>, closing: Option<String>) -> Self {
         let opening_len = opening.as_ref().map_or(0, |s| s.len());
         let closing_len = closing.as_ref().map_or(0, |s| s.len());
@@ -157,8 +157,8 @@ impl DynStr {
 
 #[derive(Debug)]
 pub(crate) enum DynStrPart {
-    Str(Str),
-    DynStr(DynStr),
+    Str(StringLike),
+    DynStr(DynStringLike),
     Exprs(EmbeddedExprs),
 }
 
@@ -227,7 +227,7 @@ impl HeredocIndentMode {
 
 #[derive(Debug)]
 pub(crate) enum HeredocPart {
-    Str(Str),
+    Str(StringLike),
     Exprs(EmbeddedExprs),
 }
 
@@ -632,8 +632,8 @@ impl Formatter {
     fn format(&mut self, node: &Node, ctx: &FormatContext) {
         match &node.kind {
             Kind::Atom(value) => self.format_atom(value),
-            Kind::Str(str) => self.format_str(str),
-            Kind::DynStr(dstr) => self.format_dyn_str(dstr, ctx),
+            Kind::StringLike(str) => self.format_string_like(str),
+            Kind::DynStringLike(dstr) => self.format_dyn_string_like(dstr, ctx),
             Kind::HeredocOpening(opening) => self.format_heredoc_opening(opening),
             Kind::Exprs(exprs) => self.format_exprs(exprs, ctx, false),
             Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
@@ -649,7 +649,7 @@ impl Formatter {
         self.push_str(value);
     }
 
-    fn format_str(&mut self, str: &Str) {
+    fn format_string_like(&mut self, str: &StringLike) {
         // Ignore non-UTF8 source code for now.
         let value = String::from_utf8_lossy(&str.value);
         if let Some(opening) = &str.opening {
@@ -661,7 +661,7 @@ impl Formatter {
         }
     }
 
-    fn format_dyn_str(&mut self, dstr: &DynStr, ctx: &FormatContext) {
+    fn format_dyn_string_like(&mut self, dstr: &DynStringLike, ctx: &FormatContext) {
         if let Some(opening) = &dstr.opening {
             self.push_str(opening);
         }
@@ -673,11 +673,11 @@ impl Formatter {
             match part {
                 DynStrPart::Str(str) => {
                     divided = str.opening.is_some();
-                    self.format_str(str);
+                    self.format_string_like(str);
                 }
                 DynStrPart::DynStr(dstr) => {
                     divided = true;
-                    self.format_dyn_str(dstr, ctx);
+                    self.format_dyn_string_like(dstr, ctx);
                 }
                 DynStrPart::Exprs(embedded) => {
                     self.format_embedded_exprs(embedded, ctx);

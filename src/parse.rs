@@ -402,8 +402,8 @@ impl FmtNodeBuilder<'_> {
                     let heredoc_opening = self.visit_simple_heredoc(node);
                     fmt::Kind::HeredocOpening(heredoc_opening)
                 } else {
-                    let str = self.visit_string(node);
-                    fmt::Kind::Str(str)
+                    let str = self.visit_string_like(node);
+                    fmt::Kind::StringLike(str)
                 };
                 trivia.set_trailing(self.take_trailing_comment(next_loc_start));
                 fmt::Node::new(trivia, kind)
@@ -416,8 +416,8 @@ impl FmtNodeBuilder<'_> {
                     let heredoc_opening = self.visit_complex_heredoc(node);
                     fmt::Kind::HeredocOpening(heredoc_opening)
                 } else {
-                    let str = self.visit_interpolated_string(node);
-                    fmt::Kind::DynStr(str)
+                    let str = self.visit_interpolated(node);
+                    fmt::Kind::DynStringLike(str)
                 };
                 trivia.set_trailing(self.take_trailing_comment(next_loc_start));
                 fmt::Node::new(trivia, kind)
@@ -926,30 +926,30 @@ impl FmtNodeBuilder<'_> {
         (path, trivia)
     }
 
-    fn visit_string(&mut self, node: prism::StringNode) -> fmt::Str {
+    fn visit_string_like(&mut self, node: prism::StringNode) -> fmt::StringLike {
         let value = Self::source_lossy_at(&node.content_loc());
         let opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
         let closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
-        fmt::Str::new(opening, value.into(), closing)
+        fmt::StringLike::new(opening, value.into(), closing)
     }
 
-    fn visit_interpolated_string(&mut self, itp_str: prism::InterpolatedStringNode) -> fmt::DynStr {
-        let opening = itp_str.opening_loc().as_ref().map(Self::source_lossy_at);
-        let closing = itp_str.closing_loc().as_ref().map(Self::source_lossy_at);
-        let mut dstr = fmt::DynStr::new(opening, closing);
-        for part in itp_str.parts().iter() {
+    fn visit_interpolated(&mut self, str: prism::InterpolatedStringNode) -> fmt::DynStringLike {
+        let opening = str.opening_loc().as_ref().map(Self::source_lossy_at);
+        let closing = str.closing_loc().as_ref().map(Self::source_lossy_at);
+        let mut dstr = fmt::DynStringLike::new(opening, closing);
+        for part in str.parts().iter() {
             match part {
                 prism::Node::StringNode { .. } => {
                     let node = part.as_string_node().unwrap();
                     let node_end = node.location().end_offset();
-                    let str = self.visit_string(node);
+                    let str = self.visit_string_like(node);
                     dstr.append_part(fmt::DynStrPart::Str(str));
                     self.last_loc_end = node_end;
                 }
                 prism::Node::InterpolatedStringNode { .. } => {
                     let node = part.as_interpolated_string_node().unwrap();
                     let node_end = node.location().end_offset();
-                    let str = self.visit_interpolated_string(node);
+                    let str = self.visit_interpolated(node);
                     dstr.append_part(fmt::DynStrPart::DynStr(str));
                     self.last_loc_end = node_end;
                 }
@@ -983,7 +983,7 @@ impl FmtNodeBuilder<'_> {
         let open = node.opening_loc().unwrap().as_slice();
         let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
         let opening_id = String::from_utf8_lossy(id).to_string();
-        let str = self.visit_string(node);
+        let str = self.visit_string_like(node);
         let heredoc = fmt::Heredoc {
             id: opening_id.clone(),
             indent_mode,
@@ -1008,7 +1008,7 @@ impl FmtNodeBuilder<'_> {
                 prism::Node::StringNode { .. } => {
                     let node = part.as_string_node().unwrap();
                     let node_end = node.location().end_offset();
-                    let str = self.visit_string(node);
+                    let str = self.visit_string_like(node);
                     parts.push(fmt::HeredocPart::Str(str));
                     self.last_loc_end = node_end;
                     last_str_end = Some(node_end);
@@ -1020,7 +1020,7 @@ impl FmtNodeBuilder<'_> {
                         // I don't know why but ruby-prism ignores spaces before an interpolation in some cases.
                         if last_str_end < loc.start_offset() {
                             let value = self.src[last_str_end..loc.start_offset()].to_vec();
-                            let str = fmt::Str::new(None, value, None);
+                            let str = fmt::StringLike::new(None, value, None);
                             parts.push(fmt::HeredocPart::Str(str))
                         }
                     }
