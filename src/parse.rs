@@ -402,7 +402,11 @@ impl FmtNodeBuilder<'_> {
                     let heredoc_opening = self.visit_simple_heredoc(node);
                     fmt::Kind::HeredocOpening(heredoc_opening)
                 } else {
-                    let str = self.visit_string_like(node);
+                    let str = self.visit_string_like(
+                        node.opening_loc(),
+                        node.content_loc(),
+                        node.closing_loc(),
+                    );
                     fmt::Kind::StringLike(str)
                 };
                 trivia.set_trailing(self.take_trailing_comment(next_loc_start));
@@ -421,6 +425,17 @@ impl FmtNodeBuilder<'_> {
                 };
                 trivia.set_trailing(self.take_trailing_comment(next_loc_start));
                 fmt::Node::new(trivia, kind)
+            }
+
+            prism::Node::SymbolNode { .. } => {
+                let node = node.as_symbol_node().unwrap();
+                let loc = node.location();
+                let mut trivia = self.take_leading_trivia(loc.start_offset());
+                // XXX: I cannot find the case where the value_loc is None.
+                let value_loc = node.value_loc().expect("symbol value must exist");
+                let str = self.visit_string_like(node.opening_loc(), value_loc, node.closing_loc());
+                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+                fmt::Node::new(trivia, fmt::Kind::StringLike(str))
             }
 
             prism::Node::IfNode { .. } => {
@@ -926,10 +941,15 @@ impl FmtNodeBuilder<'_> {
         (path, trivia)
     }
 
-    fn visit_string_like(&mut self, node: prism::StringNode) -> fmt::StringLike {
-        let value = Self::source_lossy_at(&node.content_loc());
-        let opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
-        let closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
+    fn visit_string_like(
+        &mut self,
+        opening_loc: Option<prism::Location>,
+        value_loc: prism::Location,
+        closing_loc: Option<prism::Location>,
+    ) -> fmt::StringLike {
+        let value = Self::source_lossy_at(&value_loc);
+        let opening = opening_loc.as_ref().map(Self::source_lossy_at);
+        let closing = closing_loc.as_ref().map(Self::source_lossy_at);
         fmt::StringLike::new(opening, value.into(), closing)
     }
 
@@ -942,7 +962,11 @@ impl FmtNodeBuilder<'_> {
                 prism::Node::StringNode { .. } => {
                     let node = part.as_string_node().unwrap();
                     let node_end = node.location().end_offset();
-                    let str = self.visit_string_like(node);
+                    let str = self.visit_string_like(
+                        node.opening_loc(),
+                        node.content_loc(),
+                        node.closing_loc(),
+                    );
                     dstr.append_part(fmt::DynStrPart::Str(str));
                     self.last_loc_end = node_end;
                 }
@@ -983,7 +1007,8 @@ impl FmtNodeBuilder<'_> {
         let open = node.opening_loc().unwrap().as_slice();
         let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
         let opening_id = String::from_utf8_lossy(id).to_string();
-        let str = self.visit_string_like(node);
+        let str =
+            self.visit_string_like(node.opening_loc(), node.content_loc(), node.closing_loc());
         let heredoc = fmt::Heredoc {
             id: opening_id.clone(),
             indent_mode,
@@ -1008,7 +1033,11 @@ impl FmtNodeBuilder<'_> {
                 prism::Node::StringNode { .. } => {
                     let node = part.as_string_node().unwrap();
                     let node_end = node.location().end_offset();
-                    let str = self.visit_string_like(node);
+                    let str = self.visit_string_like(
+                        node.opening_loc(),
+                        node.content_loc(),
+                        node.closing_loc(),
+                    );
                     parts.push(fmt::HeredocPart::Str(str));
                     self.last_loc_end = node_end;
                     last_str_end = Some(node_end);

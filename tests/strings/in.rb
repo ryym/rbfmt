@@ -6,6 +6,7 @@
   abc
     あいう😀\n
 }
+%[]
 
 %[foo bar baz]
 %(foo bar baz)
