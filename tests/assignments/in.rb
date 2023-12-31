@@ -86,3 +86,15 @@ a, b, c, = xs
 
   # 5
 ) = xs
+
+a(1, 2).b, (c().d, e) = xs
+
+a.b(1 # 1
+   ).c, d, = xs
+
+a[1], b[2, c.d, e], foo.bar = xs
+
+
+a[1], b[2,
+        # c
+        c.d, e], foo.bar = xs

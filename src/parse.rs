@@ -168,6 +168,36 @@ impl<'src> CallRoot for prism::CallOperatorWriteNode<'src> {
         None
     }
 }
+impl<'src> CallRoot for prism::CallTargetNode<'src> {
+    fn location(&self) -> prism::Location {
+        self.location()
+    }
+    fn receiver(&self) -> Option<prism::Node> {
+        Some(self.receiver())
+    }
+    fn message_loc(&self) -> Option<prism::Location> {
+        Some(self.message_loc())
+    }
+    fn call_operator_loc(&self) -> Option<prism::Location> {
+        Some(self.call_operator_loc())
+    }
+    fn name(&self) -> &[u8] {
+        // We cannot use `name()` because it automatically has `=` suffix.
+        self.message_loc().as_slice()
+    }
+    fn arguments(&self) -> Option<prism::ArgumentsNode> {
+        None
+    }
+    fn opening_loc(&self) -> Option<prism::Location> {
+        None
+    }
+    fn closing_loc(&self) -> Option<prism::Location> {
+        None
+    }
+    fn block(&self) -> Option<prism::Node> {
+        None
+    }
+}
 
 impl<'src> CallRoot for prism::IndexAndWriteNode<'src> {
     fn location(&self) -> prism::Location {
@@ -239,6 +269,35 @@ impl<'src> CallRoot for prism::IndexOperatorWriteNode<'src> {
     }
     fn call_operator_loc(&self) -> Option<prism::Location> {
         self.call_operator_loc()
+    }
+    fn name(&self) -> &[u8] {
+        b"[]"
+    }
+    fn arguments(&self) -> Option<prism::ArgumentsNode> {
+        self.arguments()
+    }
+    fn opening_loc(&self) -> Option<prism::Location> {
+        Some(self.opening_loc())
+    }
+    fn closing_loc(&self) -> Option<prism::Location> {
+        Some(self.closing_loc())
+    }
+    fn block(&self) -> Option<prism::Node> {
+        None
+    }
+}
+impl<'src> CallRoot for prism::IndexTargetNode<'src> {
+    fn location(&self) -> prism::Location {
+        self.location()
+    }
+    fn receiver(&self) -> Option<prism::Node> {
+        Some(self.receiver())
+    }
+    fn message_loc(&self) -> Option<prism::Location> {
+        Some(self.location())
+    }
+    fn call_operator_loc(&self) -> Option<prism::Location> {
+        None
     }
     fn name(&self) -> &[u8] {
         b"[]"
@@ -769,6 +828,20 @@ impl FmtNodeBuilder<'_> {
             prism::Node::ConstantPathTargetNode { .. } => {
                 let (path, trivia) = self.visit_constant_path(node, next_loc_start);
                 fmt::Node::new(trivia, fmt::Kind::Atom(path))
+            }
+            prism::Node::CallTargetNode { .. } => {
+                let node = node.as_call_target_node().unwrap();
+                let mut trivia = self.take_leading_trivia(node.location().start_offset());
+                let chain = self.visit_call_root(&node, next_loc_start, None);
+                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+                fmt::Node::new(trivia, fmt::Kind::MethodChain(chain))
+            }
+            prism::Node::IndexTargetNode { .. } => {
+                let node = node.as_index_target_node().unwrap();
+                let mut trivia = self.take_leading_trivia(node.location().start_offset());
+                let chain = self.visit_call_root(&node, next_loc_start, None);
+                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+                fmt::Node::new(trivia, fmt::Kind::MethodChain(chain))
             }
 
             prism::Node::MultiWriteNode { .. } => {
