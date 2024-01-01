@@ -26,6 +26,10 @@ CC
 aa
 quote quote
 
+<<~`exec`
+  curl example.com
+exec
+
 foo(<<~H1, <<~H2).bar
   h1 content
 H1

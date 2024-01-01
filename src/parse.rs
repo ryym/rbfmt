@@ -399,7 +399,11 @@ impl FmtNodeBuilder<'_> {
                 let loc = node.location();
                 let mut trivia = self.take_leading_trivia(loc.start_offset());
                 let kind = if Self::is_heredoc(node.opening_loc().as_ref()) {
-                    let heredoc_opening = self.visit_simple_heredoc(node);
+                    let heredoc_opening = self.visit_simple_heredoc(
+                        node.opening_loc(),
+                        node.content_loc(),
+                        node.closing_loc(),
+                    );
                     fmt::Kind::HeredocOpening(heredoc_opening)
                 } else {
                     let str = self.visit_string_like(
@@ -426,6 +430,29 @@ impl FmtNodeBuilder<'_> {
                         node.closing_loc(),
                     );
                     fmt::Kind::DynStringLike(str)
+                };
+                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+                fmt::Node::new(trivia, kind)
+            }
+
+            prism::Node::XStringNode { .. } => {
+                let node = node.as_x_string_node().unwrap();
+                let loc = node.location();
+                let mut trivia = self.take_leading_trivia(loc.start_offset());
+                let kind = if Self::is_heredoc(Some(&node.opening_loc())) {
+                    let heredoc_opening = self.visit_simple_heredoc(
+                        Some(node.opening_loc()),
+                        node.content_loc(),
+                        Some(node.closing_loc()),
+                    );
+                    fmt::Kind::HeredocOpening(heredoc_opening)
+                } else {
+                    let str = self.visit_string_like(
+                        Some(node.opening_loc()),
+                        node.content_loc(),
+                        Some(node.closing_loc()),
+                    );
+                    fmt::Kind::StringLike(str)
                 };
                 trivia.set_trailing(self.take_trailing_comment(next_loc_start));
                 fmt::Node::new(trivia, kind)
@@ -1026,13 +1053,18 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn visit_simple_heredoc(&mut self, node: prism::StringNode) -> fmt::HeredocOpening {
-        let open = node.opening_loc().unwrap().as_slice();
+    fn visit_simple_heredoc(
+        &mut self,
+        opening_loc: Option<prism::Location>,
+        content_loc: prism::Location,
+        closing_loc: Option<prism::Location>,
+    ) -> fmt::HeredocOpening {
+        let open = opening_loc.as_ref().unwrap().as_slice();
         let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
         let opening_id = String::from_utf8_lossy(id).to_string();
-        let closing_loc = node.closing_loc().expect("heredoc must have closing");
+        let closing_loc = closing_loc.expect("heredoc must have closing");
         let closing_id = Self::source_lossy_at(&closing_loc).trim().to_string();
-        let str = self.visit_string_like(None, node.content_loc(), None);
+        let str = self.visit_string_like(None, content_loc, None);
         let heredoc = fmt::Heredoc {
             id: closing_id,
             indent_mode,

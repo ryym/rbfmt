@@ -1,5 +1,6 @@
 'abcあいう😀\n'
 "abcあいう😀\n"
+`abcあいう😀\n`
 %q{abcあいう😀\n} # a
 %{abcあいう😀\n} # b
 %Q{
