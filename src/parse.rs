@@ -377,6 +377,7 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(fmt::Trivia::new(), kind)
             }
 
+            prism::Node::SelfNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::NilNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::TrueNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::FalseNode { .. } => self.parse_atom(node, next_loc_start),

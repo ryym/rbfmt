@@ -11,3 +11,6 @@ Foo::Bar::Baz
 
 # b
 Foo::Bar::Baz # c
+
+self
+self.foo # foo

@@ -13,3 +13,6 @@ Foo::
 
   Bar:: # b
   Baz # c
+
+self
+self.foo # foo
