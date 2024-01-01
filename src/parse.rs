@@ -389,6 +389,8 @@ impl FmtNodeBuilder<'_> {
             prism::Node::InstanceVariableReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ClassVariableReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::GlobalVariableReadNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::BackReferenceReadNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::NumberedReferenceReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ConstantReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ConstantPathNode { .. } => {
                 let (path, trivia) = self.visit_constant_path(node, next_loc_start);

@@ -14,3 +14,8 @@ Foo::Bar::Baz # c
 
 self
 self.foo # foo
+
+$'
+$&
+$1
+$99999

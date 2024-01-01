@@ -16,3 +16,8 @@ Foo::
 
 self
 self.foo # foo
+
+$'
+$&
+$1
+$99999
