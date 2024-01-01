@@ -1122,8 +1122,13 @@ impl FmtNodeBuilder<'_> {
                 _ => panic!("unexpected heredoc part: {:?}", part),
             }
         }
+        let closing_loc = node.closing_loc().expect("heredoc must have closing");
+        let closing_id = Self::source_lossy_at(&closing_loc)
+            .trim_start()
+            .trim_end_matches('\n')
+            .to_string();
         let heredoc = fmt::Heredoc {
-            id: opening_id.clone(),
+            id: closing_id,
             indent_mode,
             parts,
         };

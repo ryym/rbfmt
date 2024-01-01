@@ -30,6 +30,14 @@ quote quote
 aa
 end-with-space 
 
+<<-"quote quote"
+aa#{1}
+quote quote
+
+<<-"end-with-space "
+aa#{1}
+end-with-space 
+
 <<~`exec`
   curl example.com
 exec
