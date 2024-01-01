@@ -22,6 +22,10 @@ BB
   squiggly
 CC
 
+<<-'quote quote'
+aa
+quote quote
+
 foo(<<~H1, <<~H2).bar
   h1 content
 H1
