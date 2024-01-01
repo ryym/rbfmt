@@ -26,6 +26,10 @@ CC
 aa
 quote quote
 
+<<-'end-with-space '
+aa
+end-with-space 
+
 <<~`exec`
   curl example.com
 exec

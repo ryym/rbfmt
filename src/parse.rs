@@ -1063,7 +1063,10 @@ impl FmtNodeBuilder<'_> {
         let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
         let opening_id = String::from_utf8_lossy(id).to_string();
         let closing_loc = closing_loc.expect("heredoc must have closing");
-        let closing_id = Self::source_lossy_at(&closing_loc).trim().to_string();
+        let closing_id = Self::source_lossy_at(&closing_loc)
+            .trim_start()
+            .trim_end_matches('\n')
+            .to_string();
         let str = self.visit_string_like(None, content_loc, None);
         let heredoc = fmt::Heredoc {
             id: closing_id,
