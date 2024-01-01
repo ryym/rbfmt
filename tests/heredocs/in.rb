@@ -42,6 +42,10 @@ end-with-space
   curl example.com
 exec
 
+<<~`exec`
+  curl example.com/#{Date.now}
+exec
+
 foo(<<~H1, <<~H2).bar
   h1 content
 H1
