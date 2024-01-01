@@ -420,7 +420,11 @@ impl FmtNodeBuilder<'_> {
                     let heredoc_opening = self.visit_complex_heredoc(node);
                     fmt::Kind::HeredocOpening(heredoc_opening)
                 } else {
-                    let str = self.visit_interpolated(node);
+                    let str = self.visit_interpolated(
+                        node.opening_loc(),
+                        node.parts(),
+                        node.closing_loc(),
+                    );
                     fmt::Kind::DynStringLike(str)
                 };
                 trivia.set_trailing(self.take_trailing_comment(next_loc_start));
@@ -436,6 +440,16 @@ impl FmtNodeBuilder<'_> {
                 let str = self.visit_string_like(node.opening_loc(), value_loc, node.closing_loc());
                 trivia.set_trailing(self.take_trailing_comment(next_loc_start));
                 fmt::Node::new(trivia, fmt::Kind::StringLike(str))
+            }
+            prism::Node::InterpolatedSymbolNode { .. } => {
+                let node = node.as_interpolated_symbol_node().unwrap();
+                let loc = node.location();
+                let mut trivia = self.take_leading_trivia(loc.start_offset());
+                let str =
+                    self.visit_interpolated(node.opening_loc(), node.parts(), node.closing_loc());
+                let kind = fmt::Kind::DynStringLike(str);
+                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+                fmt::Node::new(trivia, kind)
             }
 
             prism::Node::IfNode { .. } => {
@@ -953,11 +967,16 @@ impl FmtNodeBuilder<'_> {
         fmt::StringLike::new(opening, value.into(), closing)
     }
 
-    fn visit_interpolated(&mut self, str: prism::InterpolatedStringNode) -> fmt::DynStringLike {
-        let opening = str.opening_loc().as_ref().map(Self::source_lossy_at);
-        let closing = str.closing_loc().as_ref().map(Self::source_lossy_at);
+    fn visit_interpolated(
+        &mut self,
+        opening_loc: Option<prism::Location>,
+        parts: prism::NodeList,
+        closing_loc: Option<prism::Location>,
+    ) -> fmt::DynStringLike {
+        let opening = opening_loc.as_ref().map(Self::source_lossy_at);
+        let closing = closing_loc.as_ref().map(Self::source_lossy_at);
         let mut dstr = fmt::DynStringLike::new(opening, closing);
-        for part in str.parts().iter() {
+        for part in parts.iter() {
             match part {
                 prism::Node::StringNode { .. } => {
                     let node = part.as_string_node().unwrap();
@@ -973,7 +992,11 @@ impl FmtNodeBuilder<'_> {
                 prism::Node::InterpolatedStringNode { .. } => {
                     let node = part.as_interpolated_string_node().unwrap();
                     let node_end = node.location().end_offset();
-                    let str = self.visit_interpolated(node);
+                    let str = self.visit_interpolated(
+                        node.opening_loc(),
+                        node.parts(),
+                        node.closing_loc(),
+                    );
                     dstr.append_part(fmt::DynStrPart::DynStr(str));
                     self.last_loc_end = node_end;
                 }
