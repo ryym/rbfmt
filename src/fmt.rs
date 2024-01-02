@@ -87,6 +87,7 @@ pub(crate) enum Kind {
     Assign(Assign),
     MultiAssignTarget(MultiAssignTarget),
     Splat(Box<Node>),
+    Array(Array),
 }
 
 impl Kind {
@@ -103,6 +104,7 @@ impl Kind {
             Self::Assign(assign) => assign.width,
             Self::MultiAssignTarget(multi) => multi.width,
             Self::Splat(node) => node.width.add(&Width::Flat(1)),
+            Self::Array(array) => array.width,
         }
     }
 }
@@ -551,6 +553,51 @@ impl MultiAssignTarget {
 }
 
 #[derive(Debug)]
+pub(crate) struct Array {
+    width: Width,
+    opening: String,
+    closing: String,
+    elements: Vec<Node>,
+    virtual_end: Option<VirtualEnd>,
+}
+
+impl Array {
+    pub(crate) fn new(opening: String, closing: String) -> Self {
+        let width = Width::Flat(opening.len() + closing.len());
+        Self {
+            width,
+            opening,
+            closing,
+            elements: vec![],
+            virtual_end: None,
+        }
+    }
+
+    pub(crate) fn separator(&self) -> &str {
+        if self.opening.as_bytes()[0] == b'%' {
+            ""
+        } else {
+            ","
+        }
+    }
+
+    pub(crate) fn append_element(&mut self, element: Node) {
+        if !self.elements.is_empty() {
+            self.width.append_value(self.separator().len() + 1);
+        }
+        self.width.append(&element.width);
+        self.elements.push(element);
+    }
+
+    pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
+        if let Some(end) = &end {
+            self.width.append(&end.width);
+        }
+        self.virtual_end = end;
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Trivia {
     pub leading: Vec<LineTrivia>,
     pub trailing: Option<Comment>,
@@ -642,6 +689,7 @@ impl Formatter {
             Kind::Assign(assign) => self.format_assign(assign, ctx),
             Kind::MultiAssignTarget(multi) => self.format_multi_assign_target(multi, ctx),
             Kind::Splat(node) => self.format_splat(node, ctx),
+            Kind::Array(array) => self.format_array(array, ctx),
         }
     }
 
@@ -1092,6 +1140,48 @@ impl Formatter {
     fn format_splat(&mut self, target: &Node, ctx: &FormatContext) {
         self.push('*');
         self.format(target, ctx);
+    }
+
+    fn format_array(&mut self, array: &Array, ctx: &FormatContext) {
+        if array.width.fits_in(self.remaining_width) {
+            self.push_str(&array.opening);
+            for (i, n) in array.elements.iter().enumerate() {
+                if i > 0 {
+                    self.push_str(array.separator());
+                    self.push(' ');
+                }
+                self.format(n, ctx);
+            }
+            self.push_str(&array.closing);
+        } else {
+            self.push_str(&array.opening);
+            self.indent();
+            for (i, arg) in array.elements.iter().enumerate() {
+                self.break_line(ctx);
+                self.write_leading_trivia(
+                    &arg.trivia.leading,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: i == 0,
+                        end: false,
+                    },
+                );
+                self.put_indent();
+                self.format(arg, ctx);
+                self.push_str(array.separator());
+                self.write_trailing_comment(&arg.trivia.trailing);
+            }
+            self.write_trivia_at_virtual_end(
+                ctx,
+                &array.virtual_end,
+                true,
+                array.elements.is_empty(),
+            );
+            self.dedent();
+            self.break_line(ctx);
+            self.put_indent();
+            self.push_str(&array.closing);
+        }
     }
 
     fn write_leading_trivia(

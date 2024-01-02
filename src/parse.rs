@@ -959,6 +959,32 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Splat(Box::new(target)))
             }
 
+            prism::Node::ArrayNode { .. } => {
+                let node = node.as_array_node().unwrap();
+                // XXX: I cannot find the case where the opening and closing are None.
+                let (opening_loc, closing_loc) = match (node.opening_loc(), node.closing_loc()) {
+                    (Some(op), Some(cl)) => (op, cl),
+                    _ => panic!("array must have opening and closing"),
+                };
+                let mut trivia = self.take_leading_trivia(node.location().start_offset());
+                let opening = Self::source_lossy_at(&opening_loc);
+                let closing = Self::source_lossy_at(&closing_loc);
+                let mut array = fmt::Array::new(opening, closing);
+                let closing_start = closing_loc.start_offset();
+                Self::each_node_with_next_start(
+                    node.elements().iter(),
+                    closing_start,
+                    |node, next_start| {
+                        let element = self.visit(node, next_start);
+                        array.append_element(element);
+                    },
+                );
+                let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
+                array.set_virtual_end(virtual_end);
+                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+                fmt::Node::new(trivia, fmt::Kind::Array(array))
+            }
+
             _ => todo!("parse {:?}", node),
         };
 
