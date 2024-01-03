@@ -1242,10 +1242,10 @@ impl Formatter {
         } else {
             self.push_str(&array.opening);
             self.indent();
-            for (i, arg) in array.elements.iter().enumerate() {
+            for (i, element) in array.elements.iter().enumerate() {
                 self.break_line(ctx);
                 self.write_leading_trivia(
-                    &arg.trivia.leading,
+                    &element.trivia.leading,
                     ctx,
                     EmptyLineHandling::Trim {
                         start: i == 0,
@@ -1253,9 +1253,9 @@ impl Formatter {
                     },
                 );
                 self.put_indent();
-                self.format(arg, ctx);
+                self.format(element, ctx);
                 self.push_str(array.separator());
-                self.write_trailing_comment(&arg.trivia.trailing);
+                self.write_trailing_comment(&element.trivia.trailing);
             }
             self.write_trivia_at_virtual_end(
                 ctx,
@@ -1285,10 +1285,10 @@ impl Formatter {
         } else {
             self.push_str(&hash.opening);
             self.indent();
-            for (i, arg) in hash.elements.iter().enumerate() {
+            for (i, element) in hash.elements.iter().enumerate() {
                 self.break_line(ctx);
                 self.write_leading_trivia(
-                    &arg.trivia.leading,
+                    &element.trivia.leading,
                     ctx,
                     EmptyLineHandling::Trim {
                         start: i == 0,
@@ -1296,9 +1296,9 @@ impl Formatter {
                     },
                 );
                 self.put_indent();
-                self.format(arg, ctx);
+                self.format(element, ctx);
                 self.push(',');
-                self.write_trailing_comment(&arg.trivia.trailing);
+                self.write_trailing_comment(&element.trivia.trailing);
             }
             self.write_trivia_at_virtual_end(
                 ctx,
