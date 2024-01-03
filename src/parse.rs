@@ -1034,6 +1034,9 @@ impl FmtNodeBuilder<'_> {
                 let assoc = fmt::Assoc::new(key, operator, value);
                 fmt::Node::new(trivia, fmt::Kind::Assoc(assoc))
             }
+            prism::Node::ImplicitNode { .. } => {
+                fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Atom("".to_string()))
+            }
 
             _ => todo!("parse {:?}", node),
         };

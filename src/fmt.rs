@@ -37,6 +37,13 @@ impl Width {
         }
     }
 
+    pub(crate) fn is_empty(&self) -> bool {
+        match self {
+            Self::Flat(w) => *w == 0,
+            Self::NotFlat => false,
+        }
+    }
+
     pub(crate) fn add(self, other: &Self) -> Self {
         match (&self, other) {
             (Self::Flat(w1), Self::Flat(w2)) => Self::Flat(*w1 + w2),
@@ -1315,15 +1322,18 @@ impl Formatter {
 
     fn format_assoc(&mut self, assoc: &Assoc, ctx: &FormatContext) {
         self.format(&assoc.key, ctx);
-        self.push(' ');
         if assoc.value.width.fits_in(self.remaining_width) {
             if let Some(op) = &assoc.operator {
-                self.push_str(op);
                 self.push(' ');
+                self.push_str(op);
             }
-            self.format(&assoc.value, ctx);
+            if !assoc.value.width.is_empty() {
+                self.push(' ');
+                self.format(&assoc.value, ctx);
+            }
         } else {
             if let Some(op) = &assoc.operator {
+                self.push(' ');
                 self.push_str(op);
             }
             self.break_line(ctx);
