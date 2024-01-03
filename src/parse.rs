@@ -985,6 +985,44 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(trivia, fmt::Kind::Array(array))
             }
 
+            prism::Node::HashNode { .. } => {
+                let node = node.as_hash_node().unwrap();
+                let mut trivia = self.take_leading_trivia(node.location().start_offset());
+                let opening_loc = node.opening_loc();
+                let closing_loc = node.closing_loc();
+                let opening = Self::source_lossy_at(&opening_loc);
+                let closing = Self::source_lossy_at(&closing_loc);
+                let mut hash = fmt::Hash::new(opening, closing);
+                let closing_start = closing_loc.start_offset();
+                Self::each_node_with_next_start(
+                    node.elements().iter(),
+                    closing_start,
+                    |node, next_start| {
+                        let element = self.visit(node, next_start);
+                        hash.append_element(element);
+                    },
+                );
+                let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
+                hash.set_virtual_end(virtual_end);
+                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+                fmt::Node::new(trivia, fmt::Kind::Hash(hash))
+            }
+            prism::Node::AssocNode { .. } => {
+                let node = node.as_assoc_node().unwrap();
+                let mut trivia = self.take_leading_trivia(node.location().start_offset());
+                let key = node.key();
+                let key_loc = key.location();
+                let key = self.visit(key, key_loc.end_offset());
+                let operator = node.operator_loc().map(|l| Self::source_lossy_at(&l));
+                // XXX: I cannot find the case where the value is None.
+                let value = node.value().expect("assoc node must have value");
+                let value_loc = value.location();
+                let value = self.visit(value, value_loc.end_offset());
+                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+                let assoc = fmt::Assoc::new(key, operator, value);
+                fmt::Node::new(trivia, fmt::Kind::Assoc(assoc))
+            }
+
             _ => todo!("parse {:?}", node),
         };
 

@@ -88,6 +88,8 @@ pub(crate) enum Kind {
     MultiAssignTarget(MultiAssignTarget),
     Splat(Box<Node>),
     Array(Array),
+    Hash(Hash),
+    Assoc(Assoc),
 }
 
 impl Kind {
@@ -105,6 +107,8 @@ impl Kind {
             Self::MultiAssignTarget(multi) => multi.width,
             Self::Splat(node) => node.width.add(&Width::Flat(1)),
             Self::Array(array) => array.width,
+            Self::Hash(hash) => hash.width,
+            Self::Assoc(assoc) => assoc.width,
         }
     }
 }
@@ -598,6 +602,68 @@ impl Array {
 }
 
 #[derive(Debug)]
+pub(crate) struct Hash {
+    width: Width,
+    opening: String,
+    closing: String,
+    elements: Vec<Node>,
+    virtual_end: Option<VirtualEnd>,
+}
+
+impl Hash {
+    pub(crate) fn new(opening: String, closing: String) -> Self {
+        let width = Width::Flat(opening.len() + closing.len());
+        Self {
+            width,
+            opening,
+            closing,
+            elements: vec![],
+            virtual_end: None,
+        }
+    }
+
+    pub(crate) fn append_element(&mut self, element: Node) {
+        if !self.elements.is_empty() {
+            self.width.append_value(", ".len());
+        }
+        self.width.append(&element.width);
+        self.elements.push(element);
+    }
+
+    pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
+        if let Some(end) = &end {
+            self.width.append(&end.width);
+        }
+        self.virtual_end = end;
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Assoc {
+    width: Width,
+    key: Box<Node>,
+    value: Box<Node>,
+    operator: Option<String>,
+}
+
+impl Assoc {
+    pub(crate) fn new(key: Node, operator: Option<String>, value: Node) -> Self {
+        let mut width = key.width.add(&value.width);
+        width.append_value(1); // space
+        if let Some(op) = &operator {
+            width.append_value(op.len());
+            width.append_value(1); // space
+        }
+        Self {
+            width,
+            key: Box::new(key),
+            value: Box::new(value),
+            operator,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Trivia {
     pub leading: Vec<LineTrivia>,
     pub trailing: Option<Comment>,
@@ -690,6 +756,8 @@ impl Formatter {
             Kind::MultiAssignTarget(multi) => self.format_multi_assign_target(multi, ctx),
             Kind::Splat(node) => self.format_splat(node, ctx),
             Kind::Array(array) => self.format_array(array, ctx),
+            Kind::Hash(hash) => self.format_hash(hash, ctx),
+            Kind::Assoc(assoc) => self.format_assoc(assoc, ctx),
         }
     }
 
@@ -1181,6 +1249,78 @@ impl Formatter {
             self.break_line(ctx);
             self.put_indent();
             self.push_str(&array.closing);
+        }
+    }
+
+    fn format_hash(&mut self, hash: &Hash, ctx: &FormatContext) {
+        if hash.width.fits_in(self.remaining_width) {
+            self.push_str(&hash.opening);
+            self.push(' ');
+            for (i, n) in hash.elements.iter().enumerate() {
+                if i > 0 {
+                    self.push_str(", ");
+                }
+                self.format(n, ctx);
+            }
+            self.push(' ');
+            self.push_str(&hash.closing);
+        } else {
+            self.push_str(&hash.opening);
+            self.indent();
+            for (i, arg) in hash.elements.iter().enumerate() {
+                self.break_line(ctx);
+                self.write_leading_trivia(
+                    &arg.trivia.leading,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: i == 0,
+                        end: false,
+                    },
+                );
+                self.put_indent();
+                self.format(arg, ctx);
+                self.push(',');
+                self.write_trailing_comment(&arg.trivia.trailing);
+            }
+            self.write_trivia_at_virtual_end(
+                ctx,
+                &hash.virtual_end,
+                true,
+                hash.elements.is_empty(),
+            );
+            self.dedent();
+            self.break_line(ctx);
+            self.put_indent();
+            self.push_str(&hash.closing);
+        }
+    }
+
+    fn format_assoc(&mut self, assoc: &Assoc, ctx: &FormatContext) {
+        self.format(&assoc.key, ctx);
+        self.push(' ');
+        if assoc.value.width.fits_in(self.remaining_width) {
+            if let Some(op) = &assoc.operator {
+                self.push_str(op);
+                self.push(' ');
+            }
+            self.format(&assoc.value, ctx);
+        } else {
+            if let Some(op) = &assoc.operator {
+                self.push_str(op);
+            }
+            self.break_line(ctx);
+            self.indent();
+            self.write_leading_trivia(
+                &assoc.value.trivia.leading,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: true,
+                    end: true,
+                },
+            );
+            self.put_indent();
+            self.format(&assoc.value, ctx);
+            self.dedent();
         }
     }
 
