@@ -955,9 +955,19 @@ impl FmtNodeBuilder<'_> {
             prism::Node::SplatNode { .. } => {
                 let node = node.as_splat_node().unwrap();
                 let operator = Self::source_lossy_at(&node.operator_loc());
+                // XXX: I cannot find the case where the expression is None.
                 let expr = node.expression().expect("SplatNode must have expression");
                 let expr = self.visit(expr, next_loc_start);
                 let splat = fmt::Splat::new(operator, expr);
+                fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Splat(splat))
+            }
+            prism::Node::AssocSplatNode { .. } => {
+                let node = node.as_assoc_splat_node().unwrap();
+                let operator = Self::source_lossy_at(&node.operator_loc());
+                // XXX: I cannot find the case where the value is None.
+                let value = node.value().expect("AssocSplatNode must have value");
+                let value = self.visit(value, next_loc_start);
+                let splat = fmt::Splat::new(operator, value);
                 fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Splat(splat))
             }
 
