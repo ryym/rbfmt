@@ -954,9 +954,11 @@ impl FmtNodeBuilder<'_> {
 
             prism::Node::SplatNode { .. } => {
                 let node = node.as_splat_node().unwrap();
-                let target = node.expression().expect("SplatNode must have expression");
-                let target = self.visit(target, next_loc_start);
-                fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Splat(Box::new(target)))
+                let operator = Self::source_lossy_at(&node.operator_loc());
+                let expr = node.expression().expect("SplatNode must have expression");
+                let expr = self.visit(expr, next_loc_start);
+                let splat = fmt::Splat::new(operator, expr);
+                fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Splat(splat))
             }
 
             prism::Node::ArrayNode { .. } => {

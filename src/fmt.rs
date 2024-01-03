@@ -86,7 +86,7 @@ pub(crate) enum Kind {
     MethodChain(MethodChain),
     Assign(Assign),
     MultiAssignTarget(MultiAssignTarget),
-    Splat(Box<Node>),
+    Splat(Splat),
     Array(Array),
     Hash(Hash),
     Assoc(Assoc),
@@ -105,7 +105,7 @@ impl Kind {
             Self::MethodChain(chain) => chain.width,
             Self::Assign(assign) => assign.width,
             Self::MultiAssignTarget(multi) => multi.width,
-            Self::Splat(node) => node.width.add(&Width::Flat(1)),
+            Self::Splat(splat) => splat.width,
             Self::Array(array) => array.width,
             Self::Hash(hash) => hash.width,
             Self::Assoc(assoc) => assoc.width,
@@ -602,6 +602,24 @@ impl Array {
 }
 
 #[derive(Debug)]
+pub(crate) struct Splat {
+    width: Width,
+    operator: String,
+    expression: Box<Node>,
+}
+
+impl Splat {
+    pub(crate) fn new(operator: String, expression: Node) -> Self {
+        let width = Width::Flat(operator.len()).add(&expression.width);
+        Self {
+            width,
+            operator,
+            expression: Box::new(expression),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Hash {
     width: Width,
     opening: String,
@@ -754,7 +772,7 @@ impl Formatter {
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
             Kind::Assign(assign) => self.format_assign(assign, ctx),
             Kind::MultiAssignTarget(multi) => self.format_multi_assign_target(multi, ctx),
-            Kind::Splat(node) => self.format_splat(node, ctx),
+            Kind::Splat(splat) => self.format_splat(splat, ctx),
             Kind::Array(array) => self.format_array(array, ctx),
             Kind::Hash(hash) => self.format_hash(hash, ctx),
             Kind::Assoc(assoc) => self.format_assoc(assoc, ctx),
@@ -1205,9 +1223,9 @@ impl Formatter {
         }
     }
 
-    fn format_splat(&mut self, target: &Node, ctx: &FormatContext) {
-        self.push('*');
-        self.format(target, ctx);
+    fn format_splat(&mut self, splat: &Splat, ctx: &FormatContext) {
+        self.push_str(&splat.operator);
+        self.format(&splat.expression, ctx);
     }
 
     fn format_array(&mut self, array: &Array, ctx: &FormatContext) {
