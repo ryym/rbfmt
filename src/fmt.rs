@@ -96,6 +96,7 @@ pub(crate) enum Kind {
     Splat(Splat),
     Array(Array),
     Hash(Hash),
+    KeywordHash(KeywordHash),
     Assoc(Assoc),
 }
 
@@ -115,6 +116,7 @@ impl Kind {
             Self::Splat(splat) => splat.width,
             Self::Array(array) => array.width,
             Self::Hash(hash) => hash.width,
+            Self::KeywordHash(khash) => khash.width,
             Self::Assoc(assoc) => assoc.width,
         }
     }
@@ -664,6 +666,30 @@ impl Hash {
 }
 
 #[derive(Debug)]
+pub(crate) struct KeywordHash {
+    width: Width,
+    elements: Vec<Node>,
+}
+
+impl KeywordHash {
+    pub(crate) fn new() -> Self {
+        let width = Width::Flat(0);
+        Self {
+            width,
+            elements: vec![],
+        }
+    }
+
+    pub(crate) fn append_element(&mut self, element: Node) {
+        if !self.elements.is_empty() {
+            self.width.append_value(", ".len());
+        }
+        self.width.append(&element.width);
+        self.elements.push(element);
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Assoc {
     width: Width,
     key: Box<Node>,
@@ -782,6 +808,7 @@ impl Formatter {
             Kind::Splat(splat) => self.format_splat(splat, ctx),
             Kind::Array(array) => self.format_array(array, ctx),
             Kind::Hash(hash) => self.format_hash(hash, ctx),
+            Kind::KeywordHash(khash) => self.format_keyword_hash(khash, ctx),
             Kind::Assoc(assoc) => self.format_assoc(assoc, ctx),
         }
     }
@@ -1317,6 +1344,38 @@ impl Formatter {
             self.break_line(ctx);
             self.put_indent();
             self.push_str(&hash.closing);
+        }
+    }
+
+    fn format_keyword_hash(&mut self, khash: &KeywordHash, ctx: &FormatContext) {
+        if khash.width.fits_in(self.remaining_width) {
+            for (i, n) in khash.elements.iter().enumerate() {
+                if i > 0 {
+                    self.push_str(", ");
+                }
+                self.format(n, ctx);
+            }
+        } else {
+            let last_idx = khash.elements.len() - 1;
+            for (i, element) in khash.elements.iter().enumerate() {
+                if i > 0 {
+                    self.break_line(ctx);
+                    self.write_leading_trivia(
+                        &element.trivia.leading,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: false,
+                            end: false,
+                        },
+                    );
+                    self.put_indent();
+                }
+                self.format(element, ctx);
+                if i < last_idx {
+                    self.push(',');
+                }
+                self.write_trailing_comment(&element.trivia.trailing);
+            }
         }
     }
 
