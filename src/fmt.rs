@@ -966,10 +966,7 @@ impl Formatter {
         }
 
         let if_trivia = &expr.if_first.trivia;
-        self.format_trivia_in_keyword_gap(ctx, if_trivia, &expr.if_first.cond.trivia, |self_| {
-            self_.put_indent(); // XXX: necessary only when trivia exists after keyword.
-            self_.format(&expr.if_first.cond, ctx);
-        });
+        self.format_node_after_keyword(ctx, if_trivia, &expr.if_first.cond);
         if !expr.if_first.body.is_empty() {
             self.break_line(ctx);
             self.format_exprs(&expr.if_first.body, ctx, true);
@@ -981,10 +978,7 @@ impl Formatter {
             self.put_indent();
             self.push_str("elsif");
             let elsif_trivia = &elsif.trivia;
-            self.format_trivia_in_keyword_gap(ctx, elsif_trivia, &elsif.cond.trivia, |self_| {
-                self_.put_indent();
-                self_.format(&elsif.cond, ctx);
-            });
+            self.format_node_after_keyword(ctx, elsif_trivia, &elsif.cond);
             if !elsif.body.is_empty() {
                 self.break_line(ctx);
                 self.format_exprs(&elsif.body, ctx, true);
@@ -1016,38 +1010,30 @@ impl Formatter {
         self.push_str(&modifier.keyword);
 
         let if_trivia = &modifier.conditional.trivia;
-        self.format_trivia_in_keyword_gap(
-            ctx,
-            if_trivia,
-            &modifier.conditional.cond.trivia,
-            |self_| {
-                self_.put_indent();
-                self_.format(&modifier.conditional.cond, ctx);
-            },
-        );
+        self.format_node_after_keyword(ctx, if_trivia, &modifier.conditional.cond);
         self.dedent();
     }
 
     // Handle comments like "if # foo\n #bar\n predicate"
-    fn format_trivia_in_keyword_gap(
+    fn format_node_after_keyword(
         &mut self,
         ctx: &FormatContext,
         keyword_trivia: &Trivia,
-        next_trivia: &Trivia,
-        next_node: impl FnOnce(&mut Self),
+        node: &Node,
     ) {
-        if keyword_trivia.trailing.is_none() && next_trivia.leading.is_empty() {
+        if keyword_trivia.trailing.is_none() && node.trivia.leading.is_empty() {
             self.push(' ');
-            next_node(self);
-            self.write_trailing_comment(&next_trivia.trailing);
+            self.format(node, ctx);
+            self.write_trailing_comment(&node.trivia.trailing);
             self.indent();
         } else {
             self.write_trailing_comment(&keyword_trivia.trailing);
             self.indent();
             self.break_line(ctx);
-            self.write_leading_trivia(&next_trivia.leading, ctx, EmptyLineHandling::trim_start());
-            next_node(self);
-            self.write_trailing_comment(&next_trivia.trailing);
+            self.write_leading_trivia(&node.trivia.leading, ctx, EmptyLineHandling::trim_start());
+            self.put_indent();
+            self.format(node, ctx);
+            self.write_trailing_comment(&node.trivia.trailing);
         }
     }
 
