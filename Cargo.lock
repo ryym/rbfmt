@@ -266,6 +266,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "rbf"
+version = "0.1.0"
+dependencies = [
+ "ruby-prism",
+ "similar-asserts",
+]
+
+[[package]]
 name = "regex"
 version = "1.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -319,14 +327,6 @@ checksum = "ceac5aac8065f4ba15114c9b72f7bd3c6d83cf8cb6b6350c8e055b57b83ca0cf"
 dependencies = [
  "bindgen",
  "cc",
-]
-
-[[package]]
-name = "rubyfmt"
-version = "0.1.0"
-dependencies = [
- "ruby-prism",
- "similar-asserts",
 ]
 
 [[package]]

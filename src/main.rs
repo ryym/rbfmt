@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     let source = fs::read(path)?;
-    let result = rubyfmt::format(source);
+    let result = rbf::format(source);
     print!("{}", result);
     Ok(())
 }
