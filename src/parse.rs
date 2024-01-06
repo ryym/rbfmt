@@ -368,13 +368,13 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_program_node().unwrap();
                 let exprs = self.visit_statements(Some(node.statements()), next_loc_start);
                 let kind = fmt::Kind::Exprs(exprs);
-                fmt::Node::new(fmt::Trivia::new(), kind)
+                fmt::Node::without_trivia(kind)
             }
             prism::Node::StatementsNode { .. } => {
                 let node = node.as_statements_node().unwrap();
                 let exprs = self.visit_statements(Some(node), next_loc_start);
                 let kind = fmt::Kind::Exprs(exprs);
-                fmt::Node::new(fmt::Trivia::new(), kind)
+                fmt::Node::without_trivia(kind)
             }
 
             prism::Node::SelfNode { .. } => self.parse_atom(node, next_loc_start),
@@ -393,14 +393,14 @@ impl FmtNodeBuilder<'_> {
             prism::Node::NumberedReferenceReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ConstantReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ConstantPathNode { .. } => {
-                let (path, trivia) = self.visit_constant_path(node, next_loc_start);
-                fmt::Node::new(trivia, fmt::Kind::Atom(path))
+                let (leading, path, trailing) = self.visit_constant_path(node, next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Atom(path), trailing)
             }
 
             prism::Node::StringNode { .. } => {
                 let node = node.as_string_node().unwrap();
                 let loc = node.location();
-                let mut trivia = self.take_leading_trivia(loc.start_offset());
+                let leading = self.take_leading_trivia(loc.start_offset());
                 let kind = if Self::is_heredoc(node.opening_loc().as_ref()) {
                     let heredoc_opening = self.visit_simple_heredoc(
                         node.opening_loc(),
@@ -416,13 +416,13 @@ impl FmtNodeBuilder<'_> {
                     );
                     fmt::Kind::StringLike(str)
                 };
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(trivia, kind)
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, kind, trailing)
             }
             prism::Node::InterpolatedStringNode { .. } => {
                 let node = node.as_interpolated_string_node().unwrap();
                 let loc = node.location();
-                let mut trivia = self.take_leading_trivia(loc.start_offset());
+                let leading = self.take_leading_trivia(loc.start_offset());
                 let kind = if Self::is_heredoc(node.opening_loc().as_ref()) {
                     let heredoc_opening = self.visit_complex_heredoc(
                         node.opening_loc(),
@@ -438,14 +438,14 @@ impl FmtNodeBuilder<'_> {
                     );
                     fmt::Kind::DynStringLike(str)
                 };
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(trivia, kind)
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, kind, trailing)
             }
 
             prism::Node::XStringNode { .. } => {
                 let node = node.as_x_string_node().unwrap();
                 let loc = node.location();
-                let mut trivia = self.take_leading_trivia(loc.start_offset());
+                let leading = self.take_leading_trivia(loc.start_offset());
                 let kind = if Self::is_heredoc(Some(&node.opening_loc())) {
                     let heredoc_opening = self.visit_simple_heredoc(
                         Some(node.opening_loc()),
@@ -461,13 +461,13 @@ impl FmtNodeBuilder<'_> {
                     );
                     fmt::Kind::StringLike(str)
                 };
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(trivia, kind)
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, kind, trailing)
             }
             prism::Node::InterpolatedXStringNode { .. } => {
                 let node = node.as_interpolated_x_string_node().unwrap();
                 let loc = node.location();
-                let mut trivia = self.take_leading_trivia(loc.start_offset());
+                let leading = self.take_leading_trivia(loc.start_offset());
                 let kind = if Self::is_heredoc(Some(&node.opening_loc())) {
                     let heredoc_opening = self.visit_complex_heredoc(
                         Some(node.opening_loc()),
@@ -483,29 +483,29 @@ impl FmtNodeBuilder<'_> {
                     );
                     fmt::Kind::DynStringLike(str)
                 };
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(trivia, kind)
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, kind, trailing)
             }
 
             prism::Node::SymbolNode { .. } => {
                 let node = node.as_symbol_node().unwrap();
                 let loc = node.location();
-                let mut trivia = self.take_leading_trivia(loc.start_offset());
+                let leading = self.take_leading_trivia(loc.start_offset());
                 // XXX: I cannot find the case where the value_loc is None.
                 let value_loc = node.value_loc().expect("symbol value must exist");
                 let str = self.visit_string_like(node.opening_loc(), value_loc, node.closing_loc());
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(trivia, fmt::Kind::StringLike(str))
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::StringLike(str), trailing)
             }
             prism::Node::InterpolatedSymbolNode { .. } => {
                 let node = node.as_interpolated_symbol_node().unwrap();
                 let loc = node.location();
-                let mut trivia = self.take_leading_trivia(loc.start_offset());
+                let leading = self.take_leading_trivia(loc.start_offset());
                 let str =
                     self.visit_interpolated(node.opening_loc(), node.parts(), node.closing_loc());
                 let kind = fmt::Kind::DynStringLike(str);
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(trivia, kind)
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, kind, trailing)
             }
 
             prism::Node::IfNode { .. } => {
@@ -570,105 +570,105 @@ impl FmtNodeBuilder<'_> {
             prism::Node::CallNode { .. } => {
                 let node = node.as_call_node().unwrap();
                 let loc = node.location();
-                let mut trivia = self.take_leading_trivia(loc.start_offset());
+                let leading = self.take_leading_trivia(loc.start_offset());
                 let chain = self.visit_call_root(&node, next_loc_start, None);
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(trivia, fmt::Kind::MethodChain(chain))
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::MethodChain(chain), trailing)
             }
 
             prism::Node::LocalVariableWriteNode { .. } => {
                 let node = node.as_local_variable_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::LocalVariableAndWriteNode { .. } => {
                 let node = node.as_local_variable_and_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::LocalVariableOrWriteNode { .. } => {
                 let node = node.as_local_variable_or_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::LocalVariableOperatorWriteNode { .. } => {
                 let node = node.as_local_variable_operator_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
 
             prism::Node::InstanceVariableWriteNode { .. } => {
                 let node = node.as_instance_variable_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::InstanceVariableAndWriteNode { .. } => {
                 let node = node.as_instance_variable_and_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::InstanceVariableOrWriteNode { .. } => {
                 let node = node.as_instance_variable_or_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::InstanceVariableOperatorWriteNode { .. } => {
                 let node = node.as_instance_variable_operator_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
 
             prism::Node::ClassVariableWriteNode { .. } => {
                 let node = node.as_class_variable_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     // XXX: When does the operator becomes None?
@@ -676,233 +676,233 @@ impl FmtNodeBuilder<'_> {
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::ClassVariableAndWriteNode { .. } => {
                 let node = node.as_class_variable_and_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::ClassVariableOrWriteNode { .. } => {
                 let node = node.as_class_variable_or_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::ClassVariableOperatorWriteNode { .. } => {
                 let node = node.as_class_variable_operator_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
 
             prism::Node::GlobalVariableWriteNode { .. } => {
                 let node = node.as_global_variable_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::GlobalVariableAndWriteNode { .. } => {
                 let node = node.as_global_variable_and_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::GlobalVariableOrWriteNode { .. } => {
                 let node = node.as_global_variable_or_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::GlobalVariableOperatorWriteNode { .. } => {
                 let node = node.as_global_variable_operator_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
 
             prism::Node::ConstantWriteNode { .. } => {
                 let node = node.as_constant_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::ConstantAndWriteNode { .. } => {
                 let node = node.as_constant_and_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::ConstantOrWriteNode { .. } => {
                 let node = node.as_constant_or_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::ConstantOperatorWriteNode { .. } => {
                 let node = node.as_constant_operator_write_node().unwrap();
-                let (assign, trivia) = self.visit_variable_assign(
+                let (leading, assign, trailing) = self.visit_variable_assign(
                     node.location(),
                     node.name_loc(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
 
             prism::Node::ConstantPathWriteNode { .. } => {
                 let node = node.as_constant_path_write_node().unwrap();
-                let (assign, trivia) = self.visit_constant_path_assign(
+                let (leading, assign, trailing) = self.visit_constant_path_assign(
                     node.target(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::ConstantPathAndWriteNode { .. } => {
                 let node = node.as_constant_path_and_write_node().unwrap();
-                let (assign, trivia) = self.visit_constant_path_assign(
+                let (leading, assign, trailing) = self.visit_constant_path_assign(
                     node.target(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::ConstantPathOrWriteNode { .. } => {
                 let node = node.as_constant_path_or_write_node().unwrap();
-                let (assign, trivia) = self.visit_constant_path_assign(
+                let (leading, assign, trailing) = self.visit_constant_path_assign(
                     node.target(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::ConstantPathOperatorWriteNode { .. } => {
                 let node = node.as_constant_path_operator_write_node().unwrap();
-                let (assign, trivia) = self.visit_constant_path_assign(
+                let (leading, assign, trailing) = self.visit_constant_path_assign(
                     node.target(),
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
 
             prism::Node::CallAndWriteNode { .. } => {
                 let node = node.as_call_and_write_node().unwrap();
-                let (assign, trivia) = self.visit_call_assign(
+                let (leading, assign, trailing) = self.visit_call_assign(
                     &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::CallOrWriteNode { .. } => {
                 let node = node.as_call_or_write_node().unwrap();
-                let (assign, trivia) = self.visit_call_assign(
+                let (leading, assign, trailing) = self.visit_call_assign(
                     &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::CallOperatorWriteNode { .. } => {
                 let node = node.as_call_operator_write_node().unwrap();
-                let (assign, trivia) = self.visit_call_assign(
+                let (leading, assign, trailing) = self.visit_call_assign(
                     &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
 
             prism::Node::IndexAndWriteNode { .. } => {
                 let node = node.as_index_and_write_node().unwrap();
-                let (assign, trivia) = self.visit_call_assign(
+                let (leading, assign, trailing) = self.visit_call_assign(
                     &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::IndexOrWriteNode { .. } => {
                 let node = node.as_index_or_write_node().unwrap();
-                let (assign, trivia) = self.visit_call_assign(
+                let (leading, assign, trailing) = self.visit_call_assign(
                     &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::IndexOperatorWriteNode { .. } => {
                 let node = node.as_index_operator_write_node().unwrap();
-                let (assign, trivia) = self.visit_call_assign(
+                let (leading, assign, trailing) = self.visit_call_assign(
                     &node,
                     node.operator_loc(),
                     node.value(),
                     next_loc_start,
                 );
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
 
             prism::Node::LocalVariableTargetNode { .. } => self.parse_atom(node, next_loc_start),
@@ -911,32 +911,32 @@ impl FmtNodeBuilder<'_> {
             prism::Node::GlobalVariableTargetNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ConstantTargetNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ConstantPathTargetNode { .. } => {
-                let (path, trivia) = self.visit_constant_path(node, next_loc_start);
-                fmt::Node::new(trivia, fmt::Kind::Atom(path))
+                let (leading, path, trailing) = self.visit_constant_path(node, next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Atom(path), trailing)
             }
             prism::Node::CallTargetNode { .. } => {
                 let node = node.as_call_target_node().unwrap();
-                let mut trivia = self.take_leading_trivia(node.location().start_offset());
+                let leading = self.take_leading_trivia(node.location().start_offset());
                 let chain = self.visit_call_root(&node, next_loc_start, None);
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(trivia, fmt::Kind::MethodChain(chain))
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::MethodChain(chain), trailing)
             }
             prism::Node::IndexTargetNode { .. } => {
                 let node = node.as_index_target_node().unwrap();
-                let mut trivia = self.take_leading_trivia(node.location().start_offset());
+                let leading = self.take_leading_trivia(node.location().start_offset());
                 let chain = self.visit_call_root(&node, next_loc_start, None);
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(trivia, fmt::Kind::MethodChain(chain))
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::MethodChain(chain), trailing)
             }
 
             prism::Node::MultiWriteNode { .. } => {
                 let node = node.as_multi_write_node().unwrap();
-                let (assign, trivia) = self.visit_multi_assign(node, next_loc_start);
-                fmt::Node::new(trivia, fmt::Kind::Assign(assign))
+                let (leading, assign, trailing) = self.visit_multi_assign(node, next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
             prism::Node::MultiTargetNode { .. } => {
                 let node = node.as_multi_target_node().unwrap();
-                let mut trivia = self.take_leading_trivia(node.location().start_offset());
+                let leading = self.take_leading_trivia(node.location().start_offset());
                 let target = self.visit_multi_assign_target(
                     node.lefts(),
                     node.rest(),
@@ -945,11 +945,11 @@ impl FmtNodeBuilder<'_> {
                     node.rparen_loc(),
                     next_loc_start,
                 );
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(trivia, fmt::Kind::MultiAssignTarget(target))
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::MultiAssignTarget(target), trailing)
             }
             prism::Node::ImplicitRestNode { .. } => {
-                fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Atom("".to_string()))
+                fmt::Node::without_trivia(fmt::Kind::Atom("".to_string()))
             }
 
             prism::Node::SplatNode { .. } => {
@@ -959,7 +959,8 @@ impl FmtNodeBuilder<'_> {
                 let expr = node.expression().expect("SplatNode must have expression");
                 let expr = self.visit(expr, next_loc_start);
                 let splat = fmt::Splat::new(operator, expr);
-                fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Splat(splat))
+                // XXX: We need to parse Trivia around the splat operator.
+                fmt::Node::without_trivia(fmt::Kind::Splat(splat))
             }
             prism::Node::AssocSplatNode { .. } => {
                 let node = node.as_assoc_splat_node().unwrap();
@@ -968,7 +969,8 @@ impl FmtNodeBuilder<'_> {
                 let value = node.value().expect("AssocSplatNode must have value");
                 let value = self.visit(value, next_loc_start);
                 let splat = fmt::Splat::new(operator, value);
-                fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Splat(splat))
+                // XXX: We need to parse Trivia around the splat operator.
+                fmt::Node::without_trivia(fmt::Kind::Splat(splat))
             }
 
             prism::Node::ArrayNode { .. } => {
@@ -978,7 +980,7 @@ impl FmtNodeBuilder<'_> {
                     (Some(op), Some(cl)) => (op, cl),
                     _ => panic!("array must have opening and closing"),
                 };
-                let mut trivia = self.take_leading_trivia(node.location().start_offset());
+                let leading = self.take_leading_trivia(node.location().start_offset());
                 let opening = Self::source_lossy_at(&opening_loc);
                 let closing = Self::source_lossy_at(&closing_loc);
                 let mut array = fmt::Array::new(opening, closing);
@@ -993,13 +995,13 @@ impl FmtNodeBuilder<'_> {
                 );
                 let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
                 array.set_virtual_end(virtual_end);
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(trivia, fmt::Kind::Array(array))
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Array(array), trailing)
             }
 
             prism::Node::HashNode { .. } => {
                 let node = node.as_hash_node().unwrap();
-                let mut trivia = self.take_leading_trivia(node.location().start_offset());
+                let leading = self.take_leading_trivia(node.location().start_offset());
                 let opening_loc = node.opening_loc();
                 let closing_loc = node.closing_loc();
                 let opening = Self::source_lossy_at(&opening_loc);
@@ -1016,12 +1018,12 @@ impl FmtNodeBuilder<'_> {
                 );
                 let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
                 hash.set_virtual_end(virtual_end);
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(trivia, fmt::Kind::Hash(hash))
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Hash(hash), trailing)
             }
             prism::Node::KeywordHashNode { .. } => {
                 let node = node.as_keyword_hash_node().unwrap();
-                let mut trivia = self.take_leading_trivia(node.location().start_offset());
+                let leading = self.take_leading_trivia(node.location().start_offset());
                 let mut khash = fmt::KeywordHash::new();
                 Self::each_node_with_next_start(
                     node.elements().iter(),
@@ -1036,12 +1038,12 @@ impl FmtNodeBuilder<'_> {
                         khash.append_element(element);
                     },
                 );
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-                fmt::Node::new(trivia, fmt::Kind::KeywordHash(khash))
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::KeywordHash(khash), trailing)
             }
             prism::Node::AssocNode { .. } => {
                 let node = node.as_assoc_node().unwrap();
-                let mut trivia = self.take_leading_trivia(node.location().start_offset());
+                let leading = self.take_leading_trivia(node.location().start_offset());
                 let key = node.key();
                 let key_loc = key.location();
                 let key = self.visit(key, key_loc.end_offset());
@@ -1050,12 +1052,12 @@ impl FmtNodeBuilder<'_> {
                 let value = node.value().expect("assoc node must have value");
                 let value_loc = value.location();
                 let value = self.visit(value, value_loc.end_offset());
-                trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+                let trailing = self.take_trailing_comment(next_loc_start);
                 let assoc = fmt::Assoc::new(key, operator, value);
-                fmt::Node::new(trivia, fmt::Kind::Assoc(assoc))
+                fmt::Node::new(leading, fmt::Kind::Assoc(assoc), trailing)
             }
             prism::Node::ImplicitNode { .. } => {
-                fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Atom("".to_string()))
+                fmt::Node::without_trivia(fmt::Kind::Atom("".to_string()))
             }
 
             _ => todo!("parse {:?}", node),
@@ -1068,22 +1070,22 @@ impl FmtNodeBuilder<'_> {
 
     fn parse_atom(&mut self, node: prism::Node, next_loc_start: usize) -> fmt::Node {
         let loc = node.location();
-        let mut trivia = self.take_leading_trivia(loc.start_offset());
+        let leading = self.take_leading_trivia(loc.start_offset());
         let value = Self::source_lossy_at(&loc);
-        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        fmt::Node::new(trivia, fmt::Kind::Atom(value))
+        let trailing = self.take_trailing_comment(next_loc_start);
+        fmt::Node::new(leading, fmt::Kind::Atom(value), trailing)
     }
 
     fn visit_constant_path(
         &mut self,
         node: prism::Node,
         next_loc_start: usize,
-    ) -> (String, fmt::Trivia) {
+    ) -> (fmt::LeadingTrivia, String, fmt::TrailingTrivia) {
         let loc = node.location();
 
         // Use `end_offset` to treat any trivia inside the path as leading trivia for simplicity.
         // e.g. "Foo::\n#comment\nBar" -> "#comment\nFoo::Bar"
-        let mut trivia = self.take_leading_trivia(loc.end_offset());
+        let leading_trivia = self.take_leading_trivia(loc.end_offset());
 
         fn rec(node: Option<prism::Node>, parts: &mut Vec<u8>) {
             if let Some(node) = node {
@@ -1106,8 +1108,8 @@ impl FmtNodeBuilder<'_> {
         rec(Some(node), &mut parts);
 
         let path = String::from_utf8_lossy(&parts).to_string();
-        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        (path, trivia)
+        let trailing_trivia = self.take_trailing_comment(next_loc_start);
+        (leading_trivia, path, trailing_trivia)
     }
 
     fn visit_string_like(
@@ -1281,14 +1283,13 @@ impl FmtNodeBuilder<'_> {
     }
 
     fn visit_if_or_unless(&mut self, node: IfOrUnless, next_loc_start: usize) -> fmt::Node {
-        let mut if_trivia = self.take_leading_trivia(node.loc.start_offset());
+        let if_leading = self.take_leading_trivia(node.loc.start_offset());
 
         let end_loc = node.end_loc.expect("if/unless expression must have end");
         let end_start = end_loc.start_offset();
 
         let if_next_loc = node.predicate.location().start_offset();
-        let mut trivia = fmt::Trivia::new();
-        trivia.set_trailing(self.take_trailing_comment(if_next_loc));
+        let keyword_trailing = self.take_trailing_comment(if_next_loc);
 
         let conseq = node.consequent;
         let next_pred_loc_start = node
@@ -1306,7 +1307,7 @@ impl FmtNodeBuilder<'_> {
                 // take trailing of else/elsif
                 let else_start = conseq.location().start_offset();
                 let body = self.visit_statements(node.statements, else_start);
-                let if_first = fmt::Conditional::new(trivia, predicate, body);
+                let if_first = fmt::Conditional::new(keyword_trailing, predicate, body);
                 let mut ifexpr = fmt::IfExpr::new(node.is_if, if_first);
                 self.visit_ifelse(conseq, &mut ifexpr);
                 ifexpr
@@ -1314,13 +1315,13 @@ impl FmtNodeBuilder<'_> {
             // if...end
             None => {
                 let body = self.visit_statements(node.statements, end_start);
-                let if_first = fmt::Conditional::new(trivia, predicate, body);
+                let if_first = fmt::Conditional::new(keyword_trailing, predicate, body);
                 fmt::IfExpr::new(node.is_if, if_first)
             }
         };
 
-        if_trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        fmt::Node::new(if_trivia, fmt::Kind::IfExpr(ifexpr))
+        let if_trailing = self.take_trailing_comment(next_loc_start);
+        fmt::Node::new(if_leading, fmt::Kind::IfExpr(ifexpr), if_trailing)
     }
 
     fn visit_ifelse(&mut self, node: prism::Node, ifexpr: &mut fmt::IfExpr) {
@@ -1338,8 +1339,7 @@ impl FmtNodeBuilder<'_> {
                     .as_ref()
                     .map(|s| s.location().start_offset())
                     .unwrap_or(end_loc.start_offset());
-                let mut trivia = fmt::Trivia::new();
-                trivia.set_trailing(self.take_trailing_comment(elsif_next_loc));
+                let keyword_trailing = self.take_trailing_comment(elsif_next_loc);
 
                 let conseq = node.consequent();
                 let next_loc_start = node
@@ -1356,7 +1356,7 @@ impl FmtNodeBuilder<'_> {
                     .unwrap_or(end_loc.start_offset());
                 let body = self.visit_statements(node.statements(), body_end_loc);
 
-                let conditional = fmt::Conditional::new(trivia, predicate, body);
+                let conditional = fmt::Conditional::new(keyword_trailing, predicate, body);
                 ifexpr.elsifs.push(conditional);
                 if let Some(conseq) = conseq {
                     self.visit_ifelse(conseq, ifexpr);
@@ -1375,11 +1375,13 @@ impl FmtNodeBuilder<'_> {
                     .as_ref()
                     .map(|s| s.location().start_offset())
                     .unwrap_or(end_loc.start_offset());
-                let mut trivia = fmt::Trivia::new();
-                trivia.set_trailing(self.take_trailing_comment(else_next_loc));
+                let keyword_trailing = self.take_trailing_comment(else_next_loc);
 
                 let body = self.visit_statements(node.statements(), end_loc.start_offset());
-                ifexpr.if_last = Some(fmt::Else { trivia, body });
+                ifexpr.if_last = Some(fmt::Else {
+                    keyword_trailing,
+                    body,
+                });
             }
             _ => {
                 panic!("unexpected node in IfNode: {:?}", node);
@@ -1388,24 +1390,23 @@ impl FmtNodeBuilder<'_> {
     }
 
     fn visit_postmodifier(&mut self, postmod: Postmodifier, next_loc_start: usize) -> fmt::Node {
-        let mut trivia = self.take_leading_trivia(postmod.loc.start_offset());
+        let if_leading = self.take_leading_trivia(postmod.loc.start_offset());
 
         let kwd_loc = postmod.keyword_loc;
         let exprs = self.visit_statements(postmod.statements, kwd_loc.start_offset());
 
         let pred_loc = postmod.predicate.location();
-        let mut kwd_trivia = fmt::Trivia::new();
-        kwd_trivia.set_trailing(self.take_trailing_comment(pred_loc.start_offset()));
+        let keyword_trailing = self.take_trailing_comment(pred_loc.start_offset());
 
         let predicate = self.visit(postmod.predicate, next_loc_start);
 
         let postmod = fmt::Postmodifier::new(
             postmod.keyword,
-            fmt::Conditional::new(kwd_trivia, predicate, exprs),
+            fmt::Conditional::new(keyword_trailing, predicate, exprs),
         );
 
-        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        fmt::Node::new(trivia, fmt::Kind::Postmodifier(postmod))
+        let if_trailing = self.take_trailing_comment(next_loc_start);
+        fmt::Node::new(if_leading, fmt::Kind::Postmodifier(postmod), if_trailing)
     }
 
     fn visit_call_root<C: CallRoot>(
@@ -1437,16 +1438,16 @@ impl FmtNodeBuilder<'_> {
             None => fmt::MethodChain::new(None),
         };
 
-        let mut trivia = if let Some(msg_loc) = call.message_loc() {
+        let call_leading = if let Some(msg_loc) = call.message_loc() {
             self.take_leading_trivia(msg_loc.start_offset())
         } else {
-            fmt::Trivia::new()
+            fmt::LeadingTrivia::new()
             // foo.\n#hoge\n(2)
         };
 
         let call_op = call.call_operator_loc().map(|l| Self::source_lossy_at(&l));
         let name = String::from_utf8_lossy(call.name()).to_string();
-        let mut method_call = fmt::MethodCall::new(call_op, name);
+        let mut method_call = fmt::MethodCall::new(call_leading, call_op, name);
 
         let args = match call.arguments() {
             None => {
@@ -1496,8 +1497,7 @@ impl FmtNodeBuilder<'_> {
                     .map(|b| b.location())
                     .unwrap_or(node.closing_loc())
                     .start_offset();
-                let mut trivia = fmt::Trivia::new();
-                trivia.set_trailing(self.take_trailing_comment(block_next_loc));
+                let block_trailing = self.take_trailing_comment(block_next_loc);
 
                 let body_end_loc = node.closing_loc().start_offset();
                 let body = node.body().map(|n| self.visit(n, body_end_loc));
@@ -1514,7 +1514,7 @@ impl FmtNodeBuilder<'_> {
                 };
 
                 fmt::MethodBlock {
-                    trivia,
+                    trailing_trivia: block_trailing,
                     width,
                     body,
                     was_flat,
@@ -1527,10 +1527,10 @@ impl FmtNodeBuilder<'_> {
         }
 
         if let Some(next_msg_start) = next_msg_start {
-            trivia.set_trailing(self.take_trailing_comment(next_msg_start));
+            let call_trailing = self.take_trailing_comment(next_msg_start);
+            method_call.set_trailing_trivia(call_trailing);
         }
 
-        method_call.set_trivia(trivia);
         chain.append_call(method_call);
 
         self.last_loc_end = call.location().end_offset();
@@ -1544,14 +1544,14 @@ impl FmtNodeBuilder<'_> {
         operator_loc: prism::Location,
         value: prism::Node,
         next_loc_start: usize,
-    ) -> (fmt::Assign, fmt::Trivia) {
-        let mut trivia = self.take_leading_trivia(node_loc.start_offset());
+    ) -> (fmt::LeadingTrivia, fmt::Assign, fmt::TrailingTrivia) {
+        let leading = self.take_leading_trivia(node_loc.start_offset());
         let name = Self::source_lossy_at(&name_loc);
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.visit(value, next_loc_start);
-        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        let target = fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Atom(name));
-        (fmt::Assign::new(target, operator, value), trivia)
+        let trailing = self.take_trailing_comment(next_loc_start);
+        let target = fmt::Node::without_trivia(fmt::Kind::Atom(name));
+        (leading, fmt::Assign::new(target, operator, value), trailing)
     }
 
     fn visit_constant_path_assign(
@@ -1560,14 +1560,14 @@ impl FmtNodeBuilder<'_> {
         operator_loc: prism::Location,
         value: prism::Node,
         next_loc_start: usize,
-    ) -> (fmt::Assign, fmt::Trivia) {
-        let (path, mut trivia) =
+    ) -> (fmt::LeadingTrivia, fmt::Assign, fmt::TrailingTrivia) {
+        let (leading, path, _) =
             self.visit_constant_path(const_path.as_node(), operator_loc.start_offset());
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.visit(value, next_loc_start);
-        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        let target = fmt::Node::new(fmt::Trivia::new(), fmt::Kind::Atom(path));
-        (fmt::Assign::new(target, operator, value), trivia)
+        let trailing = self.take_trailing_comment(next_loc_start);
+        let target = fmt::Node::without_trivia(fmt::Kind::Atom(path));
+        (leading, fmt::Assign::new(target, operator, value), trailing)
     }
 
     fn visit_call_assign(
@@ -1576,22 +1576,22 @@ impl FmtNodeBuilder<'_> {
         operator_loc: prism::Location,
         value: prism::Node,
         next_loc_start: usize,
-    ) -> (fmt::Assign, fmt::Trivia) {
-        let mut trivia = self.take_leading_trivia(call.location().start_offset());
+    ) -> (fmt::LeadingTrivia, fmt::Assign, fmt::TrailingTrivia) {
+        let leading = self.take_leading_trivia(call.location().start_offset());
         let chain = self.visit_call_root(call, next_loc_start, None);
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.visit(value, next_loc_start);
-        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
-        let target = fmt::Node::new(fmt::Trivia::new(), fmt::Kind::MethodChain(chain));
-        (fmt::Assign::new(target, operator, value), trivia)
+        let trailing = self.take_trailing_comment(next_loc_start);
+        let target = fmt::Node::without_trivia(fmt::Kind::MethodChain(chain));
+        (leading, fmt::Assign::new(target, operator, value), trailing)
     }
 
     fn visit_multi_assign(
         &mut self,
         node: prism::MultiWriteNode,
         next_loc_start: usize,
-    ) -> (fmt::Assign, fmt::Trivia) {
-        let mut trivia = self.take_leading_trivia(node.location().start_offset());
+    ) -> (fmt::LeadingTrivia, fmt::Assign, fmt::TrailingTrivia) {
+        let leading = self.take_leading_trivia(node.location().start_offset());
         let target = self.visit_multi_assign_target(
             node.lefts(),
             node.rest(),
@@ -1602,10 +1602,10 @@ impl FmtNodeBuilder<'_> {
         );
         let operator = Self::source_lossy_at(&node.operator_loc());
         let value = self.visit(node.value(), next_loc_start);
-        trivia.set_trailing(self.take_trailing_comment(next_loc_start));
+        let trailing = self.take_trailing_comment(next_loc_start);
 
-        let target = fmt::Node::new(fmt::Trivia::new(), fmt::Kind::MultiAssignTarget(target));
-        (fmt::Assign::new(target, operator, value), trivia)
+        let target = fmt::Node::without_trivia(fmt::Kind::MultiAssignTarget(target));
+        (leading, fmt::Assign::new(target, operator, value), trailing)
     }
 
     fn visit_multi_assign_target(
@@ -1687,16 +1687,15 @@ impl FmtNodeBuilder<'_> {
     fn take_end_trivia_as_virtual_end(&mut self, end: Option<usize>) -> Option<fmt::VirtualEnd> {
         if let Some(end) = end {
             let trivia = self.take_leading_trivia(end);
-            if !trivia.leading.is_empty() {
-                let width = trivia.width;
-                return Some(fmt::VirtualEnd { trivia, width });
+            if !trivia.is_empty() {
+                return Some(fmt::VirtualEnd::new(trivia));
             }
         }
         None
     }
 
-    fn take_leading_trivia(&mut self, loc_start: usize) -> fmt::Trivia {
-        let mut trivia = fmt::Trivia::new();
+    fn take_leading_trivia(&mut self, loc_start: usize) -> fmt::LeadingTrivia {
+        let mut trivia = fmt::LeadingTrivia::new();
 
         while let Some(comment) = self.comments.peek() {
             let loc = comment.location();
@@ -1707,7 +1706,7 @@ impl FmtNodeBuilder<'_> {
             let value = Self::source_lossy_at(&loc);
             let fmt_comment = fmt::Comment { value };
             self.take_empty_lines_until(loc.start_offset(), &mut trivia);
-            trivia.append_leading(fmt::LineTrivia::Comment(fmt_comment));
+            trivia.append_line(fmt::LineTrivia::Comment(fmt_comment));
             self.last_loc_end = loc.end_offset() - 1;
             self.comments.next();
         }
@@ -1716,15 +1715,15 @@ impl FmtNodeBuilder<'_> {
         trivia
     }
 
-    fn take_empty_lines_until(&mut self, end: usize, trivia: &mut fmt::Trivia) {
+    fn take_empty_lines_until(&mut self, end: usize, trivia: &mut fmt::LeadingTrivia) {
         let range = self.last_empty_line_range_within(self.last_loc_end, end);
         if let Some(range) = range {
-            trivia.append_leading(fmt::LineTrivia::EmptyLine);
+            trivia.append_line(fmt::LineTrivia::EmptyLine);
             self.last_loc_end = range.end;
         }
     }
 
-    fn take_trailing_comment(&mut self, next_loc_start: usize) -> Option<fmt::Comment> {
+    fn take_trailing_comment(&mut self, next_loc_start: usize) -> fmt::TrailingTrivia {
         if let Some(comment) = self.comments.peek() {
             let loc = comment.location();
             if (self.last_loc_end..=next_loc_start).contains(&loc.start_offset())
@@ -1733,10 +1732,11 @@ impl FmtNodeBuilder<'_> {
                 self.last_loc_end = loc.end_offset() - 1;
                 self.comments.next();
                 let value = Self::source_lossy_at(&loc);
-                return Some(fmt::Comment { value });
+                let comment = Some(fmt::Comment { value });
+                return fmt::TrailingTrivia::new(comment);
             }
-        }
-        None
+        };
+        fmt::TrailingTrivia::none()
     }
 
     fn last_empty_line_range_within(&self, start: usize, end: usize) -> Option<Range<usize>> {

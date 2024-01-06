@@ -65,19 +65,32 @@ impl Width {
 
 #[derive(Debug)]
 pub(crate) struct Node {
-    pub trivia: Trivia,
+    pub leading_trivia: LeadingTrivia,
+    pub trailing_trivia: TrailingTrivia,
     pub kind: Kind,
     pub width: Width,
 }
 
 impl Node {
-    pub(crate) fn new(trivia: Trivia, kind: Kind) -> Self {
-        let width = trivia.width.add(&kind.width());
+    pub(crate) fn new(
+        leading_trivia: LeadingTrivia,
+        kind: Kind,
+        trailing_trivia: TrailingTrivia,
+    ) -> Self {
+        let width = leading_trivia
+            .width
+            .add(&kind.width())
+            .add(&trailing_trivia.width);
         Self {
-            trivia,
+            leading_trivia,
+            trailing_trivia,
             kind,
             width,
         }
+    }
+
+    pub(crate) fn without_trivia(kind: Kind) -> Self {
+        Self::new(LeadingTrivia::new(), kind, TrailingTrivia::none())
     }
 }
 
@@ -248,8 +261,17 @@ pub(crate) enum HeredocPart {
 
 #[derive(Debug)]
 pub(crate) struct VirtualEnd {
-    pub width: Width,
-    pub trivia: Trivia,
+    width: Width,
+    leading_trivia: LeadingTrivia,
+}
+
+impl VirtualEnd {
+    pub(crate) fn new(leading_trivia: LeadingTrivia) -> Self {
+        Self {
+            width: leading_trivia.width,
+            leading_trivia,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -369,17 +391,17 @@ impl Postmodifier {
 #[derive(Debug)]
 pub(crate) struct Conditional {
     pub width: Width,
-    pub trivia: Trivia,
+    pub keyword_trailing: TrailingTrivia,
     pub cond: Box<Node>,
     pub body: Exprs,
 }
 
 impl Conditional {
-    pub(crate) fn new(trivia: Trivia, cond: Node, body: Exprs) -> Self {
-        let width = trivia.width.add(&cond.width).add(&body.width);
+    pub(crate) fn new(keyword_trailing: TrailingTrivia, cond: Node, body: Exprs) -> Self {
+        let width = keyword_trailing.width.add(&cond.width).add(&body.width);
         Self {
             width,
-            trivia,
+            keyword_trailing,
             cond: Box::new(cond),
             body,
         }
@@ -388,7 +410,7 @@ impl Conditional {
 
 #[derive(Debug)]
 pub(crate) struct Else {
-    pub trivia: Trivia,
+    pub keyword_trailing: TrailingTrivia,
     pub body: Exprs,
 }
 
@@ -427,7 +449,8 @@ impl Arguments {
 #[derive(Debug)]
 pub(crate) struct MethodCall {
     pub width: Width,
-    pub trivia: Trivia,
+    pub leading_trivia: LeadingTrivia,
+    pub trailing_trivia: TrailingTrivia,
     pub call_op: Option<String>,
     pub name: String,
     pub args: Option<Arguments>,
@@ -435,11 +458,18 @@ pub(crate) struct MethodCall {
 }
 
 impl MethodCall {
-    pub(crate) fn new(call_op: Option<String>, name: String) -> Self {
-        let width = Width::Flat(name.len() + call_op.as_ref().map_or(0, |s| s.len()));
+    pub(crate) fn new(
+        leading_trivia: LeadingTrivia,
+        call_op: Option<String>,
+        name: String,
+    ) -> Self {
+        let call_op_len = call_op.as_ref().map_or(0, |s| s.len());
+        let msg_width = Width::Flat(name.len() + call_op_len);
+        let width = leading_trivia.width.add(&msg_width);
         Self {
             width,
-            trivia: Trivia::new(),
+            leading_trivia,
+            trailing_trivia: TrailingTrivia::none(),
             call_op,
             name,
             args: None,
@@ -447,9 +477,9 @@ impl MethodCall {
         }
     }
 
-    pub(crate) fn set_trivia(&mut self, trivia: Trivia) {
+    pub(crate) fn set_trailing_trivia(&mut self, trivia: TrailingTrivia) {
         self.width.append(&trivia.width);
-        self.trivia = trivia;
+        self.trailing_trivia = trivia;
     }
 
     pub(crate) fn set_args(&mut self, args: Arguments) {
@@ -468,7 +498,7 @@ impl MethodCall {
 #[derive(Debug)]
 pub(crate) struct MethodBlock {
     pub width: Width,
-    pub trivia: Trivia,
+    pub trailing_trivia: TrailingTrivia,
     // pub args
     pub body: Exprs,
     pub was_flat: bool,
@@ -715,33 +745,53 @@ impl Assoc {
 }
 
 #[derive(Debug)]
-pub(crate) struct Trivia {
-    pub leading: Vec<LineTrivia>,
-    pub trailing: Option<Comment>,
-    pub width: Width,
+pub(crate) struct LeadingTrivia {
+    lines: Vec<LineTrivia>,
+    width: Width,
 }
 
-impl Trivia {
+impl LeadingTrivia {
     pub(crate) fn new() -> Self {
         Self {
-            leading: vec![],
-            trailing: None,
+            lines: vec![],
             width: Width::Flat(0),
         }
     }
 
-    pub(crate) fn append_leading(&mut self, trivia: LineTrivia) {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.lines.is_empty()
+    }
+
+    pub(crate) fn append_line(&mut self, trivia: LineTrivia) {
         if matches!(trivia, LineTrivia::Comment(_)) {
             self.width = Width::NotFlat;
         }
-        self.leading.push(trivia);
+        self.lines.push(trivia);
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct TrailingTrivia {
+    comment: Option<Comment>,
+    width: Width,
+}
+
+impl TrailingTrivia {
+    pub(crate) fn new(comment: Option<Comment>) -> Self {
+        let width = if comment.is_some() {
+            Width::NotFlat
+        } else {
+            Width::Flat(0)
+        };
+        Self { comment, width }
     }
 
-    pub(crate) fn set_trailing(&mut self, comment: Option<Comment>) {
-        if comment.is_some() {
-            self.width = Width::NotFlat;
-        }
-        self.trailing = comment;
+    pub(crate) fn none() -> Self {
+        Self::new(None)
+    }
+
+    pub(crate) fn is_none(&self) -> bool {
+        self.comment.is_none()
     }
 }
 
@@ -892,7 +942,7 @@ impl Formatter {
                 self.break_line(ctx);
             }
             self.write_leading_trivia(
-                &n.trivia.leading,
+                &n.leading_trivia,
                 ctx,
                 EmptyLineHandling::Trim {
                     start: i == 0,
@@ -901,7 +951,7 @@ impl Formatter {
             );
             self.put_indent();
             self.format(n, ctx);
-            self.write_trailing_comment(&n.trivia.trailing);
+            self.write_trailing_comment(&n.trailing_trivia);
         }
         self.write_trivia_at_virtual_end(
             ctx,
@@ -920,7 +970,8 @@ impl Formatter {
     ) {
         if let Some(end) = end {
             let mut trailing_empty_lines = 0;
-            for trivia in end.trivia.leading.iter().rev() {
+            let leading_lines = &end.leading_trivia.lines;
+            for trivia in leading_lines.iter().rev() {
                 match trivia {
                     LineTrivia::EmptyLine => {
                         trailing_empty_lines += 1;
@@ -930,16 +981,16 @@ impl Formatter {
                     }
                 }
             }
-            if trailing_empty_lines == end.trivia.leading.len() {
+            if trailing_empty_lines == leading_lines.len() {
                 return;
             }
 
             if break_first {
                 self.break_line(ctx);
             }
-            let target_len = end.trivia.leading.len() - trailing_empty_lines;
+            let target_len = leading_lines.len() - trailing_empty_lines;
             let last_idx = target_len - 1;
-            for (i, trivia) in end.trivia.leading.iter().take(target_len).enumerate() {
+            for (i, trivia) in leading_lines.iter().take(target_len).enumerate() {
                 match trivia {
                     LineTrivia::EmptyLine => {
                         if !(trim_start && i == 0) || i == last_idx {
@@ -965,8 +1016,7 @@ impl Formatter {
             self.push_str("unless");
         }
 
-        let if_trivia = &expr.if_first.trivia;
-        self.format_node_after_keyword(ctx, if_trivia, &expr.if_first.cond);
+        self.format_node_after_keyword(ctx, &expr.if_first.keyword_trailing, &expr.if_first.cond);
         if !expr.if_first.body.is_empty() {
             self.break_line(ctx);
             self.format_exprs(&expr.if_first.body, ctx, true);
@@ -977,8 +1027,7 @@ impl Formatter {
             self.dedent();
             self.put_indent();
             self.push_str("elsif");
-            let elsif_trivia = &elsif.trivia;
-            self.format_node_after_keyword(ctx, elsif_trivia, &elsif.cond);
+            self.format_node_after_keyword(ctx, &elsif.keyword_trailing, &elsif.cond);
             if !elsif.body.is_empty() {
                 self.break_line(ctx);
                 self.format_exprs(&elsif.body, ctx, true);
@@ -990,7 +1039,7 @@ impl Formatter {
             self.dedent();
             self.put_indent();
             self.push_str("else");
-            self.write_trailing_comment(&if_last.trivia.trailing);
+            self.write_trailing_comment(&if_last.keyword_trailing);
             self.indent();
             if !if_last.body.is_empty() {
                 self.break_line(ctx);
@@ -1008,9 +1057,11 @@ impl Formatter {
         self.format_exprs(&modifier.conditional.body, ctx, false);
         self.push(' ');
         self.push_str(&modifier.keyword);
-
-        let if_trivia = &modifier.conditional.trivia;
-        self.format_node_after_keyword(ctx, if_trivia, &modifier.conditional.cond);
+        self.format_node_after_keyword(
+            ctx,
+            &modifier.conditional.keyword_trailing,
+            &modifier.conditional.cond,
+        );
         self.dedent();
     }
 
@@ -1018,31 +1069,29 @@ impl Formatter {
     fn format_node_after_keyword(
         &mut self,
         ctx: &FormatContext,
-        keyword_trivia: &Trivia,
+        keyword_trailing: &TrailingTrivia,
         node: &Node,
     ) {
-        if keyword_trivia.trailing.is_none() && node.trivia.leading.is_empty() {
+        if keyword_trailing.is_none() && node.leading_trivia.is_empty() {
             self.push(' ');
             self.format(node, ctx);
-            self.write_trailing_comment(&node.trivia.trailing);
+            self.write_trailing_comment(&node.trailing_trivia);
             self.indent();
         } else {
-            self.write_trailing_comment(&keyword_trivia.trailing);
+            self.write_trailing_comment(keyword_trailing);
             self.indent();
             self.break_line(ctx);
-            self.write_leading_trivia(&node.trivia.leading, ctx, EmptyLineHandling::trim_start());
+            self.write_leading_trivia(&node.leading_trivia, ctx, EmptyLineHandling::trim_start());
             self.put_indent();
             self.format(node, ctx);
-            self.write_trailing_comment(&node.trivia.trailing);
+            self.write_trailing_comment(&node.trailing_trivia);
         }
     }
 
     fn format_method_chain(&mut self, chain: &MethodChain, ctx: &FormatContext) {
         if let Some(recv) = &chain.receiver {
             self.format(recv, ctx);
-            if recv.trivia.trailing.is_some() {
-                self.write_trailing_comment(&recv.trivia.trailing);
-            }
+            self.write_trailing_comment(&recv.trailing_trivia);
         }
 
         if chain.width.fits_in(self.remaining_width) {
@@ -1086,7 +1135,7 @@ impl Formatter {
                 }
                 if let Some(call_op) = &call.call_op {
                     self.break_line(ctx);
-                    self.write_leading_trivia(&call.trivia.leading, ctx, EmptyLineHandling::Skip);
+                    self.write_leading_trivia(&call.leading_trivia, ctx, EmptyLineHandling::Skip);
                     self.put_indent();
                     self.push_str(call_op);
                 }
@@ -1111,7 +1160,7 @@ impl Formatter {
                         for (i, arg) in args.nodes.iter().enumerate() {
                             self.break_line(ctx);
                             self.write_leading_trivia(
-                                &arg.trivia.leading,
+                                &arg.leading_trivia,
                                 ctx,
                                 EmptyLineHandling::Trim {
                                     start: i == 0,
@@ -1121,7 +1170,7 @@ impl Formatter {
                             self.put_indent();
                             self.format(arg, ctx);
                             self.push(',');
-                            self.write_trailing_comment(&arg.trivia.trailing);
+                            self.write_trailing_comment(&arg.trailing_trivia);
                         }
                         self.write_trivia_at_virtual_end(
                             ctx,
@@ -1137,12 +1186,12 @@ impl Formatter {
                 }
 
                 if let Some(block) = &call.block {
-                    if block.trivia.trailing.is_some()
+                    if !block.trailing_trivia.is_none()
                         || !block.body.width.fits_in(self.remaining_width)
                         || !block.was_flat
                     {
                         self.push_str(" do");
-                        self.write_trailing_comment(&block.trivia.trailing);
+                        self.write_trailing_comment(&block.trailing_trivia);
                         self.indent();
                         if !block.body.is_empty() {
                             self.break_line(ctx);
@@ -1160,7 +1209,7 @@ impl Formatter {
                         self.push_str(" }");
                     }
                 }
-                self.write_trailing_comment(&call.trivia.trailing);
+                self.write_trailing_comment(&call.trailing_trivia);
             }
             if indented {
                 self.dedent();
@@ -1183,7 +1232,7 @@ impl Formatter {
             self.break_line(ctx);
             self.indent();
             self.write_leading_trivia(
-                &value.trivia.leading,
+                &value.leading_trivia,
                 ctx,
                 EmptyLineHandling::Trim {
                     start: true,
@@ -1192,7 +1241,7 @@ impl Formatter {
             );
             self.put_indent();
             self.format(value, ctx);
-            self.write_trailing_comment(&value.trivia.trailing);
+            self.write_trailing_comment(&value.trailing_trivia);
             self.dedent();
         }
     }
@@ -1221,7 +1270,7 @@ impl Formatter {
             for (i, target) in multi.targets.iter().enumerate() {
                 self.break_line(ctx);
                 self.write_leading_trivia(
-                    &target.trivia.leading,
+                    &target.leading_trivia,
                     ctx,
                     EmptyLineHandling::Trim {
                         start: i == 0,
@@ -1233,7 +1282,7 @@ impl Formatter {
                 if i < last_idx || multi.with_implicit_rest {
                     self.push(',');
                 }
-                self.write_trailing_comment(&target.trivia.trailing);
+                self.write_trailing_comment(&target.trailing_trivia);
             }
             self.write_trivia_at_virtual_end(ctx, &multi.virtual_end, true, false);
             self.dedent();
@@ -1265,7 +1314,7 @@ impl Formatter {
             for (i, element) in array.elements.iter().enumerate() {
                 self.break_line(ctx);
                 self.write_leading_trivia(
-                    &element.trivia.leading,
+                    &element.leading_trivia,
                     ctx,
                     EmptyLineHandling::Trim {
                         start: i == 0,
@@ -1275,7 +1324,7 @@ impl Formatter {
                 self.put_indent();
                 self.format(element, ctx);
                 self.push_str(array.separator());
-                self.write_trailing_comment(&element.trivia.trailing);
+                self.write_trailing_comment(&element.trailing_trivia);
             }
             self.write_trivia_at_virtual_end(
                 ctx,
@@ -1308,7 +1357,7 @@ impl Formatter {
             for (i, element) in hash.elements.iter().enumerate() {
                 self.break_line(ctx);
                 self.write_leading_trivia(
-                    &element.trivia.leading,
+                    &element.leading_trivia,
                     ctx,
                     EmptyLineHandling::Trim {
                         start: i == 0,
@@ -1318,7 +1367,7 @@ impl Formatter {
                 self.put_indent();
                 self.format(element, ctx);
                 self.push(',');
-                self.write_trailing_comment(&element.trivia.trailing);
+                self.write_trailing_comment(&element.trailing_trivia);
             }
             self.write_trivia_at_virtual_end(
                 ctx,
@@ -1347,7 +1396,7 @@ impl Formatter {
                 if i > 0 {
                     self.break_line(ctx);
                     self.write_leading_trivia(
-                        &element.trivia.leading,
+                        &element.leading_trivia,
                         ctx,
                         EmptyLineHandling::Trim {
                             start: false,
@@ -1360,7 +1409,7 @@ impl Formatter {
                 if i < last_idx {
                     self.push(',');
                 }
-                self.write_trailing_comment(&element.trivia.trailing);
+                self.write_trailing_comment(&element.trailing_trivia);
             }
         }
     }
@@ -1384,7 +1433,7 @@ impl Formatter {
             self.break_line(ctx);
             self.indent();
             self.write_leading_trivia(
-                &assoc.value.trivia.leading,
+                &assoc.value.leading_trivia,
                 ctx,
                 EmptyLineHandling::Trim {
                     start: true,
@@ -1399,15 +1448,15 @@ impl Formatter {
 
     fn write_leading_trivia(
         &mut self,
-        trivia: &Vec<LineTrivia>,
+        trivia: &LeadingTrivia,
         ctx: &FormatContext,
         emp_line_handling: EmptyLineHandling,
     ) {
         if trivia.is_empty() {
             return;
         }
-        let last_idx = trivia.len() - 1;
-        for (i, trivia) in trivia.iter().enumerate() {
+        let last_idx = trivia.lines.len() - 1;
+        for (i, trivia) in trivia.lines.iter().enumerate() {
             match trivia {
                 LineTrivia::EmptyLine => {
                     let should_skip = match emp_line_handling {
@@ -1429,8 +1478,8 @@ impl Formatter {
         }
     }
 
-    fn write_trailing_comment(&mut self, comment: &Option<Comment>) {
-        if let Some(comment) = comment {
+    fn write_trailing_comment(&mut self, trivia: &TrailingTrivia) {
+        if let Some(comment) = &trivia.comment {
             self.push(' ');
             self.push_str(&comment.value);
         }
