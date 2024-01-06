@@ -35,11 +35,18 @@ impl Shape {
         Self::Inline { len }
     }
 
-    pub(crate) fn is_multilines(&self) -> bool {
-        matches!(self, Self::Multilines)
+    pub(crate) fn is_inline(&self) -> bool {
+        matches!(self, Self::Inline { .. })
     }
 
-    pub(crate) fn fits_in(&self, shape: usize) -> bool {
+    pub(crate) fn fits_in_inline(&self, shape: usize) -> bool {
+        match self {
+            Self::Inline { len } => *len < shape,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn fits_in_one_line(&self, shape: usize) -> bool {
         match self {
             Self::Inline { len } | Self::LineEnd { len } => *len < shape,
             Self::Multilines => false,
@@ -67,6 +74,17 @@ impl Shape {
             },
             Self::LineEnd { .. } | Self::Multilines => Self::Multilines,
         }
+    }
+
+    pub(crate) fn insert(&mut self, other: &Self) {
+        let shape = match self {
+            Self::Inline { len: len1 } => match other {
+                Self::Inline { len: len2 } => Self::Inline { len: *len1 + *len2 },
+                Self::LineEnd { .. } | Self::Multilines => Self::Multilines,
+            },
+            Self::LineEnd { .. } | Self::Multilines => Self::Multilines,
+        };
+        let _ = mem::replace(self, shape);
     }
 }
 
@@ -185,7 +203,7 @@ impl DynStringLike {
     }
 
     pub(crate) fn append_part(&mut self, part: DynStrPart) {
-        self.shape.append(part.shape());
+        self.shape.insert(part.shape());
         self.parts.push(part);
     }
 }
@@ -315,10 +333,6 @@ impl Exprs {
 
     pub(crate) fn shape(&self) -> Shape {
         self.shape
-    }
-
-    pub(crate) fn can_be_flat(&self) -> bool {
-        !self.shape.is_multilines()
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -481,21 +495,22 @@ impl MethodCall {
         }
     }
 
-    pub(crate) fn set_trailing_trivia(&mut self, trivia: TrailingTrivia) {
-        self.shape.append(&trivia.shape);
-        self.trailing_trivia = trivia;
-    }
-
     pub(crate) fn set_args(&mut self, args: Arguments) {
         // For now surround the arguments by parentheses always.
-        self.shape.append(&Shape::inline("()".len()));
+        self.shape.append(&Shape::inline("(".len()));
         self.shape.append(&args.shape);
+        self.shape.append(&Shape::inline(")".len()));
         self.args = Some(args);
     }
 
     pub(crate) fn set_block(&mut self, block: MethodBlock) {
         self.shape.append(&block.shape);
         self.block = Some(block);
+    }
+
+    pub(crate) fn set_trailing_trivia(&mut self, trivia: TrailingTrivia) {
+        self.shape.append(&trivia.shape);
+        self.trailing_trivia = trivia;
     }
 }
 
@@ -580,13 +595,13 @@ impl MultiAssignTarget {
     }
 
     pub(crate) fn append_target(&mut self, target: Node) {
-        self.shape.append(&target.shape);
+        self.shape.insert(&target.shape);
         self.targets.push(target);
     }
 
     pub(crate) fn set_implicit_rest(&mut self, yes: bool) {
         if yes {
-            self.shape.append(&Shape::inline(",".len()));
+            self.shape.insert(&Shape::inline(",".len()));
         }
         self.with_implicit_rest = yes;
     }
@@ -631,15 +646,15 @@ impl Array {
     pub(crate) fn append_element(&mut self, element: Node) {
         if !self.elements.is_empty() {
             let sep_len = self.separator().len() + 1; // space
-            self.shape.append(&Shape::inline(sep_len));
+            self.shape.insert(&Shape::inline(sep_len));
         }
-        self.shape.append(&element.shape);
+        self.shape.insert(&element.shape);
         self.elements.push(element);
     }
 
     pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
         if let Some(end) = &end {
-            self.shape.append(&end.shape);
+            self.shape.insert(&end.shape);
         }
         self.virtual_end = end;
     }
@@ -686,15 +701,15 @@ impl Hash {
 
     pub(crate) fn append_element(&mut self, element: Node) {
         if !self.elements.is_empty() {
-            self.shape.append(&Shape::inline(", ".len()));
+            self.shape.insert(&Shape::inline(", ".len()));
         }
-        self.shape.append(&element.shape);
+        self.shape.insert(&element.shape);
         self.elements.push(element);
     }
 
     pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
         if let Some(end) = &end {
-            self.shape.append(&end.shape);
+            self.shape.insert(&end.shape);
         }
         self.virtual_end = end;
     }
@@ -784,7 +799,10 @@ pub(crate) struct TrailingTrivia {
 impl TrailingTrivia {
     pub(crate) fn new(comment: Option<Comment>) -> Self {
         let shape = if comment.is_some() {
-            Shape::Multilines
+            Shape::LineEnd {
+                // Do not take into account the length of trailing comment.
+                len: 0,
+            }
         } else {
             Shape::inline(0)
         };
@@ -915,7 +933,7 @@ impl Formatter {
     fn format_embedded_exprs(&mut self, embedded: &EmbeddedExprs, ctx: &FormatContext) {
         self.push_str(&embedded.opening);
 
-        if embedded.exprs.shape.fits_in(self.remaining_width) {
+        if embedded.exprs.shape.fits_in_inline(self.remaining_width) {
             self.format_exprs(&embedded.exprs, ctx, false);
         } else {
             self.break_line(ctx);
@@ -936,7 +954,7 @@ impl Formatter {
     }
 
     fn format_exprs(&mut self, exprs: &Exprs, ctx: &FormatContext, block_always: bool) {
-        if exprs.can_be_flat() && !block_always {
+        if exprs.shape.is_inline() && !block_always {
             if let Some(node) = exprs.nodes.get(0) {
                 self.format(node, ctx);
             }
@@ -1099,7 +1117,7 @@ impl Formatter {
             self.write_trailing_comment(&recv.trailing_trivia);
         }
 
-        if chain.shape.fits_in(self.remaining_width) {
+        if chain.shape.fits_in_inline(self.remaining_width) {
             for call in chain.calls.iter() {
                 if let Some(call_op) = &call.call_op {
                     self.push_str(call_op);
@@ -1153,7 +1171,8 @@ impl Formatter {
 
                 if let Some(args) = &call.args {
                     self.push(args_parens.0);
-                    if args.shape.fits_in(self.remaining_width.saturating_sub(1)) {
+                    let remaining = self.remaining_width.saturating_sub(1);
+                    if args.shape.fits_in_inline(remaining) {
                         for (i, arg) in args.nodes.iter().enumerate() {
                             if i > 0 {
                                 self.push_str(", ");
@@ -1192,7 +1211,7 @@ impl Formatter {
 
                 if let Some(block) = &call.block {
                     if !block.trailing_trivia.is_none()
-                        || !block.body.shape.fits_in(self.remaining_width)
+                        || !block.body.shape.fits_in_inline(self.remaining_width)
                         || !block.was_flat
                     {
                         self.push_str(" do");
@@ -1230,9 +1249,10 @@ impl Formatter {
     }
 
     fn format_assign_right(&mut self, value: &Node, ctx: &FormatContext) {
-        if value.shape.fits_in(self.remaining_width) {
+        if value.shape.fits_in_one_line(self.remaining_width) {
             self.push(' ');
             self.format(value, ctx);
+            self.write_trailing_comment(&value.trailing_trivia);
         } else {
             self.break_line(ctx);
             self.indent();
@@ -1252,7 +1272,7 @@ impl Formatter {
     }
 
     fn format_multi_assign_target(&mut self, multi: &MultiAssignTarget, ctx: &FormatContext) {
-        if multi.shape.fits_in(self.remaining_width) {
+        if multi.shape.fits_in_inline(self.remaining_width) {
             if let Some(lparen) = &multi.lparen {
                 self.push_str(lparen);
             }
@@ -1303,7 +1323,7 @@ impl Formatter {
     }
 
     fn format_array(&mut self, array: &Array, ctx: &FormatContext) {
-        if array.shape.fits_in(self.remaining_width) {
+        if array.shape.fits_in_one_line(self.remaining_width) {
             self.push_str(&array.opening);
             for (i, n) in array.elements.iter().enumerate() {
                 if i > 0 {
@@ -1345,7 +1365,7 @@ impl Formatter {
     }
 
     fn format_hash(&mut self, hash: &Hash, ctx: &FormatContext) {
-        if hash.shape.fits_in(self.remaining_width) {
+        if hash.shape.fits_in_one_line(self.remaining_width) {
             self.push_str(&hash.opening);
             self.push(' ');
             for (i, n) in hash.elements.iter().enumerate() {
@@ -1388,7 +1408,7 @@ impl Formatter {
     }
 
     fn format_keyword_hash(&mut self, khash: &KeywordHash, ctx: &FormatContext) {
-        if khash.shape.fits_in(self.remaining_width) {
+        if khash.shape.fits_in_inline(self.remaining_width) {
             for (i, n) in khash.elements.iter().enumerate() {
                 if i > 0 {
                     self.push_str(", ");
@@ -1421,7 +1441,7 @@ impl Formatter {
 
     fn format_assoc(&mut self, assoc: &Assoc, ctx: &FormatContext) {
         self.format(&assoc.key, ctx);
-        if assoc.value.shape.fits_in(self.remaining_width) {
+        if assoc.value.shape.fits_in_inline(self.remaining_width) {
             if let Some(op) = &assoc.operator {
                 self.push(' ');
                 self.push_str(op);
