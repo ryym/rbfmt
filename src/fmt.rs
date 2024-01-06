@@ -24,41 +24,48 @@ pub(crate) fn format(node: Node, heredoc_map: HeredocMap) -> String {
 pub(crate) struct Pos(pub usize);
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) enum Width {
-    Flat(usize),
-    NotFlat,
+pub(crate) enum Shape {
+    Inline { len: usize },
+    LineEnd { len: usize },
+    Multilines,
 }
 
-impl Width {
-    pub(crate) fn fits_in(&self, width: usize) -> bool {
+impl Shape {
+    pub(crate) fn inline(len: usize) -> Self {
+        Self::Inline { len }
+    }
+
+    pub(crate) fn is_multilines(&self) -> bool {
+        matches!(self, Self::Multilines)
+    }
+
+    pub(crate) fn fits_in(&self, shape: usize) -> bool {
         match self {
-            Self::Flat(w) => *w <= width,
-            Self::NotFlat => false,
+            Self::Inline { len } | Self::LineEnd { len } => *len < shape,
+            Self::Multilines => false,
         }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
         match self {
-            Self::Flat(w) => *w == 0,
-            Self::NotFlat => false,
-        }
-    }
-
-    pub(crate) fn add(self, other: &Self) -> Self {
-        match (&self, other) {
-            (Self::Flat(w1), Self::Flat(w2)) => Self::Flat(*w1 + w2),
-            _ => Self::NotFlat,
+            Self::Inline { len } | Self::LineEnd { len } => *len == 0,
+            Self::Multilines => false,
         }
     }
 
     pub(crate) fn append(&mut self, other: &Self) {
-        let width = self.add(other);
-        let _ = mem::replace(self, width);
+        let shape = self.add(other);
+        let _ = mem::replace(self, shape);
     }
 
-    pub(crate) fn append_value(&mut self, value: usize) {
-        if let Self::Flat(width) = &self {
-            let _ = mem::replace(self, Self::Flat(width + value));
+    pub(crate) fn add(self, other: &Self) -> Self {
+        match self {
+            Self::Inline { len: len1 } => match other {
+                Self::Inline { len: len2 } => Self::Inline { len: len1 + len2 },
+                Self::LineEnd { len: len2 } => Self::LineEnd { len: len1 + len2 },
+                Self::Multilines => Self::Multilines,
+            },
+            Self::LineEnd { .. } | Self::Multilines => Self::Multilines,
         }
     }
 }
@@ -68,7 +75,7 @@ pub(crate) struct Node {
     pub leading_trivia: LeadingTrivia,
     pub trailing_trivia: TrailingTrivia,
     pub kind: Kind,
-    pub width: Width,
+    pub shape: Shape,
 }
 
 impl Node {
@@ -77,15 +84,15 @@ impl Node {
         kind: Kind,
         trailing_trivia: TrailingTrivia,
     ) -> Self {
-        let width = leading_trivia
-            .width
-            .add(&kind.width())
-            .add(&trailing_trivia.width);
+        let shape = leading_trivia
+            .shape
+            .add(&kind.shape())
+            .add(&trailing_trivia.shape);
         Self {
             leading_trivia,
             trailing_trivia,
             kind,
-            width,
+            shape,
         }
     }
 
@@ -114,30 +121,30 @@ pub(crate) enum Kind {
 }
 
 impl Kind {
-    pub(crate) fn width(&self) -> Width {
+    pub(crate) fn shape(&self) -> Shape {
         match self {
-            Self::Atom(s) => Width::Flat(s.len()),
-            Self::StringLike(s) => s.width,
-            Self::DynStringLike(s) => s.width,
-            Self::HeredocOpening(opening) => *opening.width(),
-            Self::Exprs(exprs) => exprs.width,
-            Self::IfExpr(_) => IfExpr::width(),
-            Self::Postmodifier(pmod) => pmod.width,
-            Self::MethodChain(chain) => chain.width,
-            Self::Assign(assign) => assign.width,
-            Self::MultiAssignTarget(multi) => multi.width,
-            Self::Splat(splat) => splat.width,
-            Self::Array(array) => array.width,
-            Self::Hash(hash) => hash.width,
-            Self::KeywordHash(khash) => khash.width,
-            Self::Assoc(assoc) => assoc.width,
+            Self::Atom(s) => Shape::inline(s.len()),
+            Self::StringLike(s) => s.shape,
+            Self::DynStringLike(s) => s.shape,
+            Self::HeredocOpening(opening) => *opening.shape(),
+            Self::Exprs(exprs) => exprs.shape,
+            Self::IfExpr(_) => IfExpr::shape(),
+            Self::Postmodifier(pmod) => pmod.shape,
+            Self::MethodChain(chain) => chain.shape,
+            Self::Assign(assign) => assign.shape,
+            Self::MultiAssignTarget(multi) => multi.shape,
+            Self::Splat(splat) => splat.shape,
+            Self::Array(array) => array.shape,
+            Self::Hash(hash) => hash.shape,
+            Self::KeywordHash(khash) => khash.shape,
+            Self::Assoc(assoc) => assoc.shape,
         }
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct StringLike {
-    pub width: Width,
+    pub shape: Shape,
     pub opening: Option<String>,
     pub value: Vec<u8>,
     pub closing: Option<String>,
@@ -149,7 +156,7 @@ impl StringLike {
         let closing_len = closing.as_ref().map_or(0, |s| s.len());
         let len = value.len() + opening_len + closing_len;
         Self {
-            width: Width::Flat(len),
+            shape: Shape::inline(len),
             opening,
             value,
             closing,
@@ -159,7 +166,7 @@ impl StringLike {
 
 #[derive(Debug)]
 pub(crate) struct DynStringLike {
-    pub width: Width,
+    pub shape: Shape,
     pub opening: Option<String>,
     pub parts: Vec<DynStrPart>,
     pub closing: Option<String>,
@@ -170,7 +177,7 @@ impl DynStringLike {
         let opening_len = opening.as_ref().map_or(0, |s| s.len());
         let closing_len = closing.as_ref().map_or(0, |s| s.len());
         Self {
-            width: Width::Flat(opening_len + closing_len),
+            shape: Shape::inline(opening_len + closing_len),
             opening,
             parts: vec![],
             closing,
@@ -178,7 +185,7 @@ impl DynStringLike {
     }
 
     pub(crate) fn append_part(&mut self, part: DynStrPart) {
-        self.width.append(part.width());
+        self.shape.append(part.shape());
         self.parts.push(part);
     }
 }
@@ -191,18 +198,18 @@ pub(crate) enum DynStrPart {
 }
 
 impl DynStrPart {
-    pub(crate) fn width(&self) -> &Width {
+    pub(crate) fn shape(&self) -> &Shape {
         match self {
-            Self::Str(s) => &s.width,
-            Self::DynStr(s) => &s.width,
-            Self::Exprs(e) => &e.width,
+            Self::Str(s) => &s.shape,
+            Self::DynStr(s) => &s.shape,
+            Self::Exprs(e) => &e.shape,
         }
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct EmbeddedExprs {
-    pub width: Width,
+    pub shape: Shape,
     pub opening: String,
     pub exprs: Exprs,
     pub closing: String,
@@ -210,9 +217,9 @@ pub(crate) struct EmbeddedExprs {
 
 impl EmbeddedExprs {
     pub(crate) fn new(opening: String, exprs: Exprs, closing: String) -> Self {
-        let width = Width::Flat(opening.len() + closing.len()).add(&exprs.width);
+        let shape = Shape::inline(opening.len() + closing.len()).add(&exprs.shape);
         Self {
-            width,
+            shape,
             opening,
             exprs,
             closing,
@@ -261,14 +268,14 @@ pub(crate) enum HeredocPart {
 
 #[derive(Debug)]
 pub(crate) struct VirtualEnd {
-    width: Width,
+    shape: Shape,
     leading_trivia: LeadingTrivia,
 }
 
 impl VirtualEnd {
     pub(crate) fn new(leading_trivia: LeadingTrivia) -> Self {
         Self {
-            width: leading_trivia.width,
+            shape: leading_trivia.shape,
             leading_trivia,
         }
     }
@@ -276,7 +283,7 @@ impl VirtualEnd {
 
 #[derive(Debug)]
 pub(crate) struct Exprs {
-    width: Width,
+    shape: Shape,
     nodes: Vec<Node>,
     virtual_end: Option<VirtualEnd>,
 }
@@ -284,7 +291,7 @@ pub(crate) struct Exprs {
 impl Exprs {
     pub(crate) fn new() -> Self {
         Self {
-            width: Width::Flat(0),
+            shape: Shape::inline(0),
             nodes: vec![],
             virtual_end: None,
         }
@@ -292,57 +299,54 @@ impl Exprs {
 
     pub(crate) fn append_node(&mut self, node: Node) {
         if self.nodes.is_empty() && !matches!(node.kind, Kind::HeredocOpening(_)) {
-            self.width = node.width;
+            self.shape = node.shape;
         } else {
-            self.width = Width::NotFlat;
+            self.shape = Shape::Multilines;
         }
         self.nodes.push(node);
     }
 
     pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
         if let Some(end) = &end {
-            self.width.append(&end.width);
+            self.shape.append(&end.shape);
         }
         self.virtual_end = end;
     }
 
-    pub(crate) fn width(&self) -> Width {
-        self.width
+    pub(crate) fn shape(&self) -> Shape {
+        self.shape
     }
 
     pub(crate) fn can_be_flat(&self) -> bool {
-        matches!(self.width, Width::Flat(_))
+        !self.shape.is_multilines()
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        match self.width {
-            Width::Flat(w) => w == 0,
-            Width::NotFlat => false,
-        }
+        self.shape.is_empty()
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct HeredocOpening {
     pos: Pos,
-    width: Width,
+    shape: Shape,
     id: String,
     indent_mode: HeredocIndentMode,
 }
 
 impl HeredocOpening {
     pub(crate) fn new(pos: Pos, id: String, indent_mode: HeredocIndentMode) -> Self {
-        let width = Width::Flat(id.len() + indent_mode.prefix_symbols().len());
+        let shape = Shape::inline(id.len() + indent_mode.prefix_symbols().len());
         Self {
             pos,
-            width,
+            shape,
             id,
             indent_mode,
         }
     }
 
-    pub(crate) fn width(&self) -> &Width {
-        &self.width
+    pub(crate) fn shape(&self) -> &Shape {
+        &self.shape
     }
 }
 
@@ -364,24 +368,24 @@ impl IfExpr {
         }
     }
 
-    pub(crate) fn width() -> Width {
-        Width::NotFlat
+    pub(crate) fn shape() -> Shape {
+        Shape::Multilines
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct Postmodifier {
-    pub width: Width,
+    pub shape: Shape,
     pub keyword: String,
     pub conditional: Conditional,
 }
 
 impl Postmodifier {
     pub(crate) fn new(keyword: String, conditional: Conditional) -> Self {
-        let kwd_width = Width::Flat(keyword.len() + 2); // keyword and spaces around it.
-        let width = conditional.width.add(&kwd_width);
+        let kwd_shape = Shape::inline(keyword.len() + 2); // keyword and spaces around it.
+        let shape = conditional.shape.add(&kwd_shape);
         Self {
-            width,
+            shape,
             keyword,
             conditional,
         }
@@ -390,7 +394,7 @@ impl Postmodifier {
 
 #[derive(Debug)]
 pub(crate) struct Conditional {
-    pub width: Width,
+    pub shape: Shape,
     pub keyword_trailing: TrailingTrivia,
     pub cond: Box<Node>,
     pub body: Exprs,
@@ -398,9 +402,9 @@ pub(crate) struct Conditional {
 
 impl Conditional {
     pub(crate) fn new(keyword_trailing: TrailingTrivia, cond: Node, body: Exprs) -> Self {
-        let width = keyword_trailing.width.add(&cond.width).add(&body.width);
+        let shape = keyword_trailing.shape.add(&cond.shape).add(&body.shape);
         Self {
-            width,
+            shape,
             keyword_trailing,
             cond: Box::new(cond),
             body,
@@ -417,7 +421,7 @@ pub(crate) struct Else {
 #[derive(Debug)]
 pub(crate) struct Arguments {
     nodes: Vec<Node>,
-    width: Width,
+    shape: Shape,
     virtual_end: Option<VirtualEnd>,
 }
 
@@ -425,22 +429,22 @@ impl Arguments {
     pub(crate) fn new() -> Self {
         Self {
             nodes: vec![],
-            width: Width::Flat(0),
+            shape: Shape::inline(0),
             virtual_end: None,
         }
     }
 
     pub(crate) fn append_node(&mut self, node: Node) {
-        self.width.append(&node.width);
+        self.shape.append(&node.shape);
         if !self.nodes.is_empty() {
-            self.width.append_value(", ".len());
+            self.shape.append(&Shape::inline(", ".len()));
         }
         self.nodes.push(node);
     }
 
     pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
         if let Some(end) = &end {
-            self.width.append(&end.width);
+            self.shape.append(&end.shape);
         }
         self.virtual_end = end;
     }
@@ -448,7 +452,7 @@ impl Arguments {
 
 #[derive(Debug)]
 pub(crate) struct MethodCall {
-    pub width: Width,
+    pub shape: Shape,
     pub leading_trivia: LeadingTrivia,
     pub trailing_trivia: TrailingTrivia,
     pub call_op: Option<String>,
@@ -464,10 +468,10 @@ impl MethodCall {
         name: String,
     ) -> Self {
         let call_op_len = call_op.as_ref().map_or(0, |s| s.len());
-        let msg_width = Width::Flat(name.len() + call_op_len);
-        let width = leading_trivia.width.add(&msg_width);
+        let msg_shape = Shape::inline(name.len() + call_op_len);
+        let shape = leading_trivia.shape.add(&msg_shape);
         Self {
-            width,
+            shape,
             leading_trivia,
             trailing_trivia: TrailingTrivia::none(),
             call_op,
@@ -478,26 +482,26 @@ impl MethodCall {
     }
 
     pub(crate) fn set_trailing_trivia(&mut self, trivia: TrailingTrivia) {
-        self.width.append(&trivia.width);
+        self.shape.append(&trivia.shape);
         self.trailing_trivia = trivia;
     }
 
     pub(crate) fn set_args(&mut self, args: Arguments) {
         // For now surround the arguments by parentheses always.
-        self.width.append_value("()".len());
-        self.width.append(&args.width);
+        self.shape.append(&Shape::inline("()".len()));
+        self.shape.append(&args.shape);
         self.args = Some(args);
     }
 
     pub(crate) fn set_block(&mut self, block: MethodBlock) {
-        self.width.append(&block.width);
+        self.shape.append(&block.shape);
         self.block = Some(block);
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct MethodBlock {
-    pub width: Width,
+    pub shape: Shape,
     pub trailing_trivia: TrailingTrivia,
     // pub args
     pub body: Exprs,
@@ -506,7 +510,7 @@ pub(crate) struct MethodBlock {
 
 #[derive(Debug)]
 pub(crate) struct MethodChain {
-    width: Width,
+    shape: Shape,
     receiver: Option<Box<Node>>,
     calls: Vec<MethodCall>,
 }
@@ -514,21 +518,21 @@ pub(crate) struct MethodChain {
 impl MethodChain {
     pub(crate) fn new(receiver: Option<Node>) -> Self {
         Self {
-            width: receiver.as_ref().map_or(Width::Flat(0), |r| r.width),
+            shape: receiver.as_ref().map_or(Shape::inline(0), |r| r.shape),
             receiver: receiver.map(Box::new),
             calls: vec![],
         }
     }
 
     pub(crate) fn append_call(&mut self, call: MethodCall) {
-        self.width.append(&call.width);
+        self.shape.append(&call.shape);
         self.calls.push(call);
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct Assign {
-    width: Width,
+    shape: Shape,
     target: Box<Node>,
     operator: String,
     value: Box<Node>,
@@ -536,12 +540,12 @@ pub(crate) struct Assign {
 
 impl Assign {
     pub(crate) fn new(target: Node, operator: String, value: Node) -> Self {
-        let width = target
-            .width
-            .add(&value.width)
-            .add(&Width::Flat(operator.len()));
+        let shape = target
+            .shape
+            .add(&value.shape)
+            .add(&Shape::inline(operator.len()));
         Self {
-            width,
+            shape,
             target: Box::new(target),
             operator,
             value: Box::new(value),
@@ -551,7 +555,7 @@ impl Assign {
 
 #[derive(Debug)]
 pub(crate) struct MultiAssignTarget {
-    width: Width,
+    shape: Shape,
     lparen: Option<String>,
     rparen: Option<String>,
     targets: Vec<Node>,
@@ -566,7 +570,7 @@ impl MultiAssignTarget {
             _ => 0,
         };
         Self {
-            width: Width::Flat(parens_len),
+            shape: Shape::inline(parens_len),
             lparen,
             rparen,
             targets: vec![],
@@ -576,20 +580,20 @@ impl MultiAssignTarget {
     }
 
     pub(crate) fn append_target(&mut self, target: Node) {
-        self.width.append(&target.width);
+        self.shape.append(&target.shape);
         self.targets.push(target);
     }
 
     pub(crate) fn set_implicit_rest(&mut self, yes: bool) {
         if yes {
-            self.width.append_value(",".len());
+            self.shape.append(&Shape::inline(",".len()));
         }
         self.with_implicit_rest = yes;
     }
 
     pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
         if let Some(end) = &end {
-            self.width.append(&end.width);
+            self.shape.append(&end.shape);
         }
         self.virtual_end = end;
     }
@@ -597,7 +601,7 @@ impl MultiAssignTarget {
 
 #[derive(Debug)]
 pub(crate) struct Array {
-    width: Width,
+    shape: Shape,
     opening: String,
     closing: String,
     elements: Vec<Node>,
@@ -606,9 +610,9 @@ pub(crate) struct Array {
 
 impl Array {
     pub(crate) fn new(opening: String, closing: String) -> Self {
-        let width = Width::Flat(opening.len() + closing.len());
+        let shape = Shape::inline(opening.len() + closing.len());
         Self {
-            width,
+            shape,
             opening,
             closing,
             elements: vec![],
@@ -626,15 +630,16 @@ impl Array {
 
     pub(crate) fn append_element(&mut self, element: Node) {
         if !self.elements.is_empty() {
-            self.width.append_value(self.separator().len() + 1);
+            let sep_len = self.separator().len() + 1; // space
+            self.shape.append(&Shape::inline(sep_len));
         }
-        self.width.append(&element.width);
+        self.shape.append(&element.shape);
         self.elements.push(element);
     }
 
     pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
         if let Some(end) = &end {
-            self.width.append(&end.width);
+            self.shape.append(&end.shape);
         }
         self.virtual_end = end;
     }
@@ -642,16 +647,16 @@ impl Array {
 
 #[derive(Debug)]
 pub(crate) struct Splat {
-    width: Width,
+    shape: Shape,
     operator: String,
     expression: Box<Node>,
 }
 
 impl Splat {
     pub(crate) fn new(operator: String, expression: Node) -> Self {
-        let width = Width::Flat(operator.len()).add(&expression.width);
+        let shape = Shape::inline(operator.len()).add(&expression.shape);
         Self {
-            width,
+            shape,
             operator,
             expression: Box::new(expression),
         }
@@ -660,7 +665,7 @@ impl Splat {
 
 #[derive(Debug)]
 pub(crate) struct Hash {
-    width: Width,
+    shape: Shape,
     opening: String,
     closing: String,
     elements: Vec<Node>,
@@ -669,9 +674,9 @@ pub(crate) struct Hash {
 
 impl Hash {
     pub(crate) fn new(opening: String, closing: String) -> Self {
-        let width = Width::Flat(opening.len() + closing.len());
+        let shape = Shape::inline(opening.len() + closing.len());
         Self {
-            width,
+            shape,
             opening,
             closing,
             elements: vec![],
@@ -681,15 +686,15 @@ impl Hash {
 
     pub(crate) fn append_element(&mut self, element: Node) {
         if !self.elements.is_empty() {
-            self.width.append_value(", ".len());
+            self.shape.append(&Shape::inline(", ".len()));
         }
-        self.width.append(&element.width);
+        self.shape.append(&element.shape);
         self.elements.push(element);
     }
 
     pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
         if let Some(end) = &end {
-            self.width.append(&end.width);
+            self.shape.append(&end.shape);
         }
         self.virtual_end = end;
     }
@@ -697,31 +702,31 @@ impl Hash {
 
 #[derive(Debug)]
 pub(crate) struct KeywordHash {
-    width: Width,
+    shape: Shape,
     elements: Vec<Node>,
 }
 
 impl KeywordHash {
     pub(crate) fn new() -> Self {
-        let width = Width::Flat(0);
+        let shape = Shape::inline(0);
         Self {
-            width,
+            shape,
             elements: vec![],
         }
     }
 
     pub(crate) fn append_element(&mut self, element: Node) {
         if !self.elements.is_empty() {
-            self.width.append_value(", ".len());
+            self.shape.append(&Shape::inline(", ".len()));
         }
-        self.width.append(&element.width);
+        self.shape.append(&element.shape);
         self.elements.push(element);
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct Assoc {
-    width: Width,
+    shape: Shape,
     key: Box<Node>,
     value: Box<Node>,
     operator: Option<String>,
@@ -729,14 +734,14 @@ pub(crate) struct Assoc {
 
 impl Assoc {
     pub(crate) fn new(key: Node, operator: Option<String>, value: Node) -> Self {
-        let mut width = key.width.add(&value.width);
-        width.append_value(1); // space
+        let mut shape = key.shape.add(&value.shape);
+        shape.append(&Shape::inline(1)); // space
         if let Some(op) = &operator {
-            width.append_value(op.len());
-            width.append_value(1); // space
+            shape.append(&Shape::inline(op.len()));
+            shape.append(&Shape::inline(1)); // space
         }
         Self {
-            width,
+            shape,
             key: Box::new(key),
             value: Box::new(value),
             operator,
@@ -747,14 +752,14 @@ impl Assoc {
 #[derive(Debug)]
 pub(crate) struct LeadingTrivia {
     lines: Vec<LineTrivia>,
-    width: Width,
+    shape: Shape,
 }
 
 impl LeadingTrivia {
     pub(crate) fn new() -> Self {
         Self {
             lines: vec![],
-            width: Width::Flat(0),
+            shape: Shape::inline(0),
         }
     }
 
@@ -764,7 +769,7 @@ impl LeadingTrivia {
 
     pub(crate) fn append_line(&mut self, trivia: LineTrivia) {
         if matches!(trivia, LineTrivia::Comment(_)) {
-            self.width = Width::NotFlat;
+            self.shape = Shape::Multilines;
         }
         self.lines.push(trivia);
     }
@@ -773,17 +778,17 @@ impl LeadingTrivia {
 #[derive(Debug)]
 pub(crate) struct TrailingTrivia {
     comment: Option<Comment>,
-    width: Width,
+    shape: Shape,
 }
 
 impl TrailingTrivia {
     pub(crate) fn new(comment: Option<Comment>) -> Self {
-        let width = if comment.is_some() {
-            Width::NotFlat
+        let shape = if comment.is_some() {
+            Shape::Multilines
         } else {
-            Width::Flat(0)
+            Shape::inline(0)
         };
-        Self { comment, width }
+        Self { comment, shape }
     }
 
     pub(crate) fn none() -> Self {
@@ -910,7 +915,7 @@ impl Formatter {
     fn format_embedded_exprs(&mut self, embedded: &EmbeddedExprs, ctx: &FormatContext) {
         self.push_str(&embedded.opening);
 
-        if embedded.exprs.width.fits_in(self.remaining_width) {
+        if embedded.exprs.shape.fits_in(self.remaining_width) {
             self.format_exprs(&embedded.exprs, ctx, false);
         } else {
             self.break_line(ctx);
@@ -1094,7 +1099,7 @@ impl Formatter {
             self.write_trailing_comment(&recv.trailing_trivia);
         }
 
-        if chain.width.fits_in(self.remaining_width) {
+        if chain.shape.fits_in(self.remaining_width) {
             for call in chain.calls.iter() {
                 if let Some(call_op) = &call.call_op {
                     self.push_str(call_op);
@@ -1148,7 +1153,7 @@ impl Formatter {
 
                 if let Some(args) = &call.args {
                     self.push(args_parens.0);
-                    if args.width.fits_in(self.remaining_width.saturating_sub(1)) {
+                    if args.shape.fits_in(self.remaining_width.saturating_sub(1)) {
                         for (i, arg) in args.nodes.iter().enumerate() {
                             if i > 0 {
                                 self.push_str(", ");
@@ -1187,7 +1192,7 @@ impl Formatter {
 
                 if let Some(block) = &call.block {
                     if !block.trailing_trivia.is_none()
-                        || !block.body.width.fits_in(self.remaining_width)
+                        || !block.body.shape.fits_in(self.remaining_width)
                         || !block.was_flat
                     {
                         self.push_str(" do");
@@ -1225,7 +1230,7 @@ impl Formatter {
     }
 
     fn format_assign_right(&mut self, value: &Node, ctx: &FormatContext) {
-        if value.width.fits_in(self.remaining_width) {
+        if value.shape.fits_in(self.remaining_width) {
             self.push(' ');
             self.format(value, ctx);
         } else {
@@ -1247,7 +1252,7 @@ impl Formatter {
     }
 
     fn format_multi_assign_target(&mut self, multi: &MultiAssignTarget, ctx: &FormatContext) {
-        if multi.width.fits_in(self.remaining_width) {
+        if multi.shape.fits_in(self.remaining_width) {
             if let Some(lparen) = &multi.lparen {
                 self.push_str(lparen);
             }
@@ -1298,7 +1303,7 @@ impl Formatter {
     }
 
     fn format_array(&mut self, array: &Array, ctx: &FormatContext) {
-        if array.width.fits_in(self.remaining_width) {
+        if array.shape.fits_in(self.remaining_width) {
             self.push_str(&array.opening);
             for (i, n) in array.elements.iter().enumerate() {
                 if i > 0 {
@@ -1340,7 +1345,7 @@ impl Formatter {
     }
 
     fn format_hash(&mut self, hash: &Hash, ctx: &FormatContext) {
-        if hash.width.fits_in(self.remaining_width) {
+        if hash.shape.fits_in(self.remaining_width) {
             self.push_str(&hash.opening);
             self.push(' ');
             for (i, n) in hash.elements.iter().enumerate() {
@@ -1383,7 +1388,7 @@ impl Formatter {
     }
 
     fn format_keyword_hash(&mut self, khash: &KeywordHash, ctx: &FormatContext) {
-        if khash.width.fits_in(self.remaining_width) {
+        if khash.shape.fits_in(self.remaining_width) {
             for (i, n) in khash.elements.iter().enumerate() {
                 if i > 0 {
                     self.push_str(", ");
@@ -1416,12 +1421,12 @@ impl Formatter {
 
     fn format_assoc(&mut self, assoc: &Assoc, ctx: &FormatContext) {
         self.format(&assoc.key, ctx);
-        if assoc.value.width.fits_in(self.remaining_width) {
+        if assoc.value.shape.fits_in(self.remaining_width) {
             if let Some(op) = &assoc.operator {
                 self.push(' ');
                 self.push_str(op);
             }
-            if !assoc.value.width.is_empty() {
+            if !assoc.value.shape.is_empty() {
                 self.push(' ');
                 self.format(&assoc.value, ctx);
             }

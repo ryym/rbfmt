@@ -1507,15 +1507,15 @@ impl FmtNodeBuilder<'_> {
                 let loc = node.location();
                 let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
 
-                let width = if was_flat {
-                    body.width().add(&fmt::Width::Flat(" {  }".len()))
+                let shape = if was_flat {
+                    body.shape().add(&fmt::Shape::inline(" {  }".len()))
                 } else {
-                    fmt::Width::NotFlat
+                    fmt::Shape::Multilines
                 };
 
                 fmt::MethodBlock {
                     trailing_trivia: block_trailing,
-                    width,
+                    shape,
                     body,
                     was_flat,
                 }
