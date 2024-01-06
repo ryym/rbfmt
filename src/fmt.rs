@@ -117,6 +117,14 @@ impl Node {
     pub(crate) fn without_trivia(kind: Kind) -> Self {
         Self::new(LeadingTrivia::new(), kind, TrailingTrivia::none())
     }
+
+    pub(crate) fn is_diagonal(&self) -> bool {
+        if !self.leading_trivia.shape.is_empty() {
+            false
+        } else {
+            self.kind.is_diagonal()
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -156,6 +164,26 @@ impl Kind {
             Self::Hash(hash) => hash.shape,
             Self::KeywordHash(khash) => khash.shape,
             Self::Assoc(assoc) => assoc.shape,
+        }
+    }
+
+    pub(crate) fn is_diagonal(&self) -> bool {
+        match self {
+            Self::Atom(_) => false,
+            Self::StringLike(_) => false,
+            Self::DynStringLike(_) => false,
+            Self::HeredocOpening(_) => false,
+            Self::Exprs(_) => false,
+            Self::IfExpr(_) => false,
+            Self::Postmodifier(_) => true,
+            Self::MethodChain(_) => true,
+            Self::Assign(_) => true,
+            Self::MultiAssignTarget(_) => true,
+            Self::Splat(_) => false,
+            Self::Array(_) => true,
+            Self::Hash(_) => true,
+            Self::KeywordHash(_) => true,
+            Self::Assoc(_) => true,
         }
     }
 }
@@ -1245,7 +1273,7 @@ impl Formatter {
     }
 
     fn format_assign_right(&mut self, value: &Node, ctx: &FormatContext) {
-        if value.shape.fits_in_one_line(self.remaining_width) {
+        if value.shape.fits_in_one_line(self.remaining_width) || value.is_diagonal() {
             self.push(' ');
             self.format(value, ctx);
             self.write_trailing_comment(&value.trailing_trivia);
@@ -1437,7 +1465,7 @@ impl Formatter {
 
     fn format_assoc(&mut self, assoc: &Assoc, ctx: &FormatContext) {
         self.format(&assoc.key, ctx);
-        if assoc.value.shape.fits_in_inline(self.remaining_width) {
+        if assoc.value.shape.fits_in_inline(self.remaining_width) || assoc.value.is_diagonal() {
             if let Some(op) = &assoc.operator {
                 self.push(' ');
                 self.push_str(op);

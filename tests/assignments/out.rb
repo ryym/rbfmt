@@ -59,10 +59,9 @@ foo
   # baz
   .baz ||= a.b {}
 
-a =
-  foo
-    # bar
-    .bar
+a = foo
+  # bar
+  .bar
 
 foo[1] &&= 1
 foo(bar).baz[true, nil] ||= a.b
