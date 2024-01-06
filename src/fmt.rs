@@ -334,10 +334,6 @@ impl Exprs {
     pub(crate) fn shape(&self) -> Shape {
         self.shape
     }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        self.shape.is_empty()
-    }
 }
 
 #[derive(Debug)]
@@ -1040,7 +1036,7 @@ impl Formatter {
         }
 
         self.format_node_after_keyword(ctx, &expr.if_first.keyword_trailing, &expr.if_first.cond);
-        if !expr.if_first.body.is_empty() {
+        if !expr.if_first.body.shape.is_empty() {
             self.break_line(ctx);
             self.format_exprs(&expr.if_first.body, ctx, true);
         }
@@ -1051,7 +1047,7 @@ impl Formatter {
             self.put_indent();
             self.push_str("elsif");
             self.format_node_after_keyword(ctx, &elsif.keyword_trailing, &elsif.cond);
-            if !elsif.body.is_empty() {
+            if !elsif.body.shape.is_empty() {
                 self.break_line(ctx);
                 self.format_exprs(&elsif.body, ctx, true);
             }
@@ -1064,7 +1060,7 @@ impl Formatter {
             self.push_str("else");
             self.write_trailing_comment(&if_last.keyword_trailing);
             self.indent();
-            if !if_last.body.is_empty() {
+            if !if_last.body.shape.is_empty() {
                 self.break_line(ctx);
                 self.format_exprs(&if_last.body, ctx, true);
             }
@@ -1140,7 +1136,7 @@ impl Formatter {
                     self.push(args_parens.1);
                 }
                 if let Some(block) = &call.block {
-                    if block.body.is_empty() {
+                    if block.body.shape.is_empty() {
                         self.push_str(" {}");
                     } else {
                         self.push_str(" { ");
@@ -1217,7 +1213,7 @@ impl Formatter {
                         self.push_str(" do");
                         self.write_trailing_comment(&block.trailing_trivia);
                         self.indent();
-                        if !block.body.is_empty() {
+                        if !block.body.shape.is_empty() {
                             self.break_line(ctx);
                             self.format_exprs(&block.body, ctx, true);
                         }
@@ -1225,7 +1221,7 @@ impl Formatter {
                         self.break_line(ctx);
                         self.put_indent();
                         self.push_str("end");
-                    } else if block.body.is_empty() {
+                    } else if block.body.shape.is_empty() {
                         self.push_str(" {}");
                     } else {
                         self.push_str(" { ");
