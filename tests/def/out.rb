@@ -26,7 +26,7 @@ def foo(
   # a
   a, # b
   b,
-  c,
+  c
   # d
 )
 end
@@ -40,7 +40,7 @@ def foo(
   a,
   # b
   b,
-  c,
+  c
 )
 end
 

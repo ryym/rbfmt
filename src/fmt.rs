@@ -1659,20 +1659,25 @@ impl Formatter {
             } else {
                 self.push('(');
                 self.indent();
-                for (i, n) in params.params.iter().enumerate() {
-                    self.break_line(ctx);
-                    self.write_leading_trivia(
-                        &n.leading_trivia,
-                        ctx,
-                        EmptyLineHandling::Trim {
-                            start: i == 0,
-                            end: false,
-                        },
-                    );
-                    self.put_indent();
-                    self.format(n, ctx);
-                    self.push(',');
-                    self.write_trailing_comment(&n.trailing_trivia);
+                if !params.params.is_empty() {
+                    let last_idx = params.params.len() - 1;
+                    for (i, n) in params.params.iter().enumerate() {
+                        self.break_line(ctx);
+                        self.write_leading_trivia(
+                            &n.leading_trivia,
+                            ctx,
+                            EmptyLineHandling::Trim {
+                                start: i == 0,
+                                end: false,
+                            },
+                        );
+                        self.put_indent();
+                        self.format(n, ctx);
+                        if i < last_idx {
+                            self.push(',');
+                        }
+                        self.write_trailing_comment(&n.trailing_trivia);
+                    }
                 }
                 self.write_trivia_at_virtual_end(
                     ctx,
