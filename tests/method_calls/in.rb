@@ -62,6 +62,11 @@ foo do # do
 end
 
 foo do
+  1
+  # 2
+end
+
+foo do
 
   # foo
 

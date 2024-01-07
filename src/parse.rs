@@ -1512,7 +1512,7 @@ impl FmtNodeBuilder<'_> {
                 let body_end_loc = node.closing_loc().start_offset();
                 let body = node.body().map(|n| self.visit(n, body_end_loc));
                 // XXX: Is this necessary? I cannot find the case where the body is not a StatementNode.
-                let body = self.wrap_as_exprs(body, Some(body_end_loc));
+                let body = self.wrap_as_exprs(body, body_end_loc);
 
                 let loc = node.location();
                 let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
@@ -1700,20 +1700,22 @@ impl FmtNodeBuilder<'_> {
         (leading, def, trailing)
     }
 
-    fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: Option<usize>) -> fmt::Exprs {
-        let mut exprs = match node {
-            None => fmt::Exprs::new(),
+    fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: usize) -> fmt::Exprs {
+        let (mut exprs, should_take_end_trivia) = match node {
+            None => (fmt::Exprs::new(), true),
             Some(node) => match node.kind {
-                fmt::Kind::Exprs(exprs) => exprs,
+                fmt::Kind::Exprs(exprs) => (exprs, false),
                 _ => {
                     let mut exprs = fmt::Exprs::new();
                     exprs.append_node(node);
-                    exprs
+                    (exprs, true)
                 }
             },
         };
-        let virtual_end = self.take_end_trivia_as_virtual_end(end);
-        exprs.set_virtual_end(virtual_end);
+        if should_take_end_trivia {
+            let virtual_end = self.take_end_trivia_as_virtual_end(Some(end));
+            exprs.set_virtual_end(virtual_end);
+        }
         exprs
     }
 
