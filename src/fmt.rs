@@ -1384,7 +1384,6 @@ impl Formatter {
         if value.shape.fits_in_one_line(self.remaining_width) || value.is_diagonal() {
             self.push(' ');
             self.format(value, ctx);
-            self.write_trailing_comment(&value.trailing_trivia);
         } else {
             self.break_line(ctx);
             self.indent();
@@ -1398,7 +1397,6 @@ impl Formatter {
             );
             self.put_indent();
             self.format(value, ctx);
-            self.write_trailing_comment(&value.trailing_trivia);
             self.dedent();
         }
     }

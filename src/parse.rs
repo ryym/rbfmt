@@ -1576,7 +1576,8 @@ impl FmtNodeBuilder<'_> {
         let leading = self.take_leading_trivia(node_loc.start_offset());
         let name = Self::source_lossy_at(&name_loc);
         let operator = Self::source_lossy_at(&operator_loc);
-        let value = self.visit(value, next_loc_start);
+        // Pass 0 to associate trailing trivia to the Assign kind, not the value.
+        let value = self.visit(value, 0);
         let trailing = self.take_trailing_comment(next_loc_start);
         let target = fmt::Node::without_trivia(fmt::Kind::Atom(name));
         (leading, fmt::Assign::new(target, operator, value), trailing)
