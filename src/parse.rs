@@ -954,23 +954,27 @@ impl FmtNodeBuilder<'_> {
 
             prism::Node::SplatNode { .. } => {
                 let node = node.as_splat_node().unwrap();
+                let loc = node.location();
+                let leading = self.take_leading_trivia(loc.start_offset());
                 let operator = Self::source_lossy_at(&node.operator_loc());
                 // XXX: I cannot find the case where the expression is None.
                 let expr = node.expression().expect("SplatNode must have expression");
-                let expr = self.visit(expr, next_loc_start);
+                let expr = self.visit(expr, loc.end_offset());
                 let splat = fmt::Splat::new(operator, expr);
-                // XXX: We need to parse Trivia around the splat operator.
-                fmt::Node::without_trivia(fmt::Kind::Splat(splat))
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Splat(splat), trailing)
             }
             prism::Node::AssocSplatNode { .. } => {
                 let node = node.as_assoc_splat_node().unwrap();
+                let loc = node.location();
+                let leading = self.take_leading_trivia(loc.start_offset());
                 let operator = Self::source_lossy_at(&node.operator_loc());
                 // XXX: I cannot find the case where the value is None.
                 let value = node.value().expect("AssocSplatNode must have value");
-                let value = self.visit(value, next_loc_start);
+                let value = self.visit(value, loc.end_offset());
                 let splat = fmt::Splat::new(operator, value);
-                // XXX: We need to parse Trivia around the splat operator.
-                fmt::Node::without_trivia(fmt::Kind::Splat(splat))
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Splat(splat), trailing)
             }
 
             prism::Node::ArrayNode { .. } => {
