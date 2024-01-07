@@ -478,16 +478,16 @@ pub(crate) struct Else {
 
 #[derive(Debug)]
 pub(crate) struct Arguments {
-    nodes: Vec<Node>,
     shape: Shape,
+    nodes: Vec<Node>,
     virtual_end: Option<VirtualEnd>,
 }
 
 impl Arguments {
     pub(crate) fn new() -> Self {
         Self {
-            nodes: vec![],
             shape: Shape::inline(0),
+            nodes: vec![],
             virtual_end: None,
         }
     }
