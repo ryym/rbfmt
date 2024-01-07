@@ -134,6 +134,7 @@ pub(crate) enum Kind {
     DynStringLike(DynStringLike),
     HeredocOpening(HeredocOpening),
     Exprs(Exprs),
+    Parens(Parens),
     IfExpr(IfExpr),
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
@@ -155,6 +156,7 @@ impl Kind {
             Self::DynStringLike(s) => s.shape,
             Self::HeredocOpening(opening) => *opening.shape(),
             Self::Exprs(exprs) => exprs.shape,
+            Self::Parens(parens) => parens.shape,
             Self::IfExpr(_) => IfExpr::shape(),
             Self::Postmodifier(pmod) => pmod.shape,
             Self::MethodChain(chain) => chain.shape,
@@ -176,6 +178,7 @@ impl Kind {
             Self::DynStringLike(_) => false,
             Self::HeredocOpening(_) => false,
             Self::Exprs(_) => false,
+            Self::Parens(_) => true,
             Self::IfExpr(_) => false,
             Self::Postmodifier(_) => true,
             Self::MethodChain(_) => true,
@@ -364,6 +367,20 @@ impl Exprs {
 
     pub(crate) fn shape(&self) -> Shape {
         self.shape
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Parens {
+    shape: Shape,
+    body: Exprs,
+}
+
+impl Parens {
+    pub(crate) fn new(body: Exprs) -> Self {
+        let mut shape = Shape::inline("()".len());
+        shape.insert(&body.shape);
+        Self { shape, body }
     }
 }
 
@@ -925,6 +942,7 @@ impl Formatter {
             Kind::DynStringLike(dstr) => self.format_dyn_string_like(dstr, ctx),
             Kind::HeredocOpening(opening) => self.format_heredoc_opening(opening),
             Kind::Exprs(exprs) => self.format_exprs(exprs, ctx, false),
+            Kind::Parens(parens) => self.format_parens(parens, ctx),
             Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
@@ -1035,6 +1053,25 @@ impl Formatter {
             !exprs.nodes.is_empty(),
             exprs.nodes.is_empty(),
         );
+    }
+
+    fn format_parens(&mut self, parens: &Parens, ctx: &FormatContext) {
+        if parens.body.shape().is_empty() {
+            self.push_str("()");
+        } else {
+            self.push('(');
+            if parens.body.shape.fits_in_inline(self.remaining_width) {
+                self.format_exprs(&parens.body, ctx, false);
+            } else {
+                self.indent();
+                self.break_line(ctx);
+                self.format_exprs(&parens.body, ctx, false);
+                self.dedent();
+                self.break_line(ctx);
+                self.put_indent();
+            }
+            self.push(')');
+        }
     }
 
     fn write_trivia_at_virtual_end(

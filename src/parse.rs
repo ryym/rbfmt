@@ -1064,6 +1064,17 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::without_trivia(fmt::Kind::Atom("".to_string()))
             }
 
+            prism::Node::ParenthesesNode { .. } => {
+                let node = node.as_parentheses_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let closing_start = node.closing_loc().start_offset();
+                let body = node.body().map(|b| self.visit(b, closing_start));
+                let body = self.wrap_as_exprs(body, closing_start);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                let parens = fmt::Parens::new(body);
+                fmt::Node::new(leading, fmt::Kind::Parens(parens), trailing)
+            }
+
             prism::Node::DefNode { .. } => {
                 let node = node.as_def_node().unwrap();
                 let (leading, def, trailing) = self.visit_def(node, next_loc_start);
