@@ -794,17 +794,25 @@ impl Assoc {
 #[derive(Debug)]
 pub(crate) struct Def {
     shape: Shape,
+    receiver: Option<Box<Node>>,
     name: String,
-    // receiver
     // parameters
+    // name_trailing
     // body (statements | begin)
     // is_inline
 }
 
 impl Def {
-    pub(crate) fn new(name: String) -> Self {
-        let shape = Shape::inline("def ".len() + name.len());
-        Self { shape, name }
+    pub(crate) fn new(receiver: Option<Node>, name: String) -> Self {
+        let mut shape = Shape::inline("def ".len() + name.len());
+        if let Some(receiver) = &receiver {
+            shape.insert(&receiver.shape);
+        }
+        Self {
+            shape,
+            receiver: receiver.map(Box::new),
+            name,
+        }
     }
 }
 
@@ -1517,10 +1525,38 @@ impl Formatter {
     }
 
     fn format_def(&mut self, def: &Def, ctx: &FormatContext) {
-        self.push_str("def ");
-        self.push_str(&def.name);
-        self.break_line(ctx);
-        self.put_indent();
+        self.push_str("def");
+        if let Some(receiver) = &def.receiver {
+            if receiver.shape.fits_in_one_line(self.remaining_width) || receiver.is_diagonal() {
+                self.push(' ');
+                self.format(receiver, ctx);
+            } else {
+                self.indent();
+                self.break_line(ctx);
+                self.put_indent();
+                // no leading trivia here.
+                self.format(receiver, ctx);
+            }
+            self.push('.');
+            if receiver.trailing_trivia.is_none() {
+                self.push_str(&def.name);
+                self.break_line(ctx);
+                self.put_indent();
+            } else {
+                self.write_trailing_comment(&receiver.trailing_trivia);
+                self.indent();
+                self.break_line(ctx);
+                self.put_indent();
+                self.push_str(&def.name);
+                self.break_line(ctx);
+                self.dedent();
+            }
+        } else {
+            self.push(' ');
+            self.push_str(&def.name);
+            self.break_line(ctx);
+            self.put_indent();
+        }
         self.push_str("end");
     }
 

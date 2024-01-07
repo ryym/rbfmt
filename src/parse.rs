@@ -1682,10 +1682,22 @@ impl FmtNodeBuilder<'_> {
         node: prism::DefNode,
         next_loc_start: usize,
     ) -> (fmt::LeadingTrivia, fmt::Def, fmt::TrailingTrivia) {
-        let leading = self.take_leading_trivia(node.location().start_offset());
+        let receiver = node.receiver();
+        let name_loc = node.name_loc();
+
+        // Take leading trivia of receiver or method name.
+        let leading_end = receiver
+            .as_ref()
+            .map(|r| r.location().start_offset())
+            .unwrap_or_else(|| name_loc.start_offset());
+        let leading = self.take_leading_trivia(leading_end);
+
+        let receiver = receiver.map(|r| self.visit(r, name_loc.end_offset()));
         let name = Self::source_lossy_at(&node.name_loc());
+        let def = fmt::Def::new(receiver, name);
         let trailing = self.take_trailing_comment(next_loc_start);
-        (leading, fmt::Def::new(name), trailing)
+
+        (leading, def, trailing)
     }
 
     fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: Option<usize>) -> fmt::Exprs {
