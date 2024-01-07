@@ -1064,6 +1064,12 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::without_trivia(fmt::Kind::Atom("".to_string()))
             }
 
+            prism::Node::DefNode { .. } => {
+                let node = node.as_def_node().unwrap();
+                let (leading, def, trailing) = self.visit_def(node, next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Def(def), trailing)
+            }
+
             _ => todo!("parse {:?}", node),
         };
 
@@ -1669,6 +1675,17 @@ impl FmtNodeBuilder<'_> {
         }
 
         multi
+    }
+
+    fn visit_def(
+        &mut self,
+        node: prism::DefNode,
+        next_loc_start: usize,
+    ) -> (fmt::LeadingTrivia, fmt::Def, fmt::TrailingTrivia) {
+        let leading = self.take_leading_trivia(node.location().start_offset());
+        let name = Self::source_lossy_at(&node.name_loc());
+        let trailing = self.take_trailing_comment(next_loc_start);
+        (leading, fmt::Def::new(name), trailing)
     }
 
     fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: Option<usize>) -> fmt::Exprs {

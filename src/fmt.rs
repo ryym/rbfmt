@@ -144,6 +144,7 @@ pub(crate) enum Kind {
     Hash(Hash),
     KeywordHash(KeywordHash),
     Assoc(Assoc),
+    Def(Def),
 }
 
 impl Kind {
@@ -164,6 +165,7 @@ impl Kind {
             Self::Hash(hash) => hash.shape,
             Self::KeywordHash(khash) => khash.shape,
             Self::Assoc(assoc) => assoc.shape,
+            Self::Def(def) => def.shape,
         }
     }
 
@@ -184,6 +186,7 @@ impl Kind {
             Self::Hash(_) => true,
             Self::KeywordHash(_) => true,
             Self::Assoc(_) => true,
+            Self::Def(_) => false,
         }
     }
 }
@@ -789,6 +792,23 @@ impl Assoc {
 }
 
 #[derive(Debug)]
+pub(crate) struct Def {
+    shape: Shape,
+    name: String,
+    // receiver
+    // parameters
+    // body (statements | begin)
+    // is_inline
+}
+
+impl Def {
+    pub(crate) fn new(name: String) -> Self {
+        let shape = Shape::inline("def ".len() + name.len());
+        Self { shape, name }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct LeadingTrivia {
     lines: Vec<LineTrivia>,
     shape: Shape,
@@ -907,6 +927,7 @@ impl Formatter {
             Kind::Hash(hash) => self.format_hash(hash, ctx),
             Kind::KeywordHash(khash) => self.format_keyword_hash(khash, ctx),
             Kind::Assoc(assoc) => self.format_assoc(assoc, ctx),
+            Kind::Def(def) => self.format_def(def, ctx),
         }
     }
 
@@ -1493,6 +1514,14 @@ impl Formatter {
             self.format(&assoc.value, ctx);
             self.dedent();
         }
+    }
+
+    fn format_def(&mut self, def: &Def, ctx: &FormatContext) {
+        self.push_str("def ");
+        self.push_str(&def.name);
+        self.break_line(ctx);
+        self.put_indent();
+        self.push_str("end");
     }
 
     fn write_leading_trivia(
