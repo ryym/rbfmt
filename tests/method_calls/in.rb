@@ -46,6 +46,11 @@ foo( # aa
 
 )
 
+foo(
+  1, # 1
+  2
+).bar
+
 # for now no special handling
 1 + 2 + 3
 foo bar
