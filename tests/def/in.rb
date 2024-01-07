@@ -41,3 +41,6 @@ end
 
 def self.foo a, b, c
 end
+
+def foo(p1, p2, *ps, p3, k1:, k2: , **ks, &block)
+end

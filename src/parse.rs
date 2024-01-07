@@ -1081,6 +1081,12 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::Def(def), trailing)
             }
             prism::Node::RequiredParameterNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::RequiredKeywordParameterNode { .. } => {
+                self.parse_atom(node, next_loc_start)
+            }
+            prism::Node::RestParameterNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::KeywordRestParameterNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::BlockParameterNode { .. } => self.parse_atom(node, next_loc_start),
 
             _ => todo!("parse {:?}", node),
         };
@@ -1761,6 +1767,9 @@ impl FmtNodeBuilder<'_> {
         }
         if let Some(rest) = params.keyword_rest() {
             nodes.push(rest);
+        }
+        if let Some(block) = params.block() {
+            nodes.push(block.as_node());
         }
         Self::each_node_with_next_start(nodes.into_iter(), next_loc_start, |node, next_start| {
             let fmt_node = self.visit(node, next_start);
