@@ -47,7 +47,7 @@ end
 def self.foo a, b, c
 end
 
-def foo(p1, p2, p3 = 3, *ps, p4, k1:, k2:, **ks, &block)
+def foo(p1, p2, p3 = 3, *ps, p4, k1:, k2:, k3: 3, **ks, &block)
 end
 
 def optionals(
@@ -62,5 +62,23 @@ def optionals(
   # c
   c = d = e,
   f = [1, 2, 3]
+)
+end
+
+def optional_keywords(
+  a: 1,
+  b: 2,
+  # c1
+  c:
+    # c2
+    # c3
+    nil, # c4
+  d: foo(
+    1,
+    2, # 2
+    3,
+  ),
+  e: :e,
+  f: [1, 2, 3]
 )
 end

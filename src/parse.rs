@@ -1098,6 +1098,18 @@ impl FmtNodeBuilder<'_> {
                 );
                 fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
             }
+            prism::Node::OptionalKeywordParameterNode { .. } => {
+                let node = node.as_optional_keyword_parameter_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let name = Self::source_lossy_at(&node.name_loc());
+                let name = fmt::Node::without_trivia(fmt::Kind::Atom(name));
+                let value = node.value();
+                let value_loc = value.location();
+                let value = self.visit(value, value_loc.end_offset());
+                let trailing = self.take_trailing_comment(next_loc_start);
+                let assoc = fmt::Assoc::new(name, None, value);
+                fmt::Node::new(leading, fmt::Kind::Assoc(assoc), trailing)
+            }
 
             _ => todo!("parse {:?}", node),
         };
