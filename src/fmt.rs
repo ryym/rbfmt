@@ -813,7 +813,7 @@ pub(crate) struct Def {
     shape: Shape,
     receiver: Option<Box<Node>>,
     name: String,
-    // parameters
+    parameters: Option<MethodParameters>,
     // name_trailing
     // body (statements | begin)
     // is_inline
@@ -829,7 +829,49 @@ impl Def {
             shape,
             receiver: receiver.map(Box::new),
             name,
+            parameters: None,
         }
+    }
+
+    pub(crate) fn set_parameters(&mut self, parameters: MethodParameters) {
+        self.shape.append(&parameters.shape);
+        self.parameters = Some(parameters);
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct MethodParameters {
+    shape: Shape,
+    opening: Option<String>,
+    closing: Option<String>,
+    params: Vec<Node>,
+    virtual_end: Option<VirtualEnd>,
+}
+
+impl MethodParameters {
+    pub(crate) fn new(opening: Option<String>, closing: Option<String>) -> Self {
+        let opening_len = opening.as_ref().map_or(0, |o| o.len());
+        let closing_len = closing.as_ref().map_or(0, |c| c.len());
+        let shape = Shape::inline(opening_len + closing_len);
+        Self {
+            shape,
+            opening,
+            closing,
+            params: vec![],
+            virtual_end: None,
+        }
+    }
+
+    pub(crate) fn append_param(&mut self, node: Node) {
+        self.shape.insert(&node.shape);
+        self.params.push(node);
+    }
+
+    pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
+        if let Some(end) = &end {
+            self.shape.append(&end.shape);
+        }
+        self.virtual_end = end;
     }
 }
 
@@ -1577,6 +1619,7 @@ impl Formatter {
             self.push('.');
             if receiver.trailing_trivia.is_none() {
                 self.push_str(&def.name);
+                self.format_method_parameters(&def.parameters, ctx);
                 self.break_line(ctx);
                 self.put_indent();
             } else {
@@ -1585,16 +1628,64 @@ impl Formatter {
                 self.break_line(ctx);
                 self.put_indent();
                 self.push_str(&def.name);
+                self.format_method_parameters(&def.parameters, ctx);
                 self.break_line(ctx);
                 self.dedent();
             }
         } else {
             self.push(' ');
             self.push_str(&def.name);
+            self.format_method_parameters(&def.parameters, ctx);
             self.break_line(ctx);
             self.put_indent();
         }
         self.push_str("end");
+    }
+
+    fn format_method_parameters(&mut self, params: &Option<MethodParameters>, ctx: &FormatContext) {
+        if let Some(params) = params {
+            if params.shape.fits_in_one_line(self.remaining_width) {
+                let opening = params.opening.as_deref().unwrap_or(" ");
+                self.push_str(opening);
+                for (i, n) in params.params.iter().enumerate() {
+                    if i > 0 {
+                        self.push_str(", ");
+                    }
+                    self.format(n, ctx);
+                }
+                if let Some(closing) = &params.closing {
+                    self.push_str(closing);
+                }
+            } else {
+                self.push('(');
+                self.indent();
+                for (i, n) in params.params.iter().enumerate() {
+                    self.break_line(ctx);
+                    self.write_leading_trivia(
+                        &n.leading_trivia,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: i == 0,
+                            end: false,
+                        },
+                    );
+                    self.put_indent();
+                    self.format(n, ctx);
+                    self.push(',');
+                    self.write_trailing_comment(&n.trailing_trivia);
+                }
+                self.write_trivia_at_virtual_end(
+                    ctx,
+                    &params.virtual_end,
+                    true,
+                    params.params.is_empty(),
+                );
+                self.dedent();
+                self.break_line(ctx);
+                self.put_indent();
+                self.push(')');
+            }
+        }
     }
 
     fn write_leading_trivia(

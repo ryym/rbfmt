@@ -346,10 +346,10 @@ impl FmtNodeBuilder<'_> {
         String::from_utf8_lossy(loc.as_slice()).to_string()
     }
 
-    fn each_node_with_next_start(
-        mut nodes: prism::NodeListIter,
+    fn each_node_with_next_start<'a>(
+        mut nodes: impl Iterator<Item = prism::Node<'a>>,
         next_loc_start: usize,
-        mut f: impl FnMut(prism::Node, usize),
+        mut f: impl FnMut(prism::Node<'a>, usize),
     ) {
         if let Some(node) = nodes.next() {
             let mut prev = node;
@@ -1080,6 +1080,7 @@ impl FmtNodeBuilder<'_> {
                 let (leading, def, trailing) = self.visit_def(node, next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::Def(def), trailing)
             }
+            prism::Node::RequiredParameterNode { .. } => self.parse_atom(node, next_loc_start),
 
             _ => todo!("parse {:?}", node),
         };
@@ -1705,10 +1706,66 @@ impl FmtNodeBuilder<'_> {
 
         let receiver = receiver.map(|r| self.visit(r, name_loc.end_offset()));
         let name = Self::source_lossy_at(&node.name_loc());
-        let def = fmt::Def::new(receiver, name);
+        let mut def = fmt::Def::new(receiver, name);
+
+        let lparen_loc = node.lparen_loc();
+        let rparen_loc = node.rparen_loc();
+        if let Some(params) = node.parameters() {
+            let lparen = lparen_loc.as_ref().map(Self::source_lossy_at);
+            let rparen = rparen_loc.as_ref().map(Self::source_lossy_at);
+            let mut parameters = fmt::MethodParameters::new(lparen, rparen);
+            let params_next = rparen_loc.as_ref().map(|l| l.start_offset()).unwrap_or(0);
+            self.visit_parameter_nodes(params, params_next, |node| {
+                parameters.append_param(node);
+            });
+            let virtual_end = self.take_end_trivia_as_virtual_end(Some(params_next));
+            parameters.set_virtual_end(virtual_end);
+            def.set_parameters(parameters);
+        } else if let (Some(lparen_loc), Some(rparen_loc)) = (&lparen_loc, &rparen_loc) {
+            let virtual_end = self.take_end_trivia_as_virtual_end(Some(rparen_loc.start_offset()));
+            if virtual_end.is_some() {
+                let lparen = Self::source_lossy_at(lparen_loc);
+                let rparen = Self::source_lossy_at(rparen_loc);
+                let mut parameters = fmt::MethodParameters::new(Some(lparen), Some(rparen));
+                parameters.set_virtual_end(virtual_end);
+                def.set_parameters(parameters);
+            }
+        }
+
         let trailing = self.take_trailing_comment(next_loc_start);
 
         (leading, def, trailing)
+    }
+
+    fn visit_parameter_nodes(
+        &mut self,
+        params: prism::ParametersNode,
+        next_loc_start: usize,
+        mut f: impl FnMut(fmt::Node),
+    ) {
+        let mut nodes = vec![];
+        for n in params.requireds().iter() {
+            nodes.push(n);
+        }
+        for n in params.optionals().iter() {
+            nodes.push(n);
+        }
+        if let Some(rest) = params.rest() {
+            nodes.push(rest);
+        }
+        for n in params.posts().iter() {
+            nodes.push(n);
+        }
+        for n in params.keywords().iter() {
+            nodes.push(n);
+        }
+        if let Some(rest) = params.keyword_rest() {
+            nodes.push(rest);
+        }
+        Self::each_node_with_next_start(nodes.into_iter(), next_loc_start, |node, next_start| {
+            let fmt_node = self.visit(node, next_start);
+            f(fmt_node);
+        });
     }
 
     fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: usize) -> fmt::Exprs {
