@@ -1080,6 +1080,8 @@ impl FmtNodeBuilder<'_> {
                 let (leading, def, trailing) = self.visit_def(node, next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::Def(def), trailing)
             }
+            prism::Node::NoKeywordsParameterNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::ForwardingParameterNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::RequiredParameterNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::RequiredKeywordParameterNode { .. } => {
                 self.parse_atom(node, next_loc_start)

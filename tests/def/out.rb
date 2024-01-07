@@ -56,6 +56,12 @@ end
 def decompose(a, (b, *c, (d, e), f), g)
 end
 
+def no_keywords(a, b, **nil)
+end
+
+def forward(a, b, ...)
+end
+
 def optionals(
   a = 1, # a
   b = foo
