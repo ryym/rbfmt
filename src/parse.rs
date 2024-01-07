@@ -1087,6 +1087,17 @@ impl FmtNodeBuilder<'_> {
             prism::Node::RestParameterNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::KeywordRestParameterNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::BlockParameterNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::OptionalParameterNode { .. } => {
+                let node = node.as_optional_parameter_node().unwrap();
+                let (leading, assign, trailing) = self.visit_variable_assign(
+                    node.location(),
+                    node.name_loc(),
+                    node.operator_loc(),
+                    node.value(),
+                    next_loc_start,
+                );
+                fmt::Node::new(leading, fmt::Kind::Assign(assign), trailing)
+            }
 
             _ => todo!("parse {:?}", node),
         };

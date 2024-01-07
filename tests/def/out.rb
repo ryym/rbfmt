@@ -47,5 +47,20 @@ end
 def self.foo a, b, c
 end
 
-def foo(p1, p2, *ps, p3, k1:, k2:, **ks, &block)
+def foo(p1, p2, p3 = 3, *ps, p4, k1:, k2:, **ks, &block)
+end
+
+def optionals(
+  a = 1, # a
+  b = foo
+    .bar(
+      1,
+      2,
+      # 3
+      3,
+    ),
+  # c
+  c = d = e,
+  f = [1, 2, 3]
+)
 end
