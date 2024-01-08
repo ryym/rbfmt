@@ -145,6 +145,7 @@ pub(crate) enum Kind {
     Hash(Hash),
     KeywordHash(KeywordHash),
     Assoc(Assoc),
+    Begin(Begin),
     Def(Def),
 }
 
@@ -167,6 +168,7 @@ impl Kind {
             Self::Hash(hash) => hash.shape,
             Self::KeywordHash(khash) => khash.shape,
             Self::Assoc(assoc) => assoc.shape,
+            Self::Begin(_) => Begin::shape(),
             Self::Def(def) => def.shape,
         }
     }
@@ -197,6 +199,7 @@ impl Kind {
             Self::Hash(_) => true,
             Self::KeywordHash(_) => true,
             Self::Assoc(_) => true,
+            Self::Begin(_) => false,
             Self::Def(_) => false,
         }
     }
@@ -817,6 +820,18 @@ impl Assoc {
 }
 
 #[derive(Debug)]
+pub(crate) struct Begin {
+    pub keyword_trailing: TrailingTrivia,
+    pub body: BlockBody,
+}
+
+impl Begin {
+    fn shape() -> Shape {
+        Shape::Multilines
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Def {
     shape: Shape,
     receiver: Option<Box<Node>>,
@@ -1081,6 +1096,7 @@ impl Formatter {
             Kind::Hash(hash) => self.format_hash(hash, ctx),
             Kind::KeywordHash(khash) => self.format_keyword_hash(khash, ctx),
             Kind::Assoc(assoc) => self.format_assoc(assoc, ctx),
+            Kind::Begin(begin) => self.format_begin(begin, ctx),
             Kind::Def(def) => self.format_def(def, ctx),
         }
     }
@@ -1685,6 +1701,15 @@ impl Formatter {
             self.format(&assoc.value, ctx);
             self.dedent();
         }
+    }
+
+    fn format_begin(&mut self, begin: &Begin, ctx: &FormatContext) {
+        self.push_str("begin");
+        self.write_trailing_comment(&begin.keyword_trailing);
+        self.format_block_body(&begin.body, ctx);
+        self.break_line(ctx);
+        self.put_indent();
+        self.push_str("end");
     }
 
     fn format_def(&mut self, def: &Def, ctx: &FormatContext) {

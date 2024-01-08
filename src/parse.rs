@@ -1113,6 +1113,27 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::Assoc(assoc), trailing)
             }
 
+            prism::Node::BeginNode { .. } => {
+                let node = node.as_begin_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let end_loc = node.end_keyword_loc().expect("begin must have end");
+                let keyword_next = node
+                    .statements()
+                    .map(|n| n.location().start_offset())
+                    .or_else(|| node.rescue_clause().map(|n| n.location().start_offset()))
+                    .or_else(|| node.else_clause().map(|n| n.location().start_offset()))
+                    .or_else(|| node.ensure_clause().map(|n| n.location().start_offset()))
+                    .unwrap_or(end_loc.start_offset());
+                let keyword_trailing = self.take_trailing_comment(keyword_next);
+                let body = self.visit_begin_body(node);
+                let begin = fmt::Begin {
+                    keyword_trailing,
+                    body,
+                };
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Begin(begin), trailing)
+            }
+
             _ => todo!("parse {:?}", node),
         };
 
