@@ -87,3 +87,25 @@ def optional_keywords(
   ]
 )
 end
+
+# shorthand syntax
+
+def foo = 1
+def bar(a, b = 1) = [1, 2, 3]
+def self.bar(a, &b) = nil
+
+def foo(a) = # 1
+  # 2
+  a # 3
+
+def foo(b) = [
+  1, 2, # 2
+  3
+]
+
+def foo(c) = foo.bar(
+  # a
+  a
+)
+
+def (a).foo = 1 # 1

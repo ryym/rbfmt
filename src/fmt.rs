@@ -822,9 +822,7 @@ pub(crate) struct Def {
     receiver: Option<Box<Node>>,
     name: String,
     parameters: Option<MethodParameters>,
-    // name_trailing
-    // body (statements | begin)
-    // is_inline
+    body: DefBody,
 }
 
 impl Def {
@@ -838,12 +836,38 @@ impl Def {
             receiver: receiver.map(Box::new),
             name,
             parameters: None,
+            body: DefBody::Block {},
         }
     }
 
     pub(crate) fn set_parameters(&mut self, parameters: MethodParameters) {
         self.shape.append(&parameters.shape);
         self.parameters = Some(parameters);
+    }
+
+    pub(crate) fn set_body(&mut self, body: DefBody) {
+        self.shape.append(&body.shape());
+        self.body = body;
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum DefBody {
+    Short {
+        expr: Box<Node>,
+    },
+    Block {
+        // head_trailing: Option<TrailingTrivia>,
+        // body: BlockBody,
+    },
+}
+
+impl DefBody {
+    pub(crate) fn shape(&self) -> Shape {
+        match self {
+            Self::Short { expr } => expr.shape,
+            Self::Block {} => Shape::Multilines,
+        }
     }
 }
 
@@ -1626,8 +1650,6 @@ impl Formatter {
             if receiver.trailing_trivia.is_none() {
                 self.push_str(&def.name);
                 self.format_method_parameters(&def.parameters, ctx);
-                self.break_line(ctx);
-                self.put_indent();
             } else {
                 self.write_trailing_comment(&receiver.trailing_trivia);
                 self.indent();
@@ -1635,17 +1657,44 @@ impl Formatter {
                 self.put_indent();
                 self.push_str(&def.name);
                 self.format_method_parameters(&def.parameters, ctx);
-                self.break_line(ctx);
                 self.dedent();
             }
         } else {
             self.push(' ');
             self.push_str(&def.name);
             self.format_method_parameters(&def.parameters, ctx);
-            self.break_line(ctx);
-            self.put_indent();
         }
-        self.push_str("end");
+        match &def.body {
+            // def foo = expr
+            DefBody::Short { expr } => {
+                self.push_str(" =");
+                if expr.shape.fits_in_one_line(self.remaining_width) || expr.is_diagonal() {
+                    self.push(' ');
+                    self.format(expr, ctx);
+                    self.write_trailing_comment(&expr.trailing_trivia);
+                } else {
+                    self.indent();
+                    self.break_line(ctx);
+                    self.write_leading_trivia(
+                        &expr.leading_trivia,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: true,
+                            end: true,
+                        },
+                    );
+                    self.format(expr, ctx);
+                    self.write_trailing_comment(&expr.trailing_trivia);
+                    self.dedent();
+                }
+            }
+            // def foo\n body\n end
+            DefBody::Block {} => {
+                self.break_line(ctx);
+                self.put_indent();
+                self.push_str("end");
+            }
+        }
     }
 
     fn format_method_parameters(&mut self, params: &Option<MethodParameters>, ctx: &FormatContext) {

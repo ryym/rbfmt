@@ -1764,6 +1764,14 @@ impl FmtNodeBuilder<'_> {
             }
         }
 
+        if node.equal_loc().is_some() {
+            let body = node.body().expect("shorthand def body must exist");
+            let expr = self.visit(body, 0);
+            def.set_body(fmt::DefBody::Short {
+                expr: Box::new(expr),
+            });
+        }
+
         let trailing = self.take_trailing_comment(next_loc_start);
 
         (leading, def, trailing)
