@@ -878,7 +878,7 @@ impl DefBody {
 pub(crate) struct BlockBody {
     pub exprs: Exprs,
     pub rescues: Vec<Rescue>,
-    // rescue_else: Option<Else>,
+    pub rescue_else: Option<Else>,
     // ensure: Option<Else>,
 }
 
@@ -887,6 +887,7 @@ impl BlockBody {
         Self {
             exprs,
             rescues: vec![],
+            rescue_else: None,
         }
     }
 }
@@ -1746,20 +1747,36 @@ impl Formatter {
                 body,
             } => {
                 self.write_trailing_comment(head_trailing);
-                if !body.exprs.shape().is_empty() {
-                    self.indent();
-                    self.break_line(ctx);
-                    self.format_exprs(&body.exprs, ctx, true);
-                    self.dedent();
-                }
-                for rescue in &body.rescues {
-                    self.break_line(ctx);
-                    self.put_indent();
-                    self.format_rescue(rescue, ctx);
-                }
+                self.format_block_body(body, ctx);
                 self.break_line(ctx);
                 self.put_indent();
                 self.push_str("end");
+            }
+        }
+    }
+
+    fn format_block_body(&mut self, body: &BlockBody, ctx: &FormatContext) {
+        if !body.exprs.shape().is_empty() {
+            self.indent();
+            self.break_line(ctx);
+            self.format_exprs(&body.exprs, ctx, true);
+            self.dedent();
+        }
+        for rescue in &body.rescues {
+            self.break_line(ctx);
+            self.put_indent();
+            self.format_rescue(rescue, ctx);
+        }
+        if let Some(rescue_else) = &body.rescue_else {
+            self.break_line(ctx);
+            self.put_indent();
+            self.push_str("else");
+            self.write_trailing_comment(&rescue_else.keyword_trailing);
+            if !rescue_else.body.shape().is_empty() {
+                self.indent();
+                self.break_line(ctx);
+                self.format_exprs(&rescue_else.body, ctx, true);
+                self.dedent();
             }
         }
     }

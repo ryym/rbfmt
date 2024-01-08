@@ -223,6 +223,24 @@ rescue Foo,
   baz => err # err
 end
 
+def foo
+rescue
+else
+end
+
+def foo
+rescue
+else # 1
+  # 2
+end
+
+def foo
+rescue
+else # 1
+  foo(:bar) # 2
+  # 3
+end
+
 # shorthand syntax
 
 def foo = 1

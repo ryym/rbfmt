@@ -1841,6 +1841,21 @@ impl FmtNodeBuilder<'_> {
             body.rescues = rescues;
         }
 
+        if let Some(else_node) = node.else_clause() {
+            let statements = else_node.statements();
+            let keyword_next = statements
+                .as_ref()
+                .map(|s| s.location().start_offset())
+                .unwrap_or(end_loc.start_offset());
+            let else_trailing = self.take_trailing_comment(keyword_next);
+            let else_next = ensure_start.unwrap_or(end_loc.start_offset());
+            let else_exprs = self.visit_statements(statements, else_next);
+            body.rescue_else = Some(fmt::Else {
+                keyword_trailing: else_trailing,
+                body: else_exprs,
+            });
+        }
+
         body
     }
 
