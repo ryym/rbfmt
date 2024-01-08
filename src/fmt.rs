@@ -173,11 +173,19 @@ impl Kind {
 
     pub(crate) fn is_diagonal(&self) -> bool {
         match self {
+            Self::Exprs(expr) => {
+                if expr.nodes.len() > 1 {
+                    return false;
+                }
+                match expr.nodes.get(0) {
+                    Some(node) => node.is_diagonal(),
+                    None => expr.virtual_end.is_none(),
+                }
+            }
             Self::Atom(_) => false,
             Self::StringLike(_) => false,
             Self::DynStringLike(_) => false,
             Self::HeredocOpening(_) => false,
-            Self::Exprs(_) => false,
             Self::Parens(_) => true,
             Self::IfExpr(_) => false,
             Self::Postmodifier(_) => true,
