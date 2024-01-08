@@ -838,7 +838,7 @@ impl Def {
             parameters: None,
             body: DefBody::Block {
                 head_trailing: TrailingTrivia::none(),
-                body: BlockBody::new(),
+                body: BlockBody::new(Exprs::new()),
             },
         }
     }
@@ -883,10 +883,8 @@ pub(crate) struct BlockBody {
 }
 
 impl BlockBody {
-    pub(crate) fn new() -> Self {
-        Self {
-            exprs: Exprs::new(),
-        }
+    pub(crate) fn new(exprs: Exprs) -> Self {
+        Self { exprs }
     }
 }
 

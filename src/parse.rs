@@ -1779,22 +1779,22 @@ impl FmtNodeBuilder<'_> {
                 .unwrap_or(end_loc.start_offset());
             let head_trailing = self.take_trailing_comment(head_next);
 
-            let mut block_body = fmt::BlockBody::new();
-            match body {
+            let block_body = match body {
                 Some(body) => match body {
                     prism::Node::StatementsNode { .. } => {
                         let stmts = body.as_statements_node().unwrap();
                         let exprs = self.visit_statements(Some(stmts), end_loc.start_offset());
-                        block_body.exprs = exprs;
+                        fmt::BlockBody::new(exprs)
                     }
                     prism::Node::BeginNode { .. } => {
-                        todo!("def begin node")
+                        let node = body.as_begin_node().unwrap();
+                        self.visit_begin_body(node)
                     }
                     _ => panic!("unexpected def body: {:?}", body),
                 },
                 None => {
                     let exprs = self.wrap_as_exprs(None, end_loc.start_offset());
-                    block_body.exprs = exprs;
+                    fmt::BlockBody::new(exprs)
                 }
             };
 
@@ -1807,6 +1807,30 @@ impl FmtNodeBuilder<'_> {
         let trailing = self.take_trailing_comment(next_loc_start);
 
         (leading, def, trailing)
+    }
+
+    fn visit_begin_body(&mut self, node: prism::BeginNode) -> fmt::BlockBody {
+        let rescue_start = node
+            .rescue_clause()
+            .as_ref()
+            .map(|r| r.location().start_offset());
+        let else_start = node
+            .else_clause()
+            .as_ref()
+            .map(|e| e.location().start_offset());
+        let ensure_start = node
+            .ensure_clause()
+            .as_ref()
+            .map(|e| e.location().start_offset());
+        // XXX: I cannot find the case where the begin block does not have end.
+        let end_loc = node.end_keyword_loc().expect("begin must have end");
+
+        let exprs_next = rescue_start
+            .or(else_start)
+            .or(ensure_start)
+            .unwrap_or(end_loc.start_offset());
+        let exprs = self.visit_statements(node.statements(), exprs_next);
+        fmt::BlockBody::new(exprs)
     }
 
     fn visit_parameter_nodes(
