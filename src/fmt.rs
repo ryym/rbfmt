@@ -879,7 +879,7 @@ pub(crate) struct BlockBody {
     pub exprs: Exprs,
     pub rescues: Vec<Rescue>,
     pub rescue_else: Option<Else>,
-    // ensure: Option<Else>,
+    pub ensure: Option<Else>,
 }
 
 impl BlockBody {
@@ -888,6 +888,7 @@ impl BlockBody {
             exprs,
             rescues: vec![],
             rescue_else: None,
+            ensure: None,
         }
     }
 }
@@ -1776,6 +1777,18 @@ impl Formatter {
                 self.indent();
                 self.break_line(ctx);
                 self.format_exprs(&rescue_else.body, ctx, true);
+                self.dedent();
+            }
+        }
+        if let Some(ensure) = &body.ensure {
+            self.break_line(ctx);
+            self.put_indent();
+            self.push_str("ensure");
+            self.write_trailing_comment(&ensure.keyword_trailing);
+            if !ensure.body.shape().is_empty() {
+                self.indent();
+                self.break_line(ctx);
+                self.format_exprs(&ensure.body, ctx, true);
                 self.dedent();
             }
         }

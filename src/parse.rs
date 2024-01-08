@@ -1846,6 +1846,7 @@ impl FmtNodeBuilder<'_> {
             let keyword_next = statements
                 .as_ref()
                 .map(|s| s.location().start_offset())
+                .or(ensure_start)
                 .unwrap_or(end_loc.start_offset());
             let else_trailing = self.take_trailing_comment(keyword_next);
             let else_next = ensure_start.unwrap_or(end_loc.start_offset());
@@ -1853,6 +1854,20 @@ impl FmtNodeBuilder<'_> {
             body.rescue_else = Some(fmt::Else {
                 keyword_trailing: else_trailing,
                 body: else_exprs,
+            });
+        }
+
+        if let Some(ensure_node) = node.ensure_clause() {
+            let statements = ensure_node.statements();
+            let keyword_next = statements
+                .as_ref()
+                .map(|s| s.location().start_offset())
+                .unwrap_or(end_loc.start_offset());
+            let ensure_trailing = self.take_trailing_comment(keyword_next);
+            let ensure_exprs = self.visit_statements(statements, end_loc.start_offset());
+            body.ensure = Some(fmt::Else {
+                keyword_trailing: ensure_trailing,
+                body: ensure_exprs,
             });
         }
 
