@@ -121,6 +121,32 @@ def foo(
 ) # c
 end
 
+# method body
+
+def foo
+  1
+end
+
+def foo
+  # 1
+end
+
+def foo
+  # 1
+  1 # 2
+  # 3
+end
+
+def foo(a, b)
+  a = a.foo.bar
+
+  # b
+  b ||= 123
+
+  # c
+  c
+end
+
 # shorthand syntax
 
 def foo = 1

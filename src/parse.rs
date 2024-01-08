@@ -1778,7 +1778,30 @@ impl FmtNodeBuilder<'_> {
                 .map(|b| b.location().start_offset())
                 .unwrap_or(end_loc.start_offset());
             let head_trailing = self.take_trailing_comment(head_next);
-            def.set_body(fmt::DefBody::Block { head_trailing });
+
+            let mut block_body = fmt::BlockBody::new();
+            match body {
+                Some(body) => match body {
+                    prism::Node::StatementsNode { .. } => {
+                        let stmts = body.as_statements_node().unwrap();
+                        let exprs = self.visit_statements(Some(stmts), end_loc.start_offset());
+                        block_body.exprs = exprs;
+                    }
+                    prism::Node::BeginNode { .. } => {
+                        todo!("def begin node")
+                    }
+                    _ => panic!("unexpected def body: {:?}", body),
+                },
+                None => {
+                    let exprs = self.wrap_as_exprs(None, end_loc.start_offset());
+                    block_body.exprs = exprs;
+                }
+            };
+
+            def.set_body(fmt::DefBody::Block {
+                head_trailing,
+                body: block_body,
+            });
         }
 
         let trailing = self.take_trailing_comment(next_loc_start);

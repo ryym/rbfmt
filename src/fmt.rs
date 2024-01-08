@@ -838,6 +838,7 @@ impl Def {
             parameters: None,
             body: DefBody::Block {
                 head_trailing: TrailingTrivia::none(),
+                body: BlockBody::new(),
             },
         }
     }
@@ -860,7 +861,7 @@ pub(crate) enum DefBody {
     },
     Block {
         head_trailing: TrailingTrivia,
-        // body: BlockBody,
+        body: BlockBody,
     },
 }
 
@@ -872,6 +873,29 @@ impl DefBody {
         }
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct BlockBody {
+    pub exprs: Exprs,
+    // rescues: Vec<Rescue>,
+    // rescue_else: Option<Else>,
+    // ensure: Option<Else>,
+}
+
+impl BlockBody {
+    pub(crate) fn new() -> Self {
+        Self {
+            exprs: Exprs::new(),
+        }
+    }
+}
+
+// #[derive(Debug)]
+// pub(crate) struct Rescue {
+//     keyword_trailing: TrailingTrivia,
+//     exceptions: Vec<Node>,
+//     reference: Option<Box<Node>>,
+// }
 
 #[derive(Debug)]
 pub(crate) struct MethodParameters {
@@ -1691,8 +1715,17 @@ impl Formatter {
                 }
             }
             // def foo\n body\n end
-            DefBody::Block { head_trailing } => {
+            DefBody::Block {
+                head_trailing,
+                body,
+            } => {
                 self.write_trailing_comment(head_trailing);
+                if !body.exprs.shape().is_empty() {
+                    self.indent();
+                    self.break_line(ctx);
+                    self.format_exprs(&body.exprs, ctx, true);
+                    self.dedent();
+                }
                 self.break_line(ctx);
                 self.put_indent();
                 self.push_str("end");
