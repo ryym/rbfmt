@@ -95,6 +95,32 @@ def optional_keywords(
 )
 end
 
+def foo # foo
+end
+
+def foo(a, b) # foo
+end
+
+def self.foo(a, b) # foo
+end
+
+def self.foo(
+  a # a
+  # b
+) # foo
+end
+
+def foo a, b, c # c
+end
+
+def foo(
+  a,
+  # b
+  b,
+  c
+) # c
+end
+
 # shorthand syntax
 
 def foo = 1

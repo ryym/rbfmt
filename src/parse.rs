@@ -1770,6 +1770,15 @@ impl FmtNodeBuilder<'_> {
             def.set_body(fmt::DefBody::Short {
                 expr: Box::new(expr),
             });
+        } else {
+            let end_loc = node.end_keyword_loc().expect("block def must have end");
+            let body = node.body();
+            let head_next = body
+                .as_ref()
+                .map(|b| b.location().start_offset())
+                .unwrap_or(end_loc.start_offset());
+            let head_trailing = self.take_trailing_comment(head_next);
+            def.set_body(fmt::DefBody::Block { head_trailing });
         }
 
         let trailing = self.take_trailing_comment(next_loc_start);

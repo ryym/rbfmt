@@ -836,7 +836,9 @@ impl Def {
             receiver: receiver.map(Box::new),
             name,
             parameters: None,
-            body: DefBody::Block {},
+            body: DefBody::Block {
+                head_trailing: TrailingTrivia::none(),
+            },
         }
     }
 
@@ -857,7 +859,7 @@ pub(crate) enum DefBody {
         expr: Box<Node>,
     },
     Block {
-        // head_trailing: Option<TrailingTrivia>,
+        head_trailing: TrailingTrivia,
         // body: BlockBody,
     },
 }
@@ -866,7 +868,7 @@ impl DefBody {
     pub(crate) fn shape(&self) -> Shape {
         match self {
             Self::Short { expr } => expr.shape,
-            Self::Block {} => Shape::Multilines,
+            Self::Block { .. } => Shape::Multilines,
         }
     }
 }
@@ -1689,7 +1691,8 @@ impl Formatter {
                 }
             }
             // def foo\n body\n end
-            DefBody::Block {} => {
+            DefBody::Block { head_trailing } => {
+                self.write_trailing_comment(head_trailing);
                 self.break_line(ctx);
                 self.put_indent();
                 self.push_str("end");
