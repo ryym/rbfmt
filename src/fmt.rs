@@ -895,6 +895,7 @@ impl BlockBody {
 pub(crate) struct Rescue {
     exceptions: Vec<Node>,
     exceptions_shape: Shape,
+    reference: Option<Box<Node>>,
     exprs: Exprs,
 }
 
@@ -903,6 +904,7 @@ impl Rescue {
         Self {
             exceptions: vec![],
             exceptions_shape: Shape::inline(0),
+            reference: None,
             exprs: Exprs::new(),
         }
     }
@@ -910,6 +912,10 @@ impl Rescue {
     pub(crate) fn append_exception(&mut self, exception: Node) {
         self.exceptions_shape.append(&exception.shape);
         self.exceptions.push(exception);
+    }
+
+    pub(crate) fn set_reference(&mut self, reference: Node) {
+        self.reference = Some(Box::new(reference))
     }
 
     pub(crate) fn set_exprs(&mut self, exprs: Exprs) {
@@ -1819,6 +1825,29 @@ impl Formatter {
                         self.write_trailing_comment(&exception.trailing_trivia);
                     }
                 }
+                self.dedent();
+            }
+        }
+        if let Some(reference) = &rescue.reference {
+            self.push_str(" =>");
+            if reference.shape.fits_in_one_line(self.remaining_width) || reference.is_diagonal() {
+                self.push(' ');
+                self.format(reference, ctx);
+                self.write_trailing_comment(&reference.trailing_trivia);
+            } else {
+                self.indent();
+                self.break_line(ctx);
+                self.write_leading_trivia(
+                    &reference.leading_trivia,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: true,
+                        end: false,
+                    },
+                );
+                self.put_indent();
+                self.format(reference, ctx);
+                self.write_trailing_comment(&reference.trailing_trivia);
                 self.dedent();
             }
         }

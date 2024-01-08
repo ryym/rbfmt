@@ -193,6 +193,28 @@ rescue *[
   hey
 end
 
+def foo
+rescue => err
+end
+
+def foo
+rescue Foo => err # err
+end
+
+def foo
+rescue foo =>
+  # 1
+  @e # 2
+
+  :body
+end
+
+def foo
+rescue Foo,
+  bar, # bar 
+  baz => err # err
+end
+
 # shorthand syntax
 
 def foo = 1
