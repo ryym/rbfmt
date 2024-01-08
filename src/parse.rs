@@ -1850,13 +1850,29 @@ impl FmtNodeBuilder<'_> {
         rescues: &mut Vec<fmt::Rescue>,
         final_next: usize,
     ) {
-        let consequent = node.consequent();
-        let exprs_next = consequent
-            .as_ref()
-            .map_or(final_next, |c| c.location().start_offset());
-        let exprs = self.visit_statements(node.statements(), exprs_next);
+        let reference = node.reference();
+        let reference_start = reference.as_ref().map(|c| c.location().start_offset());
 
-        let rescue = fmt::Rescue::new(exprs);
+        let statements = node.statements();
+        let statements_start = statements.as_ref().map(|c| c.location().start_offset());
+
+        let consequent = node.consequent();
+        let consequent_start = consequent.as_ref().map(|c| c.location().start_offset());
+
+        let mut rescue = fmt::Rescue::new();
+
+        let head_next = reference_start
+            .or(statements_start)
+            .or(consequent_start)
+            .unwrap_or(final_next);
+        Self::each_node_with_next_start(node.exceptions().iter(), head_next, |node, next_start| {
+            let fmt_node = self.visit(node, next_start);
+            rescue.append_exception(fmt_node);
+        });
+
+        let exprs_next = consequent_start.unwrap_or(final_next);
+        let exprs = self.visit_statements(statements, exprs_next);
+        rescue.set_exprs(exprs);
         rescues.push(rescue);
 
         if let Some(consequent) = consequent {

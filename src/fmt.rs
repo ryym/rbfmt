@@ -893,12 +893,27 @@ impl BlockBody {
 
 #[derive(Debug)]
 pub(crate) struct Rescue {
+    exceptions: Vec<Node>,
+    exceptions_shape: Shape,
     exprs: Exprs,
 }
 
 impl Rescue {
-    pub(crate) fn new(exprs: Exprs) -> Self {
-        Self { exprs }
+    pub(crate) fn new() -> Self {
+        Self {
+            exceptions: vec![],
+            exceptions_shape: Shape::inline(0),
+            exprs: Exprs::new(),
+        }
+    }
+
+    pub(crate) fn append_exception(&mut self, exception: Node) {
+        self.exceptions_shape.append(&exception.shape);
+        self.exceptions.push(exception);
+    }
+
+    pub(crate) fn set_exprs(&mut self, exprs: Exprs) {
+        self.exprs = exprs;
     }
 }
 
@@ -1745,6 +1760,68 @@ impl Formatter {
 
     fn format_rescue(&mut self, rescue: &Rescue, ctx: &FormatContext) {
         self.push_str("rescue");
+        if !rescue.exceptions.is_empty() {
+            if rescue
+                .exceptions_shape
+                .fits_in_one_line(self.remaining_width)
+            {
+                self.push(' ');
+                for (i, exception) in rescue.exceptions.iter().enumerate() {
+                    if i > 0 {
+                        self.push_str(", ");
+                    }
+                    self.format(exception, ctx);
+                    self.write_trailing_comment(&exception.trailing_trivia);
+                }
+            } else {
+                let exception = &rescue.exceptions[0];
+                if exception.shape.fits_in_one_line(self.remaining_width) || exception.is_diagonal()
+                {
+                    self.push(' ');
+                    self.format(exception, ctx);
+                    self.indent();
+                } else {
+                    self.push_str(" \\");
+                    self.indent();
+                    self.break_line(ctx);
+                    self.write_leading_trivia(
+                        &exception.leading_trivia,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: true,
+                            end: false,
+                        },
+                    );
+                    self.put_indent();
+                    self.format(exception, ctx);
+                }
+                if rescue.exceptions.len() > 1 {
+                    self.push(',');
+                }
+                self.write_trailing_comment(&exception.trailing_trivia);
+                if rescue.exceptions.len() > 1 {
+                    let last_idx = rescue.exceptions.len() - 1;
+                    for (i, exception) in rescue.exceptions.iter().enumerate().skip(1) {
+                        self.break_line(ctx);
+                        self.write_leading_trivia(
+                            &exception.leading_trivia,
+                            ctx,
+                            EmptyLineHandling::Trim {
+                                start: false,
+                                end: false,
+                            },
+                        );
+                        self.put_indent();
+                        self.format(exception, ctx);
+                        if i < last_idx {
+                            self.push(',');
+                        }
+                        self.write_trailing_comment(&exception.trailing_trivia);
+                    }
+                }
+                self.dedent();
+            }
+        }
         if !rescue.exprs.shape().is_empty() {
             self.indent();
             self.break_line(ctx);

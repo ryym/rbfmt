@@ -158,6 +158,41 @@ rescue
   # 3-2
 end # end
 
+def foo
+  1
+rescue Foo, Bar, *baz, foo(1).bar, @i
+  2
+rescue $g, @@c
+  3
+end
+
+def foo
+  1
+rescue foo # foo
+  2
+end
+
+def foo
+  1
+rescue foo, # 1
+  # 2
+  bar, # 3
+  # 4
+  baz # 5
+  # 6
+end
+
+def foo
+  1
+rescue foo
+  #bar
+  .bar, baz
+rescue *[
+  A, B, C
+].sample, # D
+  hey
+end
+
 # shorthand syntax
 
 def foo = 1
