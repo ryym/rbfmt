@@ -147,6 +147,27 @@ def foo(a, b)
   c
 end
 
+## rescue
+
+def foo
+rescue
+end
+
+def foo
+rescue
+  # rescue
+end
+
+def self.foo
+  1
+rescue
+  2 # 2-1
+  # 2-2
+rescue
+  3 # 3-1
+  # 3-2
+end # end
+
 # shorthand syntax
 
 def foo = 1

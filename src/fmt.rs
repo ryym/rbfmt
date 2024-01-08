@@ -877,23 +877,30 @@ impl DefBody {
 #[derive(Debug)]
 pub(crate) struct BlockBody {
     pub exprs: Exprs,
-    // rescues: Vec<Rescue>,
+    pub rescues: Vec<Rescue>,
     // rescue_else: Option<Else>,
     // ensure: Option<Else>,
 }
 
 impl BlockBody {
     pub(crate) fn new(exprs: Exprs) -> Self {
-        Self { exprs }
+        Self {
+            exprs,
+            rescues: vec![],
+        }
     }
 }
 
-// #[derive(Debug)]
-// pub(crate) struct Rescue {
-//     keyword_trailing: TrailingTrivia,
-//     exceptions: Vec<Node>,
-//     reference: Option<Box<Node>>,
-// }
+#[derive(Debug)]
+pub(crate) struct Rescue {
+    exprs: Exprs,
+}
+
+impl Rescue {
+    pub(crate) fn new(exprs: Exprs) -> Self {
+        Self { exprs }
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct MethodParameters {
@@ -1724,10 +1731,25 @@ impl Formatter {
                     self.format_exprs(&body.exprs, ctx, true);
                     self.dedent();
                 }
+                for rescue in &body.rescues {
+                    self.break_line(ctx);
+                    self.put_indent();
+                    self.format_rescue(rescue, ctx);
+                }
                 self.break_line(ctx);
                 self.put_indent();
                 self.push_str("end");
             }
+        }
+    }
+
+    fn format_rescue(&mut self, rescue: &Rescue, ctx: &FormatContext) {
+        self.push_str("rescue");
+        if !rescue.exprs.shape().is_empty() {
+            self.indent();
+            self.break_line(ctx);
+            self.format_exprs(&rescue.exprs, ctx, true);
+            self.dedent();
         }
     }
 

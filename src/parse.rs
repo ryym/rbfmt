@@ -1830,7 +1830,38 @@ impl FmtNodeBuilder<'_> {
             .or(ensure_start)
             .unwrap_or(end_loc.start_offset());
         let exprs = self.visit_statements(node.statements(), exprs_next);
-        fmt::BlockBody::new(exprs)
+        let mut body = fmt::BlockBody::new(exprs);
+
+        if let Some(rescue_node) = node.rescue_clause() {
+            let rescues_next = else_start
+                .or(ensure_start)
+                .unwrap_or(end_loc.start_offset());
+            let mut rescues = vec![];
+            self.visit_rescue_chain(rescue_node, &mut rescues, rescues_next);
+            body.rescues = rescues;
+        }
+
+        body
+    }
+
+    fn visit_rescue_chain(
+        &mut self,
+        node: prism::RescueNode,
+        rescues: &mut Vec<fmt::Rescue>,
+        final_next: usize,
+    ) {
+        let consequent = node.consequent();
+        let exprs_next = consequent
+            .as_ref()
+            .map_or(final_next, |c| c.location().start_offset());
+        let exprs = self.visit_statements(node.statements(), exprs_next);
+
+        let rescue = fmt::Rescue::new(exprs);
+        rescues.push(rescue);
+
+        if let Some(consequent) = consequent {
+            self.visit_rescue_chain(consequent, rescues, final_next);
+        }
     }
 
     fn visit_parameter_nodes(
