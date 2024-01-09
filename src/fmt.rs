@@ -672,15 +672,17 @@ impl MultiAssignTarget {
 #[derive(Debug)]
 pub(crate) struct Array {
     shape: Shape,
-    opening: String,
-    closing: String,
+    opening: Option<String>,
+    closing: Option<String>,
     elements: Vec<Node>,
     virtual_end: Option<VirtualEnd>,
 }
 
 impl Array {
-    pub(crate) fn new(opening: String, closing: String) -> Self {
-        let shape = Shape::inline(opening.len() + closing.len());
+    pub(crate) fn new(opening: Option<String>, closing: Option<String>) -> Self {
+        let opening_len = opening.as_ref().map_or(0, |s| s.len());
+        let closing_len = closing.as_ref().map_or(0, |s| s.len());
+        let shape = Shape::inline(opening_len + closing_len);
         Self {
             shape,
             opening,
@@ -691,11 +693,12 @@ impl Array {
     }
 
     pub(crate) fn separator(&self) -> &str {
-        if self.opening.as_bytes()[0] == b'%' {
-            ""
-        } else {
-            ","
+        if let Some(opening) = &self.opening {
+            if opening.as_bytes()[0] == b'%' {
+                return "";
+            }
         }
+        ","
     }
 
     pub(crate) fn append_element(&mut self, element: Node) {
@@ -1556,7 +1559,9 @@ impl Formatter {
 
     fn format_array(&mut self, array: &Array, ctx: &FormatContext) {
         if array.shape.fits_in_one_line(self.remaining_width) {
-            self.push_str(&array.opening);
+            if let Some(opening) = &array.opening {
+                self.push_str(opening);
+            }
             for (i, n) in array.elements.iter().enumerate() {
                 if i > 0 {
                     self.push_str(array.separator());
@@ -1564,9 +1569,11 @@ impl Formatter {
                 }
                 self.format(n, ctx);
             }
-            self.push_str(&array.closing);
+            if let Some(closing) = &array.closing {
+                self.push_str(closing);
+            }
         } else {
-            self.push_str(&array.opening);
+            self.push_str(array.opening.as_deref().unwrap_or("["));
             self.indent();
             for (i, element) in array.elements.iter().enumerate() {
                 self.break_line(ctx);
@@ -1592,7 +1599,7 @@ impl Formatter {
             self.dedent();
             self.break_line(ctx);
             self.put_indent();
-            self.push_str(&array.closing);
+            self.push_str(array.closing.as_deref().unwrap_or("]"));
         }
     }
 

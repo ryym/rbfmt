@@ -979,26 +979,25 @@ impl FmtNodeBuilder<'_> {
 
             prism::Node::ArrayNode { .. } => {
                 let node = node.as_array_node().unwrap();
-                // XXX: I cannot find the case where the opening and closing are None.
-                let (opening_loc, closing_loc) = match (node.opening_loc(), node.closing_loc()) {
-                    (Some(op), Some(cl)) => (op, cl),
-                    _ => panic!("array must have opening and closing"),
-                };
+                let opening_loc = node.opening_loc();
+                let closing_loc = node.closing_loc();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let opening = Self::source_lossy_at(&opening_loc);
-                let closing = Self::source_lossy_at(&closing_loc);
+                let opening = opening_loc.as_ref().map(Self::source_lossy_at);
+                let closing = closing_loc.as_ref().map(Self::source_lossy_at);
                 let mut array = fmt::Array::new(opening, closing);
-                let closing_start = closing_loc.start_offset();
+                let closing_start = closing_loc.map(|l| l.start_offset());
                 Self::each_node_with_next_start(
                     node.elements().iter(),
-                    closing_start,
+                    closing_start.unwrap_or(next_loc_start),
                     |node, next_start| {
                         let element = self.visit(node, next_start);
                         array.append_element(element);
                     },
                 );
-                let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
-                array.set_virtual_end(virtual_end);
+                if let Some(closing_start) = closing_start {
+                    let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
+                    array.set_virtual_end(virtual_end);
+                }
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::Array(array), trailing)
             }
@@ -1623,7 +1622,8 @@ impl FmtNodeBuilder<'_> {
         let name = Self::source_lossy_at(&name_loc);
         let operator = Self::source_lossy_at(&operator_loc);
         // Pass 0 to associate trailing trivia to the Assign kind, not the value.
-        let value = self.visit(value, 0);
+        let value_end = value.location().end_offset();
+        let value = self.visit(value, value_end);
         let trailing = self.take_trailing_comment(next_loc_start);
         let target = fmt::Node::without_trivia(fmt::Kind::Atom(name));
         (leading, fmt::Assign::new(target, operator, value), trailing)
