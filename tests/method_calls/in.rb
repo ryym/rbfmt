@@ -55,28 +55,6 @@ foo(
 1 + 2 + 3
 foo bar
 
-foo do
-  nil
-end
-
-foo do # do
-  1
-end
-
-foo do # do
-end
-
-foo do
-  1
-  # 2
-end
-
-foo do
-
-  # foo
-
-end
-
 a {}.b(1)&.c(1, 2) { d(e {}) {} }.f
 
 foo.bar
@@ -89,10 +67,6 @@ foo.bar
 foo # b
   # c
   .bar # d
-
-a&.foo(1, "abc") do
-  true
-end
 
 a[1] # a
 a[
