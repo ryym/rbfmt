@@ -559,6 +559,7 @@ impl MethodCall {
     }
 
     pub(crate) fn set_block(&mut self, block: MethodBlock) {
+        self.shape.append(&Shape::inline(" ".len()));
         self.shape.append(&block.shape);
         self.block = Some(block);
     }
@@ -571,11 +572,39 @@ impl MethodCall {
 
 #[derive(Debug)]
 pub(crate) struct MethodBlock {
-    pub shape: Shape,
-    pub trailing_trivia: TrailingTrivia,
-    // pub args
-    pub body: Exprs,
-    pub was_flat: bool,
+    shape: Shape,
+    opening_trailing: TrailingTrivia,
+    body: Exprs,
+}
+
+impl MethodBlock {
+    pub(crate) fn new(was_flat: bool) -> Self {
+        let shape = if was_flat {
+            Shape::inline("{}".len())
+        } else {
+            Shape::Multilines
+        };
+        Self {
+            shape,
+            opening_trailing: TrailingTrivia::none(),
+            body: Exprs::new(),
+        }
+    }
+
+    pub(crate) fn set_opening_trailing(&mut self, trailing: TrailingTrivia) {
+        self.shape.insert(&trailing.shape);
+        self.opening_trailing = trailing;
+    }
+
+    pub(crate) fn set_body(&mut self, body: Exprs) {
+        self.shape.insert(&Shape::inline("  ".len()));
+        self.shape.insert(&body.shape);
+        self.body = body;
+    }
+
+    fn has_no_content(&self) -> bool {
+        self.shape.is_inline() && self.opening_trailing.is_none() && self.body.shape.is_empty()
+    }
 }
 
 #[derive(Debug)]
@@ -1377,13 +1406,7 @@ impl Formatter {
                     self.push(args_parens.1);
                 }
                 if let Some(block) = &call.block {
-                    if block.body.shape.is_empty() {
-                        self.push_str(" {}");
-                    } else {
-                        self.push_str(" { ");
-                        self.format_exprs(&block.body, ctx, false);
-                        self.push_str(" }");
-                    }
+                    self.format_method_block(block, ctx);
                 }
             }
         } else {
@@ -1447,34 +1470,35 @@ impl Formatter {
                 }
 
                 if let Some(block) = &call.block {
-                    if !block.trailing_trivia.is_none()
-                        || !block.body.shape.fits_in_inline(self.remaining_width)
-                        || !block.was_flat
-                    {
-                        self.push_str(" do");
-                        self.write_trailing_comment(&block.trailing_trivia);
-                        self.indent();
-                        if !block.body.shape.is_empty() {
-                            self.break_line(ctx);
-                            self.format_exprs(&block.body, ctx, true);
-                        }
-                        self.dedent();
-                        self.break_line(ctx);
-                        self.put_indent();
-                        self.push_str("end");
-                    } else if block.body.shape.is_empty() {
-                        self.push_str(" {}");
-                    } else {
-                        self.push_str(" { ");
-                        self.format_exprs(&block.body, ctx, false);
-                        self.push_str(" }");
-                    }
+                    self.format_method_block(block, ctx);
                 }
                 self.write_trailing_comment(&call.trailing_trivia);
             }
             if indented {
                 self.dedent();
             }
+        }
+    }
+
+    fn format_method_block(&mut self, block: &MethodBlock, ctx: &FormatContext) {
+        if block.has_no_content() {
+            self.push_str(" {}");
+        } else if block.shape.fits_in_one_line(self.remaining_width) {
+            self.push_str(" { ");
+            self.format_exprs(&block.body, ctx, false);
+            self.push_str(" }");
+        } else {
+            self.push_str(" do");
+            self.write_trailing_comment(&block.opening_trailing);
+            self.indent();
+            if !block.body.shape.is_empty() {
+                self.break_line(ctx);
+                self.format_exprs(&block.body, ctx, true);
+            }
+            self.dedent();
+            self.break_line(ctx);
+            self.put_indent();
+            self.push_str("end");
         }
     }
 

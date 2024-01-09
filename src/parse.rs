@@ -1565,33 +1565,29 @@ impl FmtNodeBuilder<'_> {
             prism::Node::BlockNode { .. } => {
                 let node = node.as_block_node().unwrap();
 
-                let block_next_loc = node
-                    .body()
-                    .map(|b| b.location())
-                    .unwrap_or(node.closing_loc())
-                    .start_offset();
-                let block_trailing = self.take_trailing_comment(block_next_loc);
-
-                let body_end_loc = node.closing_loc().start_offset();
-                let body = node.body().map(|n| self.visit(n, body_end_loc));
-                // XXX: Is this necessary? I cannot find the case where the body is not a StatementNode.
-                let body = self.wrap_as_exprs(body, body_end_loc);
-
                 let loc = node.location();
                 let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
+                let mut method_block = fmt::MethodBlock::new(was_flat);
 
-                let shape = if was_flat {
-                    body.shape().add(&fmt::Shape::inline(" {  }".len()))
-                } else {
-                    fmt::Shape::Multilines
-                };
+                let body = node.body();
+                let body_start = body.as_ref().map(|b| b.location().start_offset());
+                let params = node.parameters();
+                let params_start = params.as_ref().map(|p| p.location().start_offset());
+                let closing_loc = node.closing_loc();
 
-                fmt::MethodBlock {
-                    trailing_trivia: block_trailing,
-                    shape,
-                    body,
-                    was_flat,
-                }
+                let opening_next_loc = params_start
+                    .or(body_start)
+                    .unwrap_or(closing_loc.start_offset());
+                let opening_trailing = self.take_trailing_comment(opening_next_loc);
+                method_block.set_opening_trailing(opening_trailing);
+
+                let body_end_loc = closing_loc.start_offset();
+                let body = body.map(|n| self.visit(n, body_end_loc));
+                // XXX: Is this necessary? I cannot find the case where the body is not a StatementNode.
+                let body = self.wrap_as_exprs(body, body_end_loc);
+                method_block.set_body(body);
+
+                method_block
             }
             _ => panic!("unexpected node for call block: {:?}", node),
         });
