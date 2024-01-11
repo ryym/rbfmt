@@ -1856,26 +1856,7 @@ impl FmtNodeBuilder<'_> {
                 .map(|b| b.location().start_offset())
                 .unwrap_or(end_loc.start_offset());
             let head_trailing = self.take_trailing_comment(head_next);
-
-            let block_body = match body {
-                Some(body) => match body {
-                    prism::Node::StatementsNode { .. } => {
-                        let stmts = body.as_statements_node().unwrap();
-                        let exprs = self.visit_statements(Some(stmts), end_loc.start_offset());
-                        fmt::BlockBody::new(exprs)
-                    }
-                    prism::Node::BeginNode { .. } => {
-                        let node = body.as_begin_node().unwrap();
-                        self.visit_begin_body(node)
-                    }
-                    _ => panic!("unexpected def body: {:?}", body),
-                },
-                None => {
-                    let exprs = self.wrap_as_exprs(None, end_loc.start_offset());
-                    fmt::BlockBody::new(exprs)
-                }
-            };
-
+            let block_body = self.parse_block_body(body, end_loc.start_offset());
             def.set_body(fmt::DefBody::Block {
                 head_trailing,
                 body: block_body,
@@ -1885,6 +1866,31 @@ impl FmtNodeBuilder<'_> {
         let trailing = self.take_trailing_comment(next_loc_start);
 
         (leading, def, trailing)
+    }
+
+    fn parse_block_body(
+        &mut self,
+        body: Option<prism::Node>,
+        next_loc_start: usize,
+    ) -> fmt::BlockBody {
+        match body {
+            Some(body) => match body {
+                prism::Node::StatementsNode { .. } => {
+                    let stmts = body.as_statements_node().unwrap();
+                    let exprs = self.visit_statements(Some(stmts), next_loc_start);
+                    fmt::BlockBody::new(exprs)
+                }
+                prism::Node::BeginNode { .. } => {
+                    let node = body.as_begin_node().unwrap();
+                    self.visit_begin_body(node)
+                }
+                _ => panic!("unexpected def body: {:?}", body),
+            },
+            None => {
+                let exprs = self.wrap_as_exprs(None, next_loc_start);
+                fmt::BlockBody::new(exprs)
+            }
+        }
     }
 
     fn visit_begin_body(&mut self, node: prism::BeginNode) -> fmt::BlockBody {
