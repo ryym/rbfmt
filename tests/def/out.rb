@@ -5,6 +5,11 @@ end
 def foo
 end
 
+def foo
+  1
+  2
+end
+
 # foo
 def foo
 end

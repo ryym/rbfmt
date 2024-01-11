@@ -4,6 +4,8 @@ end
 # def
 def foo; end
 
+def foo; 1; 2; end
+
 def
   # foo
   foo
