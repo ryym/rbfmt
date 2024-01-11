@@ -1139,6 +1139,19 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::Begin(begin), trailing)
             }
 
+            prism::Node::ClassNode { .. } => {
+                let node = node.as_class_node().unwrap();
+                let (leading, class, trailing) = self.visit_class_like(
+                    "class",
+                    node.constant_path().location(),
+                    node.superclass(),
+                    node.body(),
+                    node.end_keyword_loc(),
+                    next_loc_start,
+                );
+                fmt::Node::new(leading, fmt::Kind::ClassLike(class), trailing)
+            }
+
             _ => todo!("parse {:?}", node),
         };
 
@@ -2032,6 +2045,27 @@ impl FmtNodeBuilder<'_> {
             let fmt_node = self.visit(node, next_start);
             f(fmt_node);
         });
+    }
+
+    fn visit_class_like(
+        &mut self,
+        keyword: &str,
+        name_loc: prism::Location,
+        _superclass: Option<prism::Node>,
+        body: Option<prism::Node>,
+        end_loc: prism::Location,
+        next_loc_start: usize,
+    ) -> (fmt::LeadingTrivia, fmt::ClassLike, fmt::TrailingTrivia) {
+        let leading = self.take_leading_trivia(name_loc.start_offset());
+        let name = Self::source_lossy_at(&name_loc);
+        let body = self.parse_block_body(body, end_loc.start_offset());
+        let trailing = self.take_trailing_comment(next_loc_start);
+        let class = fmt::ClassLike {
+            keyword: keyword.to_string(),
+            name,
+            body,
+        };
+        (leading, class, trailing)
     }
 
     fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: usize) -> fmt::Exprs {

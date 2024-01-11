@@ -147,6 +147,7 @@ pub(crate) enum Kind {
     Assoc(Assoc),
     Begin(Begin),
     Def(Def),
+    ClassLike(ClassLike),
 }
 
 impl Kind {
@@ -170,6 +171,7 @@ impl Kind {
             Self::Assoc(assoc) => assoc.shape,
             Self::Begin(_) => Begin::shape(),
             Self::Def(def) => def.shape,
+            Self::ClassLike(_) => ClassLike::shape(),
         }
     }
 
@@ -201,6 +203,7 @@ impl Kind {
             Self::Assoc(_) => true,
             Self::Begin(_) => false,
             Self::Def(_) => false,
+            Self::ClassLike(_) => false,
         }
     }
 }
@@ -1064,6 +1067,21 @@ impl BlockParameters {
 }
 
 #[derive(Debug)]
+pub(crate) struct ClassLike {
+    pub keyword: String,
+    pub name: String,
+    // pub superclass: Option<Box<Node>>,
+    // pub head_trailing: TrailingTrivia,
+    pub body: BlockBody,
+}
+
+impl ClassLike {
+    fn shape() -> Shape {
+        Shape::Multilines
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct LeadingTrivia {
     lines: Vec<LineTrivia>,
     shape: Shape,
@@ -1185,6 +1203,7 @@ impl Formatter {
             Kind::Assoc(assoc) => self.format_assoc(assoc, ctx),
             Kind::Begin(begin) => self.format_begin(begin, ctx),
             Kind::Def(def) => self.format_def(def, ctx),
+            Kind::ClassLike(class) => self.format_class_like(class, ctx),
         }
     }
 
@@ -2155,6 +2174,16 @@ impl Formatter {
             self.push_str(&params.closing);
             self.write_trailing_comment(&params.closing_trailing);
         }
+    }
+
+    fn format_class_like(&mut self, class: &ClassLike, ctx: &FormatContext) {
+        self.push_str(&class.keyword);
+        self.push(' ');
+        self.push_str(&class.name);
+        self.format_block_body(&class.body, ctx);
+        self.dedent();
+        self.break_line(ctx);
+        self.push_str("end");
     }
 
     fn write_leading_trivia(
