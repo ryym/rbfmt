@@ -574,6 +574,7 @@ impl MethodCall {
 pub(crate) struct MethodBlock {
     shape: Shape,
     opening_trailing: TrailingTrivia,
+    parameters: Option<BlockParameters>,
     body: Exprs,
 }
 
@@ -587,6 +588,7 @@ impl MethodBlock {
         Self {
             shape,
             opening_trailing: TrailingTrivia::none(),
+            parameters: None,
             body: Exprs::new(),
         }
     }
@@ -596,14 +598,16 @@ impl MethodBlock {
         self.opening_trailing = trailing;
     }
 
+    pub(crate) fn set_parameters(&mut self, parameters: BlockParameters) {
+        self.shape.insert(&Shape::inline(" ".len()));
+        self.shape.insert(&parameters.shape);
+        self.parameters = Some(parameters);
+    }
+
     pub(crate) fn set_body(&mut self, body: Exprs) {
         self.shape.insert(&Shape::inline("  ".len()));
         self.shape.insert(&body.shape);
         self.body = body;
-    }
-
-    fn has_no_content(&self) -> bool {
-        self.shape.is_inline() && self.opening_trailing.is_none() && self.body.shape.is_empty()
     }
 }
 
@@ -1005,6 +1009,57 @@ impl MethodParameters {
             self.shape.append(&end.shape);
         }
         self.virtual_end = end;
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct BlockParameters {
+    shape: Shape,
+    opening: String,
+    closing: String,
+    params: Vec<Node>,
+    locals: Vec<Node>,
+    virtual_end: Option<VirtualEnd>,
+    closing_trailing: TrailingTrivia,
+}
+
+impl BlockParameters {
+    pub(crate) fn new(opening: String, closing: String) -> Self {
+        let shape = Shape::inline(opening.len() + closing.len());
+        Self {
+            shape,
+            opening,
+            closing,
+            params: vec![],
+            locals: vec![],
+            closing_trailing: TrailingTrivia::none(),
+            virtual_end: None,
+        }
+    }
+
+    pub(crate) fn append_param(&mut self, node: Node) {
+        self.shape.insert(&node.shape);
+        self.params.push(node);
+    }
+
+    pub(crate) fn append_local(&mut self, node: Node) {
+        if self.locals.is_empty() {
+            self.shape.insert(&Shape::inline("; ".len()));
+        }
+        self.shape.insert(&node.shape);
+        self.locals.push(node);
+    }
+
+    pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
+        if let Some(end) = &end {
+            self.shape.append(&end.shape);
+        }
+        self.virtual_end = end;
+    }
+
+    pub(crate) fn set_closing_trailing(&mut self, trailing: TrailingTrivia) {
+        self.shape.append(&trailing.shape);
+        self.closing_trailing = trailing;
     }
 }
 
@@ -1481,15 +1536,33 @@ impl Formatter {
     }
 
     fn format_method_block(&mut self, block: &MethodBlock, ctx: &FormatContext) {
-        if block.has_no_content() {
-            self.push_str(" {}");
-        } else if block.shape.fits_in_one_line(self.remaining_width) {
-            self.push_str(" { ");
-            self.format_exprs(&block.body, ctx, false);
-            self.push_str(" }");
+        if block.shape.fits_in_one_line(self.remaining_width) {
+            self.push_str(" {");
+            if let Some(params) = &block.parameters {
+                self.push(' ');
+                self.format_block_parameters(params, ctx);
+            }
+            if !block.body.shape.is_empty() {
+                self.push(' ');
+                self.format_exprs(&block.body, ctx, false);
+                self.push(' ');
+            }
+            self.push_str("}");
         } else {
             self.push_str(" do");
             self.write_trailing_comment(&block.opening_trailing);
+            if let Some(params) = &block.parameters {
+                if block.opening_trailing.is_none() {
+                    self.push(' ');
+                    self.format_block_parameters(params, ctx);
+                } else {
+                    self.indent();
+                    self.break_line(ctx);
+                    self.put_indent();
+                    self.format_block_parameters(params, ctx);
+                    self.dedent();
+                }
+            }
             self.indent();
             if !block.body.shape.is_empty() {
                 self.break_line(ctx);
@@ -1993,6 +2066,94 @@ impl Formatter {
                 self.put_indent();
                 self.push(')');
             }
+        }
+    }
+
+    fn format_block_parameters(&mut self, params: &BlockParameters, ctx: &FormatContext) {
+        if params.shape.fits_in_one_line(self.remaining_width) {
+            self.push_str(&params.opening);
+            for (i, n) in params.params.iter().enumerate() {
+                if n.shape.is_empty() {
+                    self.push(',');
+                } else {
+                    if i > 0 {
+                        self.push_str(", ");
+                    }
+                    self.format(n, ctx);
+                }
+            }
+            if !params.locals.is_empty() {
+                self.push_str("; ");
+                for (i, n) in params.locals.iter().enumerate() {
+                    if i > 0 {
+                        self.push_str(", ");
+                    }
+                    self.format(n, ctx);
+                }
+            }
+            self.push_str(&params.closing);
+            self.write_trailing_comment(&params.closing_trailing);
+        } else {
+            self.push_str(&params.opening);
+            self.indent();
+            if !params.params.is_empty() {
+                let last_idx = params.params.len() - 1;
+                for (i, n) in params.params.iter().enumerate() {
+                    if n.shape.is_empty() {
+                        self.write_trailing_comment(&n.trailing_trivia);
+                        continue;
+                    }
+                    self.break_line(ctx);
+                    self.write_leading_trivia(
+                        &n.leading_trivia,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: i == 0,
+                            end: false,
+                        },
+                    );
+                    self.put_indent();
+                    self.format(n, ctx);
+                    if i < last_idx {
+                        self.push(',');
+                    }
+                    self.write_trailing_comment(&n.trailing_trivia);
+                }
+            }
+            if !params.locals.is_empty() {
+                self.break_line(ctx);
+                self.put_indent();
+                self.push(';');
+                let last_idx = params.locals.len() - 1;
+                for (i, n) in params.locals.iter().enumerate() {
+                    self.break_line(ctx);
+                    self.write_leading_trivia(
+                        &n.leading_trivia,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: false,
+                            end: false,
+                        },
+                    );
+                    self.put_indent();
+                    self.format(n, ctx);
+                    if i < last_idx {
+                        self.push(',');
+                    }
+                    self.write_trailing_comment(&n.trailing_trivia);
+                }
+            }
+            self.write_trivia_at_virtual_end(
+                ctx,
+                &params.virtual_end,
+                true,
+                params.params.is_empty(),
+            );
+            self.dedent();
+            self.break_line(ctx);
+            self.put_indent();
+            self.push_str(&params.closing);
+            self.write_trailing_comment(&params.closing_trailing);
         }
     }
 

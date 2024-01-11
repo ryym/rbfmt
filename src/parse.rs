@@ -396,6 +396,7 @@ impl FmtNodeBuilder<'_> {
                 let (leading, path, trailing) = self.visit_constant_path(node, next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::Atom(path), trailing)
             }
+            prism::Node::BlockLocalVariableNode { .. } => self.parse_atom(node, next_loc_start),
 
             prism::Node::StringNode { .. } => {
                 let node = node.as_string_node().unwrap();
@@ -949,7 +950,9 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::MultiAssignTarget(target), trailing)
             }
             prism::Node::ImplicitRestNode { .. } => {
-                fmt::Node::without_trivia(fmt::Kind::Atom("".to_string()))
+                let leading = fmt::LeadingTrivia::new();
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Atom("".to_string()), trailing)
             }
 
             prism::Node::SplatNode { .. } => {
@@ -1581,6 +1584,18 @@ impl FmtNodeBuilder<'_> {
                 let opening_trailing = self.take_trailing_comment(opening_next_loc);
                 method_block.set_opening_trailing(opening_trailing);
 
+                if let Some(params) = params {
+                    let params_next_loc = body_start.unwrap_or(closing_loc.start_offset());
+                    let params = match params {
+                        prism::Node::BlockParametersNode { .. } => {
+                            let node = params.as_block_parameters_node().unwrap();
+                            self.visit_block_parameters(node, params_next_loc)
+                        }
+                        _ => panic!("unexpected node for call block params: {:?}", node),
+                    };
+                    method_block.set_parameters(params);
+                }
+
                 let body_end_loc = closing_loc.start_offset();
                 let body = body.map(|n| self.visit(n, body_end_loc));
                 // XXX: Is this necessary? I cannot find the case where the body is not a StatementNode.
@@ -1604,6 +1619,49 @@ impl FmtNodeBuilder<'_> {
 
         self.last_loc_end = call.location().end_offset();
         chain
+    }
+
+    fn visit_block_parameters(
+        &mut self,
+        node: prism::BlockParametersNode,
+        next_loc_start: usize,
+    ) -> fmt::BlockParameters {
+        // XXX: I cannot find the case where the block parameters bars don't exist.
+        let (opening_loc, closing_loc) = match (node.opening_loc(), node.closing_loc()) {
+            (Some(op), Some(cl)) => (op, cl),
+            _ => panic!("block parameters must have opening and closing"),
+        };
+        let opening = Self::source_lossy_at(&opening_loc);
+        let closing = Self::source_lossy_at(&closing_loc);
+        let mut block_params = fmt::BlockParameters::new(opening, closing);
+
+        let locals = node.locals();
+        let params_next = locals
+            .iter()
+            .next()
+            .map(|n| n.location().start_offset())
+            .unwrap_or(closing_loc.start_offset());
+
+        if let Some(params) = node.parameters() {
+            self.visit_parameter_nodes(params, params_next, |node| {
+                block_params.append_param(node);
+            });
+        }
+        Self::each_node_with_next_start(
+            locals.iter(),
+            closing_loc.start_offset(),
+            |node, next_start| {
+                let fmt_node = self.visit(node, next_start);
+                block_params.append_local(fmt_node);
+            },
+        );
+
+        let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_loc.start_offset()));
+        block_params.set_virtual_end(virtual_end);
+
+        let trailing = self.take_trailing_comment(next_loc_start);
+        block_params.set_closing_trailing(trailing);
+        block_params
     }
 
     fn visit_variable_assign(
