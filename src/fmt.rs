@@ -1070,7 +1070,7 @@ impl BlockParameters {
 pub(crate) struct ClassLike {
     pub keyword: String,
     pub name: String,
-    // pub superclass: Option<Box<Node>>,
+    pub superclass: Option<Box<Node>>,
     // pub head_trailing: TrailingTrivia,
     pub body: BlockBody,
 }
@@ -2180,6 +2180,29 @@ impl Formatter {
         self.push_str(&class.keyword);
         self.push(' ');
         self.push_str(&class.name);
+        if let Some(superclass) = &class.superclass {
+            self.push_str(" <");
+            if superclass.shape.fits_in_one_line(self.remaining_width) || superclass.is_diagonal() {
+                self.push(' ');
+                self.format(superclass, ctx);
+                self.write_trailing_comment(&superclass.trailing_trivia);
+            } else {
+                self.indent();
+                self.break_line(ctx);
+                self.write_leading_trivia(
+                    &superclass.leading_trivia,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: true,
+                        end: true,
+                    },
+                );
+                self.put_indent();
+                self.format(superclass, ctx);
+                self.write_trailing_comment(&superclass.trailing_trivia);
+                self.dedent();
+            }
+        }
         self.format_block_body(&class.body, ctx);
         self.dedent();
         self.break_line(ctx);

@@ -2051,18 +2051,26 @@ impl FmtNodeBuilder<'_> {
         &mut self,
         keyword: &str,
         name_loc: prism::Location,
-        _superclass: Option<prism::Node>,
+        superclass: Option<prism::Node>,
         body: Option<prism::Node>,
         end_loc: prism::Location,
         next_loc_start: usize,
     ) -> (fmt::LeadingTrivia, fmt::ClassLike, fmt::TrailingTrivia) {
         let leading = self.take_leading_trivia(name_loc.start_offset());
         let name = Self::source_lossy_at(&name_loc);
+
+        let super_next = body
+            .as_ref()
+            .map(|b| b.location().start_offset())
+            .unwrap_or(end_loc.start_offset());
+        let superclass = superclass.map(|n| self.visit(n, super_next));
+
         let body = self.parse_block_body(body, end_loc.start_offset());
         let trailing = self.take_trailing_comment(next_loc_start);
         let class = fmt::ClassLike {
             keyword: keyword.to_string(),
             name,
+            superclass: superclass.map(Box::new),
             body,
         };
         (leading, class, trailing)
