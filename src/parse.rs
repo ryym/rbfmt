@@ -1151,6 +1151,18 @@ impl FmtNodeBuilder<'_> {
                 );
                 fmt::Node::new(leading, fmt::Kind::ClassLike(class), trailing)
             }
+            prism::Node::ModuleNode { .. } => {
+                let node = node.as_module_node().unwrap();
+                let (leading, class, trailing) = self.visit_class_like(
+                    "module",
+                    node.constant_path().location(),
+                    None,
+                    node.body(),
+                    node.end_keyword_loc(),
+                    next_loc_start,
+                );
+                fmt::Node::new(leading, fmt::Kind::ClassLike(class), trailing)
+            }
 
             _ => todo!("parse {:?}", node),
         };
