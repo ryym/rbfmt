@@ -397,6 +397,9 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::Atom(path), trailing)
             }
             prism::Node::BlockLocalVariableNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::SourceFileNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::SourceLineNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::SourceEncodingNode { .. } => self.parse_atom(node, next_loc_start),
 
             prism::Node::StringNode { .. } => {
                 let node = node.as_string_node().unwrap();
