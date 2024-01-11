@@ -1071,7 +1071,7 @@ pub(crate) struct ClassLike {
     pub keyword: String,
     pub name: String,
     pub superclass: Option<Box<Node>>,
-    // pub head_trailing: TrailingTrivia,
+    pub head_trailing: TrailingTrivia,
     pub body: BlockBody,
 }
 
@@ -2202,10 +2202,12 @@ impl Formatter {
                 self.write_trailing_comment(&superclass.trailing_trivia);
                 self.dedent();
             }
+        } else {
+            self.write_trailing_comment(&class.head_trailing);
         }
         self.format_block_body(&class.body, ctx);
-        self.dedent();
         self.break_line(ctx);
+        self.put_indent();
         self.push_str("end");
     }
 

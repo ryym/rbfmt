@@ -1,6 +1,28 @@
 class Foo
 end
 
+class ::Foo
+end
+
+class Foo::Bar::Baz
+end
+
+class Foo
+  class Bar
+    def bar
+      'bar'
+    end
+  end
+
+  def foo
+    :foo
+  end
+end
+
+class Foo # foo
+  extend(Some)
+end
+
 # a
 # b
 class Foo

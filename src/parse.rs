@@ -2059,11 +2059,17 @@ impl FmtNodeBuilder<'_> {
         let leading = self.take_leading_trivia(name_loc.start_offset());
         let name = Self::source_lossy_at(&name_loc);
 
-        let super_next = body
+        let head_next = body
             .as_ref()
             .map(|b| b.location().start_offset())
             .unwrap_or(end_loc.start_offset());
-        let superclass = superclass.map(|n| self.visit(n, super_next));
+        let (superclass, head_trailing) = if let Some(superclass) = superclass {
+            let fmt_node = self.visit(superclass, head_next);
+            (Some(fmt_node), fmt::TrailingTrivia::none())
+        } else {
+            let head_trailing = self.take_trailing_comment(head_next);
+            (None, head_trailing)
+        };
 
         let body = self.parse_block_body(body, end_loc.start_offset());
         let trailing = self.take_trailing_comment(next_loc_start);
@@ -2071,6 +2077,7 @@ impl FmtNodeBuilder<'_> {
             keyword: keyword.to_string(),
             name,
             superclass: superclass.map(Box::new),
+            head_trailing,
             body,
         };
         (leading, class, trailing)
