@@ -65,6 +65,12 @@ def no_keywords(a, b, **nil)
 end
 
 def forward(a, b, ...)
+  foo(...)
+  bar(
+    # 1
+    ..., # 2
+    # 3
+  )
 end
 
 def optionals(
