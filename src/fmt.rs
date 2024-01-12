@@ -494,6 +494,7 @@ pub(crate) struct Else {
 pub(crate) struct Arguments {
     shape: Shape,
     nodes: Vec<Node>,
+    pub last_comma_allowed: bool,
     virtual_end: Option<VirtualEnd>,
 }
 
@@ -502,6 +503,7 @@ impl Arguments {
         Self {
             shape: Shape::inline(0),
             nodes: vec![],
+            last_comma_allowed: true,
             virtual_end: None,
         }
     }
@@ -1515,20 +1517,25 @@ impl Formatter {
                         }
                     } else {
                         self.indent();
-                        for (i, arg) in args.nodes.iter().enumerate() {
-                            self.break_line(ctx);
-                            self.write_leading_trivia(
-                                &arg.leading_trivia,
-                                ctx,
-                                EmptyLineHandling::Trim {
-                                    start: i == 0,
-                                    end: false,
-                                },
-                            );
-                            self.put_indent();
-                            self.format(arg, ctx);
-                            self.push(',');
-                            self.write_trailing_comment(&arg.trailing_trivia);
+                        if !args.nodes.is_empty() {
+                            let last_idx = args.nodes.len() - 1;
+                            for (i, arg) in args.nodes.iter().enumerate() {
+                                self.break_line(ctx);
+                                self.write_leading_trivia(
+                                    &arg.leading_trivia,
+                                    ctx,
+                                    EmptyLineHandling::Trim {
+                                        start: i == 0,
+                                        end: false,
+                                    },
+                                );
+                                self.put_indent();
+                                self.format(arg, ctx);
+                                if i < last_idx || args.last_comma_allowed {
+                                    self.push(',');
+                                }
+                                self.write_trailing_comment(&arg.trailing_trivia);
+                            }
                         }
                         self.write_trivia_at_virtual_end(
                             ctx,

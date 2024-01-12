@@ -1577,8 +1577,15 @@ impl FmtNodeBuilder<'_> {
                 Self::each_node_with_next_start(
                     args_node.arguments().iter(),
                     next_loc_start,
-                    |prev, next_start| {
-                        let fmt_node = self.visit(prev, next_start);
+                    |node, next_start| {
+                        if next_start == next_loc_start {
+                            args.last_comma_allowed = !matches!(
+                                node,
+                                prism::Node::ForwardingArgumentsNode { .. }
+                                    | prism::Node::BlockArgumentNode { .. }
+                            );
+                        }
+                        let fmt_node = self.visit(node, next_start);
                         args.append_node(fmt_node);
                     },
                 );

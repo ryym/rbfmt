@@ -68,7 +68,7 @@ def forward(a, b, ...)
   foo(...)
   bar(
     # 1
-    ..., # 2
+    ... # 2
     # 3
   )
 end
