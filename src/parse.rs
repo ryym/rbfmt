@@ -576,9 +576,17 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_call_node().unwrap();
                 let loc = node.location();
                 let leading = self.take_leading_trivia(loc.start_offset());
-                let chain = self.visit_call_root(&node, next_loc_start, None);
+
+                let kind = if node.name().as_slice() == b"[]=" {
+                    let assign = self.visit_index_write(node);
+                    fmt::Kind::Assign(assign)
+                } else {
+                    let chain = self.visit_call_root(&node, next_loc_start, None);
+                    fmt::Kind::MethodChain(chain)
+                };
+
                 let trailing = self.take_trailing_comment(next_loc_start);
-                fmt::Node::new(leading, fmt::Kind::MethodChain(chain), trailing)
+                fmt::Node::new(leading, kind, trailing)
             }
 
             prism::Node::LocalVariableWriteNode { .. } => {
@@ -1655,6 +1663,40 @@ impl FmtNodeBuilder<'_> {
 
         self.last_loc_end = call.location().end_offset();
         chain
+    }
+
+    fn visit_index_write(&mut self, call: prism::CallNode) -> fmt::Assign {
+        let (opening_loc, closing_loc) = match (call.opening_loc(), call.closing_loc()) {
+            (Some(op), Some(cl)) => (op, cl),
+            _ => panic!("index write must have opening and closing"),
+        };
+
+        let receiver = call.receiver().expect("index write must have receiver");
+        let receiver = self.visit(receiver, opening_loc.start_offset());
+
+        let args = call.arguments().expect("index write must have arguments");
+        let mut args_iter = args.arguments().iter();
+        let (arg1, arg2) = match (args_iter.next(), args_iter.next(), args_iter.next()) {
+            (Some(arg1), Some(arg2), None) => (arg1, arg2),
+            _ => panic!("index write must have exactly two arguments"),
+        };
+
+        let index_call_leading = fmt::LeadingTrivia::new();
+        let mut index_call = fmt::MethodCall::new(index_call_leading, None, "[]".to_string());
+        let mut left_args = fmt::Arguments::new();
+        let closing_start = closing_loc.start_offset();
+        left_args.append_node(self.visit(arg1, closing_start));
+        let left_args_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
+        left_args.set_virtual_end(left_args_end);
+        index_call.set_args(left_args);
+
+        let mut chain = fmt::MethodChain::new(Some(receiver));
+        chain.append_call(index_call);
+        let left = fmt::Node::without_trivia(fmt::Kind::MethodChain(chain));
+        let arg2_end = arg2.location().end_offset();
+        let right = self.visit(arg2, arg2_end);
+        let operator = "=".to_string();
+        fmt::Assign::new(left, operator, right)
     }
 
     fn visit_block_parameters(
