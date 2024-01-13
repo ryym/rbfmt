@@ -1650,14 +1650,15 @@ impl FmtNodeBuilder<'_> {
 
                 if let Some(params) = params {
                     let params_next_loc = body_start.unwrap_or(closing_loc.start_offset());
-                    let params = match params {
+                    match params {
                         prism::Node::BlockParametersNode { .. } => {
                             let node = params.as_block_parameters_node().unwrap();
-                            self.visit_block_parameters(node, params_next_loc)
+                            let params = self.visit_block_parameters(node, params_next_loc);
+                            method_block.set_parameters(params);
                         }
+                        prism::Node::NumberedParametersNode { .. } => {}
                         _ => panic!("unexpected node for call block params: {:?}", node),
-                    };
-                    method_block.set_parameters(params);
+                    }
                 }
 
                 let body_end_loc = closing_loc.start_offset();

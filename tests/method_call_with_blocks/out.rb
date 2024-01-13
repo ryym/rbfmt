@@ -109,3 +109,8 @@ foo do |
 |
   1
 end
+
+foo { _1 + _2 }
+foo do
+  _1.foo(_2)
+end
