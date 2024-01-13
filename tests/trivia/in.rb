@@ -19,5 +19,13 @@
 # spaces only
     
 
+# comment with trailing space  
+
+=begin
+block
+comment
+here
+=end
+
 # comment-9
 

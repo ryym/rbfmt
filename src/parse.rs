@@ -2342,8 +2342,10 @@ impl FmtNodeBuilder<'_> {
             if !(self.last_loc_end..=loc_start).contains(&loc.start_offset()) {
                 break;
             };
-            // We treat the found comment as line comment always.
-            let value = Self::source_lossy_at(&loc);
+            let mut value = Self::source_lossy_at(&loc);
+            if value.starts_with("=begin") {
+                value = value.trim_end().to_string();
+            }
             let fmt_comment = fmt::Comment { value };
             self.take_empty_lines_until(loc.start_offset(), &mut trivia);
             trivia.append_line(fmt::LineTrivia::Comment(fmt_comment));
