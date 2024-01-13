@@ -267,6 +267,7 @@ pub(crate) enum DynStrPart {
     Str(StringLike),
     DynStr(DynStringLike),
     Exprs(EmbeddedExprs),
+    Variable(EmbeddedVariable),
 }
 
 impl DynStrPart {
@@ -275,6 +276,7 @@ impl DynStrPart {
             Self::Str(s) => &s.shape,
             Self::DynStr(s) => &s.shape,
             Self::Exprs(e) => &e.shape,
+            Self::Variable(s) => &s.shape,
         }
     }
 }
@@ -295,6 +297,24 @@ impl EmbeddedExprs {
             opening,
             exprs,
             closing,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct EmbeddedVariable {
+    shape: Shape,
+    operator: String,
+    variable: String,
+}
+
+impl EmbeddedVariable {
+    pub(crate) fn new(operator: String, variable: String) -> Self {
+        let shape = Shape::inline(operator.len() + variable.len());
+        Self {
+            shape,
+            operator,
+            variable,
         }
     }
 }
@@ -336,6 +356,7 @@ impl HeredocIndentMode {
 pub(crate) enum HeredocPart {
     Str(StringLike),
     Exprs(EmbeddedExprs),
+    Variable(EmbeddedVariable),
 }
 
 #[derive(Debug)]
@@ -1307,6 +1328,9 @@ impl Formatter {
                 DynStrPart::Exprs(embedded) => {
                     self.format_embedded_exprs(embedded, ctx);
                 }
+                DynStrPart::Variable(var) => {
+                    self.format_embedded_variable(var);
+                }
             }
         }
         if let Some(closing) = &dstr.closing {
@@ -1329,6 +1353,11 @@ impl Formatter {
         }
 
         self.push_str(&embedded.closing);
+    }
+
+    fn format_embedded_variable(&mut self, var: &EmbeddedVariable) {
+        self.push_str(&var.operator);
+        self.format_atom(&var.variable);
     }
 
     fn format_heredoc_opening(&mut self, opening: &HeredocOpening) {
@@ -2419,6 +2448,9 @@ impl Formatter {
                         HeredocPart::Exprs(embedded) => {
                             self.format_embedded_exprs(embedded, ctx);
                         }
+                        HeredocPart::Variable(var) => {
+                            self.format_embedded_variable(var);
+                        }
                     }
                 }
                 if matches!(heredoc.indent_mode, HeredocIndentMode::EndIndented) {
@@ -2436,6 +2468,9 @@ impl Formatter {
                         }
                         HeredocPart::Exprs(embedded) => {
                             self.format_embedded_exprs(embedded, ctx);
+                        }
+                        HeredocPart::Variable(var) => {
+                            self.format_embedded_variable(var);
                         }
                     }
                 }

@@ -1347,12 +1347,18 @@ impl FmtNodeBuilder<'_> {
                     let node = part.as_embedded_statements_node().unwrap();
                     let loc = node.location();
                     self.last_loc_end = node.opening_loc().end_offset();
-
                     let exprs = self.visit_statements(node.statements(), loc.end_offset());
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
                     let embedded_exprs = fmt::EmbeddedExprs::new(opening, exprs, closing);
                     dstr.append_part(fmt::DynStrPart::Exprs(embedded_exprs));
+                }
+                prism::Node::EmbeddedVariableNode { .. } => {
+                    let node = part.as_embedded_variable_node().unwrap();
+                    let operator = Self::source_lossy_at(&node.operator_loc());
+                    let variable = Self::source_lossy_at(&node.variable().location());
+                    let embedded_var = fmt::EmbeddedVariable::new(operator, variable);
+                    dstr.append_part(fmt::DynStrPart::Variable(embedded_var));
                 }
                 _ => panic!("unexpected string interpolation node: {:?}", part),
             }
@@ -1430,12 +1436,18 @@ impl FmtNodeBuilder<'_> {
                             parts.push(fmt::HeredocPart::Str(str))
                         }
                     }
-
                     let exprs = self.visit_statements(node.statements(), loc.end_offset());
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
                     let embedded = fmt::EmbeddedExprs::new(opening, exprs, closing);
                     parts.push(fmt::HeredocPart::Exprs(embedded));
+                }
+                prism::Node::EmbeddedVariableNode { .. } => {
+                    let node = part.as_embedded_variable_node().unwrap();
+                    let operator = Self::source_lossy_at(&node.operator_loc());
+                    let variable = Self::source_lossy_at(&node.variable().location());
+                    let embedded_var = fmt::EmbeddedVariable::new(operator, variable);
+                    parts.push(fmt::HeredocPart::Variable(embedded_var));
                 }
                 _ => panic!("unexpected heredoc part: {:?}", part),
             }

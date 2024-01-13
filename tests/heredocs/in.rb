@@ -91,6 +91,10 @@ HH
  aa   #{}
 HERE
 
+<<-HERE
+a#@b #@@c #$d #{@e}
+HERE
+
 <<~H1
   aa
   #{
