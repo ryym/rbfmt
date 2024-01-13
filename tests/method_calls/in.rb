@@ -107,3 +107,12 @@ foo
   .bar =
     # a
     2 # b
+
+def supers
+  super # super
+
+  super { _1 * 2 }
+  super do |a, b; c|
+    a(b, c)
+  end
+end
