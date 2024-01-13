@@ -577,13 +577,12 @@ impl FmtNodeBuilder<'_> {
                 let loc = node.location();
                 let leading = self.take_leading_trivia(loc.start_offset());
 
-                let method_name = node.name().as_slice();
-                let kind = if method_name.last().map_or(false, |c| *c == b'=') {
-                    let assign = self.visit_call_write(node);
-                    fmt::Kind::Assign(assign)
-                } else if Self::is_infix_op(&node) {
+                let kind = if Self::is_infix_call(&node) {
                     let chain = self.visit_infix_call(node);
                     fmt::Kind::InfixChain(chain)
+                } else if Self::is_write_call(&node) {
+                    let assign = self.visit_call_write(node);
+                    fmt::Kind::Assign(assign)
                 } else {
                     let chain = self.visit_call_root(&node, next_loc_start, None);
                     fmt::Kind::MethodChain(chain)
@@ -1686,6 +1685,21 @@ impl FmtNodeBuilder<'_> {
         chain
     }
 
+    fn is_infix_call(call: &prism::CallNode) -> bool {
+        call.receiver().is_some()
+            && call.call_operator_loc().is_none()
+            && call.opening_loc().is_none()
+    }
+
+    fn is_write_call(call: &prism::CallNode) -> bool {
+        let method_name = call.name().as_slice();
+        method_name[method_name.len() - 1] == b'='
+            && method_name != b"=="
+            && method_name != b"==="
+            && method_name != b"<="
+            && method_name != b">="
+    }
+
     fn visit_call_write(&mut self, call: prism::CallNode) -> fmt::Assign {
         if call.name().as_slice() == b"[]=" {
             return self.visit_index_write(call);
@@ -1790,12 +1804,6 @@ impl FmtNodeBuilder<'_> {
         let trailing = self.take_trailing_comment(next_loc_start);
         block_params.set_closing_trailing(trailing);
         block_params
-    }
-
-    fn is_infix_op(call: &prism::CallNode) -> bool {
-        call.receiver().is_some()
-            && call.call_operator_loc().is_none()
-            && call.opening_loc().is_none()
     }
 
     fn visit_infix_call(&mut self, call: prism::CallNode) -> fmt::InfixChain {

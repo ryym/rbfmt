@@ -1,4 +1,28 @@
-1 + 2
+a + b
+a - b
+a * b
+a ** b
+a / b
+a % b
+
+a >> b
+a << b
+a & b
+a ^ b
+
+a == b
+a != b
+a === b
+a =~ b
+a !~ b
+a <=> b
+a < b
+a <= b
+a > b
+a >= b
+
+a << b ^ c == d * e > f
+
 1 + 2 - 3
 1 + (2 * 3 / (a % b)) / 4
 9 * foo.bar(3)[8] - baz
