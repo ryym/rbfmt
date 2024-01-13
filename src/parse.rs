@@ -577,8 +577,9 @@ impl FmtNodeBuilder<'_> {
                 let loc = node.location();
                 let leading = self.take_leading_trivia(loc.start_offset());
 
-                let kind = if node.name().as_slice() == b"[]=" {
-                    let assign = self.visit_index_write(node);
+                let method_name = node.name().as_slice();
+                let kind = if method_name.last().map_or(false, |c| *c == b'=') {
+                    let assign = self.visit_call_write(node);
                     fmt::Kind::Assign(assign)
                 } else {
                     let chain = self.visit_call_root(&node, next_loc_start, None);
@@ -1663,6 +1664,35 @@ impl FmtNodeBuilder<'_> {
 
         self.last_loc_end = call.location().end_offset();
         chain
+    }
+
+    fn visit_call_write(&mut self, call: prism::CallNode) -> fmt::Assign {
+        if call.name().as_slice() == b"[]=" {
+            return self.visit_index_write(call);
+        }
+
+        let msg_loc = call.message_loc().expect("call write must have message");
+        let receiver = call.receiver().expect("call write must have receiver");
+        let receiver = self.visit(receiver, msg_loc.start_offset());
+        let call_op = call.call_operator_loc().as_ref().map(Self::source_lossy_at);
+
+        let call_leading = self.take_leading_trivia(msg_loc.start_offset());
+        let mut name = String::from_utf8_lossy(call.name().as_slice()).to_string();
+        name.truncate(name.len() - 1); // Remove '='
+        let setter_call = fmt::MethodCall::new(call_leading, call_op, name);
+
+        let arg = call
+            .arguments()
+            .and_then(|args| args.arguments().iter().next())
+            .expect("call write must have argument");
+
+        let mut chain = fmt::MethodChain::new(Some(receiver));
+        chain.append_call(setter_call);
+        let left = fmt::Node::without_trivia(fmt::Kind::MethodChain(chain));
+        let arg_end = arg.location().end_offset();
+        let right = self.visit(arg, arg_end);
+        let operator = "=".to_string();
+        fmt::Assign::new(left, operator, right)
     }
 
     fn visit_index_write(&mut self, call: prism::CallNode) -> fmt::Assign {

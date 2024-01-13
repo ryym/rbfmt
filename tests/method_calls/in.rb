@@ -100,3 +100,12 @@ foo.bar(
   1, 2)[1] = 2
 
 [1].map { |n| n.abs }[0] = 1
+
+foo.bar = 1
+foo(1, 2)[3].bar(4).baz = 5, 6
+
+foo
+  # foo
+  .bar =
+    # a
+    2 # b

@@ -48,7 +48,6 @@ Const::Path = 123
 Const::Path ||= true
 Const::Path /= 0.5
 
-foo.bar=(1)
 foo(1, 2, 3)&.bar &&= 1
 foo
   # bar
