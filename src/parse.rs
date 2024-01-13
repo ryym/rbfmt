@@ -1182,7 +1182,7 @@ impl FmtNodeBuilder<'_> {
             }
             prism::Node::ModuleNode { .. } => {
                 let node = node.as_module_node().unwrap();
-                let (leading, class, trailing) = self.visit_class_like(
+                let (leading, module, trailing) = self.visit_class_like(
                     "module",
                     node.constant_path().location(),
                     None,
@@ -1190,7 +1190,25 @@ impl FmtNodeBuilder<'_> {
                     node.end_keyword_loc(),
                     next_loc_start,
                 );
-                fmt::Node::new(leading, fmt::Kind::ClassLike(class), trailing)
+                fmt::Node::new(leading, fmt::Kind::ClassLike(module), trailing)
+            }
+            prism::Node::SingletonClassNode { .. } => {
+                let node = node.as_singleton_class_node().unwrap();
+                let leading = self.take_leading_trivia(node.operator_loc().start_offset());
+                let body = node.body();
+                let end_loc = node.end_keyword_loc();
+                let expr_next = body
+                    .as_ref()
+                    .map(|b| b.location().start_offset())
+                    .unwrap_or(end_loc.start_offset());
+                let expr = self.visit(node.expression(), expr_next);
+                let body = self.parse_block_body(body, end_loc.start_offset());
+                let trailing = self.take_trailing_comment(next_loc_start);
+                let class = fmt::SingletonClass {
+                    expr: Box::new(expr),
+                    body,
+                };
+                fmt::Node::new(leading, fmt::Kind::SingletonClass(class), trailing)
             }
 
             _ => todo!("parse {:?}", node),

@@ -149,6 +149,7 @@ pub(crate) enum Kind {
     Begin(Begin),
     Def(Def),
     ClassLike(ClassLike),
+    SingletonClass(SingletonClass),
 }
 
 impl Kind {
@@ -174,6 +175,7 @@ impl Kind {
             Self::Begin(_) => Begin::shape(),
             Self::Def(def) => def.shape,
             Self::ClassLike(_) => ClassLike::shape(),
+            Self::SingletonClass(_) => SingletonClass::shape(),
         }
     }
 
@@ -207,6 +209,7 @@ impl Kind {
             Self::Begin(_) => false,
             Self::Def(_) => false,
             Self::ClassLike(_) => false,
+            Self::SingletonClass(_) => false,
         }
     }
 }
@@ -1128,6 +1131,18 @@ impl ClassLike {
 }
 
 #[derive(Debug)]
+pub(crate) struct SingletonClass {
+    pub expr: Box<Node>,
+    pub body: BlockBody,
+}
+
+impl SingletonClass {
+    fn shape() -> Shape {
+        Shape::Multilines
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct LeadingTrivia {
     lines: Vec<LineTrivia>,
     shape: Shape,
@@ -1251,6 +1266,7 @@ impl Formatter {
             Kind::Begin(begin) => self.format_begin(begin, ctx),
             Kind::Def(def) => self.format_def(def, ctx),
             Kind::ClassLike(class) => self.format_class_like(class, ctx),
+            Kind::SingletonClass(class) => self.format_singleton_class(class, ctx),
         }
     }
 
@@ -2286,6 +2302,36 @@ impl Formatter {
             }
         } else {
             self.write_trailing_comment(&class.head_trailing);
+        }
+        self.format_block_body(&class.body, ctx);
+        self.break_line(ctx);
+        self.put_indent();
+        self.push_str("end");
+    }
+
+    fn format_singleton_class(&mut self, class: &SingletonClass, ctx: &FormatContext) {
+        self.push_str("class <<");
+        if class.expr.shape.fits_in_one_line(self.remaining_width) || class.expr.is_diagonal() {
+            self.push(' ');
+            self.format(&class.expr, ctx);
+            self.write_trailing_comment(&class.expr.trailing_trivia);
+        } else {
+            self.indent();
+            self.indent();
+            self.break_line(ctx);
+            self.write_leading_trivia(
+                &class.expr.leading_trivia,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: false,
+                    end: false,
+                },
+            );
+            self.put_indent();
+            self.format(&class.expr, ctx);
+            self.write_trailing_comment(&class.expr.trailing_trivia);
+            self.dedent();
+            self.dedent();
         }
         self.format_block_body(&class.body, ctx);
         self.break_line(ctx);

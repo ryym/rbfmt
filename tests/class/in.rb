@@ -57,3 +57,50 @@ class Foo < foo(1, 2)
   .baz([]) # baz
   true
 end
+
+class << self
+end
+
+# 1
+class # 2
+  # 3
+  << # 4
+  # 5
+  foo # 6
+  # 7
+  1 # 8
+  # 9
+end
+
+class << [
+  1,
+  2, # 2
+  3,
+]
+  1
+end
+
+class << foo(1)
+  # bar
+  .bar(2, 3)
+  1
+end
+
+class <<
+  # bar
+  if true
+    2
+  end
+  1
+end
+
+class << Foo.bar
+  1
+rescue => e
+  2
+else
+  3
+ensure
+  4
+end
+
