@@ -396,14 +396,14 @@ impl FmtNodeBuilder<'_> {
         let node = match node {
             prism::Node::ProgramNode { .. } => {
                 let node = node.as_program_node().unwrap();
-                let exprs = self.visit_statements(Some(node.statements()), next_loc_start);
-                let kind = fmt::Kind::Exprs(exprs);
+                let statements = self.visit_statements(Some(node.statements()), next_loc_start);
+                let kind = fmt::Kind::Statements(statements);
                 fmt::Node::without_trivia(kind)
             }
             prism::Node::StatementsNode { .. } => {
                 let node = node.as_statements_node().unwrap();
-                let exprs = self.visit_statements(Some(node), next_loc_start);
-                let kind = fmt::Kind::Exprs(exprs);
+                let statements = self.visit_statements(Some(node), next_loc_start);
+                let kind = fmt::Kind::Statements(statements);
                 fmt::Node::without_trivia(kind)
             }
 
@@ -1138,7 +1138,7 @@ impl FmtNodeBuilder<'_> {
                 let leading = self.take_leading_trivia(node.location().start_offset());
                 let closing_start = node.closing_loc().start_offset();
                 let body = node.body().map(|b| self.visit(b, closing_start));
-                let body = self.wrap_as_exprs(body, closing_start);
+                let body = self.wrap_as_statements(body, closing_start);
                 let trailing = self.take_trailing_comment(next_loc_start);
                 let parens = fmt::Parens::new(body);
                 fmt::Node::new(leading, fmt::Kind::Parens(parens), trailing)
@@ -1240,7 +1240,7 @@ impl FmtNodeBuilder<'_> {
                 let body = self.parse_block_body(body, end_loc.start_offset());
                 let trailing = self.take_trailing_comment(next_loc_start);
                 let class = fmt::SingletonClass {
-                    expr: Box::new(expr),
+                    expression: Box::new(expr),
                     body,
                 };
                 fmt::Node::new(leading, fmt::Kind::SingletonClass(class), trailing)
@@ -1347,11 +1347,11 @@ impl FmtNodeBuilder<'_> {
                     let node = part.as_embedded_statements_node().unwrap();
                     let loc = node.location();
                     self.last_loc_end = node.opening_loc().end_offset();
-                    let exprs = self.visit_statements(node.statements(), loc.end_offset());
+                    let statements = self.visit_statements(node.statements(), loc.end_offset());
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
-                    let embedded_exprs = fmt::EmbeddedExprs::new(opening, exprs, closing);
-                    dstr.append_part(fmt::DynStrPart::Exprs(embedded_exprs));
+                    let embedded_stmts = fmt::EmbeddedStatements::new(opening, statements, closing);
+                    dstr.append_part(fmt::DynStrPart::Statements(embedded_stmts));
                 }
                 prism::Node::EmbeddedVariableNode { .. } => {
                     let node = part.as_embedded_variable_node().unwrap();
@@ -1436,11 +1436,11 @@ impl FmtNodeBuilder<'_> {
                             parts.push(fmt::HeredocPart::Str(str))
                         }
                     }
-                    let exprs = self.visit_statements(node.statements(), loc.end_offset());
+                    let statements = self.visit_statements(node.statements(), loc.end_offset());
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
-                    let embedded = fmt::EmbeddedExprs::new(opening, exprs, closing);
-                    parts.push(fmt::HeredocPart::Exprs(embedded));
+                    let embedded = fmt::EmbeddedStatements::new(opening, statements, closing);
+                    parts.push(fmt::HeredocPart::Statements(embedded));
                 }
                 prism::Node::EmbeddedVariableNode { .. } => {
                     let node = part.as_embedded_variable_node().unwrap();
@@ -1467,17 +1467,21 @@ impl FmtNodeBuilder<'_> {
         fmt::HeredocOpening::new(pos, opening_id, indent_mode)
     }
 
-    fn visit_statements(&mut self, node: Option<prism::StatementsNode>, end: usize) -> fmt::Exprs {
-        let mut exprs = fmt::Exprs::new();
+    fn visit_statements(
+        &mut self,
+        node: Option<prism::StatementsNode>,
+        end: usize,
+    ) -> fmt::Statements {
+        let mut statements = fmt::Statements::new();
         if let Some(node) = node {
             Self::each_node_with_next_start(node.body().iter(), end, |prev, next_start| {
                 let fmt_node = self.visit(prev, next_start);
-                exprs.append_node(fmt_node);
+                statements.append_node(fmt_node);
             });
         }
         let virtual_end = self.take_end_trivia_as_virtual_end(Some(end));
-        exprs.set_virtual_end(virtual_end);
-        exprs
+        statements.set_virtual_end(virtual_end);
+        statements
     }
 
     fn visit_if_or_unless(&mut self, node: IfOrUnless, next_loc_start: usize) -> fmt::Node {
@@ -1506,7 +1510,7 @@ impl FmtNodeBuilder<'_> {
                 let else_start = conseq.location().start_offset();
                 let body = self.visit_statements(node.statements, else_start);
                 let if_first = fmt::Conditional::new(keyword_trailing, predicate, body);
-                let mut ifexpr = fmt::IfExpr::new(node.is_if, if_first);
+                let mut ifexpr = fmt::If::new(node.is_if, if_first);
                 self.visit_ifelse(conseq, &mut ifexpr);
                 ifexpr
             }
@@ -1514,15 +1518,15 @@ impl FmtNodeBuilder<'_> {
             None => {
                 let body = self.visit_statements(node.statements, end_start);
                 let if_first = fmt::Conditional::new(keyword_trailing, predicate, body);
-                fmt::IfExpr::new(node.is_if, if_first)
+                fmt::If::new(node.is_if, if_first)
             }
         };
 
         let if_trailing = self.take_trailing_comment(next_loc_start);
-        fmt::Node::new(if_leading, fmt::Kind::IfExpr(ifexpr), if_trailing)
+        fmt::Node::new(if_leading, fmt::Kind::If(ifexpr), if_trailing)
     }
 
-    fn visit_ifelse(&mut self, node: prism::Node, ifexpr: &mut fmt::IfExpr) {
+    fn visit_ifelse(&mut self, node: prism::Node, ifexpr: &mut fmt::If) {
         match node {
             // elsif ("if" only, "unles...elsif" is syntax error)
             prism::Node::IfNode { .. } => {
@@ -1591,7 +1595,7 @@ impl FmtNodeBuilder<'_> {
         let if_leading = self.take_leading_trivia(postmod.loc.start_offset());
 
         let kwd_loc = postmod.keyword_loc;
-        let exprs = self.visit_statements(postmod.statements, kwd_loc.start_offset());
+        let statements = self.visit_statements(postmod.statements, kwd_loc.start_offset());
 
         let pred_loc = postmod.predicate.location();
         let keyword_trailing = self.take_trailing_comment(pred_loc.start_offset());
@@ -1600,7 +1604,7 @@ impl FmtNodeBuilder<'_> {
 
         let postmod = fmt::Postmodifier::new(
             postmod.keyword,
-            fmt::Conditional::new(keyword_trailing, predicate, exprs),
+            fmt::Conditional::new(keyword_trailing, predicate, statements),
         );
 
         let if_trailing = self.take_trailing_comment(next_loc_start);
@@ -1729,7 +1733,7 @@ impl FmtNodeBuilder<'_> {
                 let body_end_loc = closing_loc.start_offset();
                 let body = body.map(|n| self.visit(n, body_end_loc));
                 // XXX: Is this necessary? I cannot find the case where the body is not a StatementNode.
-                let body = self.wrap_as_exprs(body, body_end_loc);
+                let body = self.wrap_as_statements(body, body_end_loc);
                 method_block.set_body(body);
 
                 method_block
@@ -2079,9 +2083,9 @@ impl FmtNodeBuilder<'_> {
 
         if node.equal_loc().is_some() {
             let body = node.body().expect("shorthand def body must exist");
-            let expr = self.visit(body, 0);
+            let body = self.visit(body, 0);
             def.set_body(fmt::DefBody::Short {
-                expr: Box::new(expr),
+                body: Box::new(body),
             });
         } else {
             let end_loc = node.end_keyword_loc().expect("block def must have end");
@@ -2112,8 +2116,8 @@ impl FmtNodeBuilder<'_> {
             Some(body) => match body {
                 prism::Node::StatementsNode { .. } => {
                     let stmts = body.as_statements_node().unwrap();
-                    let exprs = self.visit_statements(Some(stmts), next_loc_start);
-                    fmt::BlockBody::new(exprs)
+                    let statements = self.visit_statements(Some(stmts), next_loc_start);
+                    fmt::BlockBody::new(statements)
                 }
                 prism::Node::BeginNode { .. } => {
                     let node = body.as_begin_node().unwrap();
@@ -2122,8 +2126,8 @@ impl FmtNodeBuilder<'_> {
                 _ => panic!("unexpected def body: {:?}", body),
             },
             None => {
-                let exprs = self.wrap_as_exprs(None, next_loc_start);
-                fmt::BlockBody::new(exprs)
+                let statements = self.wrap_as_statements(None, next_loc_start);
+                fmt::BlockBody::new(statements)
             }
         }
     }
@@ -2144,12 +2148,12 @@ impl FmtNodeBuilder<'_> {
         // XXX: I cannot find the case where the begin block does not have end.
         let end_loc = node.end_keyword_loc().expect("begin must have end");
 
-        let exprs_next = rescue_start
+        let statements_next = rescue_start
             .or(else_start)
             .or(ensure_start)
             .unwrap_or(end_loc.start_offset());
-        let exprs = self.visit_statements(node.statements(), exprs_next);
-        let mut body = fmt::BlockBody::new(exprs);
+        let statements = self.visit_statements(node.statements(), statements_next);
+        let mut body = fmt::BlockBody::new(statements);
 
         if let Some(rescue_node) = node.rescue_clause() {
             let rescues_next = else_start
@@ -2169,10 +2173,10 @@ impl FmtNodeBuilder<'_> {
                 .unwrap_or(end_loc.start_offset());
             let else_trailing = self.take_trailing_comment(keyword_next);
             let else_next = ensure_start.unwrap_or(end_loc.start_offset());
-            let else_exprs = self.visit_statements(statements, else_next);
+            let else_statements = self.visit_statements(statements, else_next);
             body.rescue_else = Some(fmt::Else {
                 keyword_trailing: else_trailing,
-                body: else_exprs,
+                body: else_statements,
             });
         }
 
@@ -2183,10 +2187,10 @@ impl FmtNodeBuilder<'_> {
                 .map(|s| s.location().start_offset())
                 .unwrap_or(end_loc.start_offset());
             let ensure_trailing = self.take_trailing_comment(keyword_next);
-            let ensure_exprs = self.visit_statements(statements, end_loc.start_offset());
+            let ensure_statements = self.visit_statements(statements, end_loc.start_offset());
             body.ensure = Some(fmt::Else {
                 keyword_trailing: ensure_trailing,
-                body: ensure_exprs,
+                body: ensure_statements,
             });
         }
 
@@ -2225,9 +2229,9 @@ impl FmtNodeBuilder<'_> {
             rescue.set_reference(reference);
         }
 
-        let exprs_next = consequent_start.unwrap_or(final_next);
-        let exprs = self.visit_statements(statements, exprs_next);
-        rescue.set_exprs(exprs);
+        let statements_next = consequent_start.unwrap_or(final_next);
+        let statements = self.visit_statements(statements, statements_next);
+        rescue.set_statements(statements);
         rescues.push(rescue);
 
         if let Some(consequent) = consequent {
@@ -2305,23 +2309,23 @@ impl FmtNodeBuilder<'_> {
         (leading, class, trailing)
     }
 
-    fn wrap_as_exprs(&mut self, node: Option<fmt::Node>, end: usize) -> fmt::Exprs {
-        let (mut exprs, should_take_end_trivia) = match node {
-            None => (fmt::Exprs::new(), true),
+    fn wrap_as_statements(&mut self, node: Option<fmt::Node>, end: usize) -> fmt::Statements {
+        let (mut statements, should_take_end_trivia) = match node {
+            None => (fmt::Statements::new(), true),
             Some(node) => match node.kind {
-                fmt::Kind::Exprs(exprs) => (exprs, false),
+                fmt::Kind::Statements(statements) => (statements, false),
                 _ => {
-                    let mut exprs = fmt::Exprs::new();
-                    exprs.append_node(node);
-                    (exprs, true)
+                    let mut statements = fmt::Statements::new();
+                    statements.append_node(node);
+                    (statements, true)
                 }
             },
         };
         if should_take_end_trivia {
             let virtual_end = self.take_end_trivia_as_virtual_end(Some(end));
-            exprs.set_virtual_end(virtual_end);
+            statements.set_virtual_end(virtual_end);
         }
-        exprs
+        statements
     }
 
     fn take_end_trivia_as_virtual_end(&mut self, end: Option<usize>) -> Option<fmt::VirtualEnd> {

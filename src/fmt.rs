@@ -133,9 +133,9 @@ pub(crate) enum Kind {
     StringLike(StringLike),
     DynStringLike(DynStringLike),
     HeredocOpening(HeredocOpening),
-    Exprs(Exprs),
+    Statements(Statements),
     Parens(Parens),
-    IfExpr(IfExpr),
+    If(If),
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
     InfixChain(InfixChain),
@@ -159,9 +159,9 @@ impl Kind {
             Self::StringLike(s) => s.shape,
             Self::DynStringLike(s) => s.shape,
             Self::HeredocOpening(opening) => *opening.shape(),
-            Self::Exprs(exprs) => exprs.shape,
+            Self::Statements(statements) => statements.shape,
             Self::Parens(parens) => parens.shape,
-            Self::IfExpr(_) => IfExpr::shape(),
+            Self::If(_) => If::shape(),
             Self::Postmodifier(pmod) => pmod.shape,
             Self::MethodChain(chain) => chain.shape,
             Self::InfixChain(chain) => chain.shape,
@@ -181,13 +181,13 @@ impl Kind {
 
     pub(crate) fn is_diagonal(&self) -> bool {
         match self {
-            Self::Exprs(expr) => {
-                if expr.nodes.len() > 1 {
+            Self::Statements(statements) => {
+                if statements.nodes.len() > 1 {
                     return false;
                 }
-                match expr.nodes.get(0) {
+                match statements.nodes.get(0) {
                     Some(node) => node.is_diagonal(),
-                    None => expr.virtual_end.is_none(),
+                    None => statements.virtual_end.is_none(),
                 }
             }
             Self::Atom(_) => false,
@@ -195,7 +195,7 @@ impl Kind {
             Self::DynStringLike(_) => false,
             Self::HeredocOpening(_) => false,
             Self::Parens(_) => true,
-            Self::IfExpr(_) => false,
+            Self::If(_) => false,
             Self::Postmodifier(_) => true,
             Self::MethodChain(_) => true,
             Self::InfixChain(_) => true,
@@ -266,7 +266,7 @@ impl DynStringLike {
 pub(crate) enum DynStrPart {
     Str(StringLike),
     DynStr(DynStringLike),
-    Exprs(EmbeddedExprs),
+    Statements(EmbeddedStatements),
     Variable(EmbeddedVariable),
 }
 
@@ -275,27 +275,27 @@ impl DynStrPart {
         match self {
             Self::Str(s) => &s.shape,
             Self::DynStr(s) => &s.shape,
-            Self::Exprs(e) => &e.shape,
+            Self::Statements(e) => &e.shape,
             Self::Variable(s) => &s.shape,
         }
     }
 }
 
 #[derive(Debug)]
-pub(crate) struct EmbeddedExprs {
+pub(crate) struct EmbeddedStatements {
     pub shape: Shape,
     pub opening: String,
-    pub exprs: Exprs,
+    pub statements: Statements,
     pub closing: String,
 }
 
-impl EmbeddedExprs {
-    pub(crate) fn new(opening: String, exprs: Exprs, closing: String) -> Self {
-        let shape = Shape::inline(opening.len() + closing.len()).add(&exprs.shape);
+impl EmbeddedStatements {
+    pub(crate) fn new(opening: String, statements: Statements, closing: String) -> Self {
+        let shape = Shape::inline(opening.len() + closing.len()).add(&statements.shape);
         Self {
             shape,
             opening,
-            exprs,
+            statements,
             closing,
         }
     }
@@ -355,7 +355,7 @@ impl HeredocIndentMode {
 #[derive(Debug)]
 pub(crate) enum HeredocPart {
     Str(StringLike),
-    Exprs(EmbeddedExprs),
+    Statements(EmbeddedStatements),
     Variable(EmbeddedVariable),
 }
 
@@ -375,13 +375,13 @@ impl VirtualEnd {
 }
 
 #[derive(Debug)]
-pub(crate) struct Exprs {
+pub(crate) struct Statements {
     shape: Shape,
     nodes: Vec<Node>,
     virtual_end: Option<VirtualEnd>,
 }
 
-impl Exprs {
+impl Statements {
     pub(crate) fn new() -> Self {
         Self {
             shape: Shape::inline(0),
@@ -414,11 +414,11 @@ impl Exprs {
 #[derive(Debug)]
 pub(crate) struct Parens {
     shape: Shape,
-    body: Exprs,
+    body: Statements,
 }
 
 impl Parens {
-    pub(crate) fn new(body: Exprs) -> Self {
+    pub(crate) fn new(body: Statements) -> Self {
         let mut shape = Shape::inline("()".len());
         shape.insert(&body.shape);
         Self { shape, body }
@@ -450,14 +450,14 @@ impl HeredocOpening {
 }
 
 #[derive(Debug)]
-pub(crate) struct IfExpr {
+pub(crate) struct If {
     pub is_if: bool,
     pub if_first: Conditional,
     pub elsifs: Vec<Conditional>,
     pub if_last: Option<Else>,
 }
 
-impl IfExpr {
+impl If {
     pub(crate) fn new(is_if: bool, if_first: Conditional) -> Self {
         Self {
             is_if,
@@ -496,11 +496,11 @@ pub(crate) struct Conditional {
     pub shape: Shape,
     pub keyword_trailing: TrailingTrivia,
     pub cond: Box<Node>,
-    pub body: Exprs,
+    pub body: Statements,
 }
 
 impl Conditional {
-    pub(crate) fn new(keyword_trailing: TrailingTrivia, cond: Node, body: Exprs) -> Self {
+    pub(crate) fn new(keyword_trailing: TrailingTrivia, cond: Node, body: Statements) -> Self {
         let shape = keyword_trailing.shape.add(&cond.shape).add(&body.shape);
         Self {
             shape,
@@ -514,7 +514,7 @@ impl Conditional {
 #[derive(Debug)]
 pub(crate) struct Else {
     pub keyword_trailing: TrailingTrivia,
-    pub body: Exprs,
+    pub body: Statements,
 }
 
 #[derive(Debug)]
@@ -607,7 +607,7 @@ pub(crate) struct MethodBlock {
     shape: Shape,
     opening_trailing: TrailingTrivia,
     parameters: Option<BlockParameters>,
-    body: Exprs,
+    body: Statements,
 }
 
 impl MethodBlock {
@@ -621,7 +621,7 @@ impl MethodBlock {
             shape,
             opening_trailing: TrailingTrivia::none(),
             parameters: None,
-            body: Exprs::new(),
+            body: Statements::new(),
         }
     }
 
@@ -636,7 +636,7 @@ impl MethodBlock {
         self.parameters = Some(parameters);
     }
 
-    pub(crate) fn set_body(&mut self, body: Exprs) {
+    pub(crate) fn set_body(&mut self, body: Statements) {
         self.shape.insert(&Shape::inline("  ".len()));
         self.shape.insert(&body.shape);
         self.body = body;
@@ -962,7 +962,7 @@ impl Def {
             parameters: None,
             body: DefBody::Block {
                 head_trailing: TrailingTrivia::none(),
-                body: BlockBody::new(Exprs::new()),
+                body: BlockBody::new(Statements::new()),
             },
         }
     }
@@ -981,7 +981,7 @@ impl Def {
 #[derive(Debug)]
 pub(crate) enum DefBody {
     Short {
-        expr: Box<Node>,
+        body: Box<Node>,
     },
     Block {
         head_trailing: TrailingTrivia,
@@ -992,7 +992,7 @@ pub(crate) enum DefBody {
 impl DefBody {
     pub(crate) fn shape(&self) -> Shape {
         match self {
-            Self::Short { expr } => expr.shape,
+            Self::Short { body } => body.shape,
             Self::Block { .. } => Shape::Multilines,
         }
     }
@@ -1000,16 +1000,16 @@ impl DefBody {
 
 #[derive(Debug)]
 pub(crate) struct BlockBody {
-    pub exprs: Exprs,
+    pub statements: Statements,
     pub rescues: Vec<Rescue>,
     pub rescue_else: Option<Else>,
     pub ensure: Option<Else>,
 }
 
 impl BlockBody {
-    pub(crate) fn new(exprs: Exprs) -> Self {
+    pub(crate) fn new(statements: Statements) -> Self {
         Self {
-            exprs,
+            statements,
             rescues: vec![],
             rescue_else: None,
             ensure: None,
@@ -1022,7 +1022,7 @@ pub(crate) struct Rescue {
     exceptions: Vec<Node>,
     exceptions_shape: Shape,
     reference: Option<Box<Node>>,
-    exprs: Exprs,
+    statements: Statements,
 }
 
 impl Rescue {
@@ -1031,7 +1031,7 @@ impl Rescue {
             exceptions: vec![],
             exceptions_shape: Shape::inline(0),
             reference: None,
-            exprs: Exprs::new(),
+            statements: Statements::new(),
         }
     }
 
@@ -1044,8 +1044,8 @@ impl Rescue {
         self.reference = Some(Box::new(reference))
     }
 
-    pub(crate) fn set_exprs(&mut self, exprs: Exprs) {
-        self.exprs = exprs;
+    pub(crate) fn set_statements(&mut self, statements: Statements) {
+        self.statements = statements;
     }
 }
 
@@ -1153,7 +1153,7 @@ impl ClassLike {
 
 #[derive(Debug)]
 pub(crate) struct SingletonClass {
-    pub expr: Box<Node>,
+    pub expression: Box<Node>,
     pub body: BlockBody,
 }
 
@@ -1271,9 +1271,9 @@ impl Formatter {
             Kind::StringLike(str) => self.format_string_like(str),
             Kind::DynStringLike(dstr) => self.format_dyn_string_like(dstr, ctx),
             Kind::HeredocOpening(opening) => self.format_heredoc_opening(opening),
-            Kind::Exprs(exprs) => self.format_exprs(exprs, ctx, false),
+            Kind::Statements(statements) => self.format_statements(statements, ctx, false),
             Kind::Parens(parens) => self.format_parens(parens, ctx),
-            Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
+            Kind::If(ifexpr) => self.format_if(ifexpr, ctx),
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
             Kind::InfixChain(chain) => self.format_infix_chain(chain, ctx),
@@ -1325,8 +1325,8 @@ impl Formatter {
                     divided = true;
                     self.format_dyn_string_like(dstr, ctx);
                 }
-                DynStrPart::Exprs(embedded) => {
-                    self.format_embedded_exprs(embedded, ctx);
+                DynStrPart::Statements(embedded) => {
+                    self.format_embedded_statements(embedded, ctx);
                 }
                 DynStrPart::Variable(var) => {
                     self.format_embedded_variable(var);
@@ -1338,15 +1338,19 @@ impl Formatter {
         }
     }
 
-    fn format_embedded_exprs(&mut self, embedded: &EmbeddedExprs, ctx: &FormatContext) {
+    fn format_embedded_statements(&mut self, embedded: &EmbeddedStatements, ctx: &FormatContext) {
         self.push_str(&embedded.opening);
 
-        if embedded.exprs.shape.fits_in_inline(self.remaining_width) {
-            self.format_exprs(&embedded.exprs, ctx, false);
+        if embedded
+            .statements
+            .shape
+            .fits_in_inline(self.remaining_width)
+        {
+            self.format_statements(&embedded.statements, ctx, false);
         } else {
             self.break_line(ctx);
             self.indent();
-            self.format_exprs(&embedded.exprs, ctx, false);
+            self.format_statements(&embedded.statements, ctx, false);
             self.break_line(ctx);
             self.dedent();
             self.put_indent();
@@ -1366,14 +1370,19 @@ impl Formatter {
         self.heredoc_queue.push_back(opening.pos);
     }
 
-    fn format_exprs(&mut self, exprs: &Exprs, ctx: &FormatContext, block_always: bool) {
-        if exprs.shape.is_inline() && !block_always {
-            if let Some(node) = exprs.nodes.get(0) {
+    fn format_statements(
+        &mut self,
+        statements: &Statements,
+        ctx: &FormatContext,
+        block_always: bool,
+    ) {
+        if statements.shape.is_inline() && !block_always {
+            if let Some(node) = statements.nodes.get(0) {
                 self.format(node, ctx);
             }
             return;
         }
-        for (i, n) in exprs.nodes.iter().enumerate() {
+        for (i, n) in statements.nodes.iter().enumerate() {
             if i > 0 {
                 self.break_line(ctx);
             }
@@ -1391,9 +1400,9 @@ impl Formatter {
         }
         self.write_trivia_at_virtual_end(
             ctx,
-            &exprs.virtual_end,
-            !exprs.nodes.is_empty(),
-            exprs.nodes.is_empty(),
+            &statements.virtual_end,
+            !statements.nodes.is_empty(),
+            statements.nodes.is_empty(),
         );
     }
 
@@ -1403,11 +1412,11 @@ impl Formatter {
         } else {
             self.push('(');
             if parens.body.shape.fits_in_inline(self.remaining_width) {
-                self.format_exprs(&parens.body, ctx, false);
+                self.format_statements(&parens.body, ctx, false);
             } else {
                 self.indent();
                 self.break_line(ctx);
-                self.format_exprs(&parens.body, ctx, false);
+                self.format_statements(&parens.body, ctx, false);
                 self.dedent();
                 self.break_line(ctx);
                 self.put_indent();
@@ -1464,7 +1473,7 @@ impl Formatter {
         }
     }
 
-    fn format_if_expr(&mut self, expr: &IfExpr, ctx: &FormatContext) {
+    fn format_if(&mut self, expr: &If, ctx: &FormatContext) {
         if expr.is_if {
             self.push_str("if");
         } else {
@@ -1474,7 +1483,7 @@ impl Formatter {
         self.format_node_after_keyword(ctx, &expr.if_first.keyword_trailing, &expr.if_first.cond);
         if !expr.if_first.body.shape.is_empty() {
             self.break_line(ctx);
-            self.format_exprs(&expr.if_first.body, ctx, true);
+            self.format_statements(&expr.if_first.body, ctx, true);
         }
 
         for elsif in &expr.elsifs {
@@ -1485,7 +1494,7 @@ impl Formatter {
             self.format_node_after_keyword(ctx, &elsif.keyword_trailing, &elsif.cond);
             if !elsif.body.shape.is_empty() {
                 self.break_line(ctx);
-                self.format_exprs(&elsif.body, ctx, true);
+                self.format_statements(&elsif.body, ctx, true);
             }
         }
 
@@ -1498,7 +1507,7 @@ impl Formatter {
             self.indent();
             if !if_last.body.shape.is_empty() {
                 self.break_line(ctx);
-                self.format_exprs(&if_last.body, ctx, true);
+                self.format_statements(&if_last.body, ctx, true);
             }
         }
 
@@ -1509,7 +1518,7 @@ impl Formatter {
     }
 
     fn format_postmodifier(&mut self, modifier: &Postmodifier, ctx: &FormatContext) {
-        self.format_exprs(&modifier.conditional.body, ctx, false);
+        self.format_statements(&modifier.conditional.body, ctx, false);
         self.push(' ');
         self.push_str(&modifier.keyword);
         self.format_node_after_keyword(
@@ -1660,7 +1669,7 @@ impl Formatter {
             }
             if !block.body.shape.is_empty() {
                 self.push(' ');
-                self.format_exprs(&block.body, ctx, false);
+                self.format_statements(&block.body, ctx, false);
                 self.push(' ');
             }
             self.push_str("}");
@@ -1682,7 +1691,7 @@ impl Formatter {
             self.indent();
             if !block.body.shape.is_empty() {
                 self.break_line(ctx);
-                self.format_exprs(&block.body, ctx, true);
+                self.format_statements(&block.body, ctx, true);
             }
             self.dedent();
             self.break_line(ctx);
@@ -1994,26 +2003,26 @@ impl Formatter {
             self.format_method_parameters(&def.parameters, ctx);
         }
         match &def.body {
-            // def foo = expr
-            DefBody::Short { expr } => {
+            // def foo = body
+            DefBody::Short { body } => {
                 self.push_str(" =");
-                if expr.shape.fits_in_one_line(self.remaining_width) || expr.is_diagonal() {
+                if body.shape.fits_in_one_line(self.remaining_width) || body.is_diagonal() {
                     self.push(' ');
-                    self.format(expr, ctx);
-                    self.write_trailing_comment(&expr.trailing_trivia);
+                    self.format(body, ctx);
+                    self.write_trailing_comment(&body.trailing_trivia);
                 } else {
                     self.indent();
                     self.break_line(ctx);
                     self.write_leading_trivia(
-                        &expr.leading_trivia,
+                        &body.leading_trivia,
                         ctx,
                         EmptyLineHandling::Trim {
                             start: true,
                             end: true,
                         },
                     );
-                    self.format(expr, ctx);
-                    self.write_trailing_comment(&expr.trailing_trivia);
+                    self.format(body, ctx);
+                    self.write_trailing_comment(&body.trailing_trivia);
                     self.dedent();
                 }
             }
@@ -2032,10 +2041,10 @@ impl Formatter {
     }
 
     fn format_block_body(&mut self, body: &BlockBody, ctx: &FormatContext) {
-        if !body.exprs.shape().is_empty() {
+        if !body.statements.shape().is_empty() {
             self.indent();
             self.break_line(ctx);
-            self.format_exprs(&body.exprs, ctx, true);
+            self.format_statements(&body.statements, ctx, true);
             self.dedent();
         }
         for rescue in &body.rescues {
@@ -2051,7 +2060,7 @@ impl Formatter {
             if !rescue_else.body.shape().is_empty() {
                 self.indent();
                 self.break_line(ctx);
-                self.format_exprs(&rescue_else.body, ctx, true);
+                self.format_statements(&rescue_else.body, ctx, true);
                 self.dedent();
             }
         }
@@ -2063,7 +2072,7 @@ impl Formatter {
             if !ensure.body.shape().is_empty() {
                 self.indent();
                 self.break_line(ctx);
-                self.format_exprs(&ensure.body, ctx, true);
+                self.format_statements(&ensure.body, ctx, true);
                 self.dedent();
             }
         }
@@ -2156,10 +2165,10 @@ impl Formatter {
                 self.dedent();
             }
         }
-        if !rescue.exprs.shape().is_empty() {
+        if !rescue.statements.shape().is_empty() {
             self.indent();
             self.break_line(ctx);
-            self.format_exprs(&rescue.exprs, ctx, true);
+            self.format_statements(&rescue.statements, ctx, true);
             self.dedent();
         }
     }
@@ -2340,16 +2349,21 @@ impl Formatter {
 
     fn format_singleton_class(&mut self, class: &SingletonClass, ctx: &FormatContext) {
         self.push_str("class <<");
-        if class.expr.shape.fits_in_one_line(self.remaining_width) || class.expr.is_diagonal() {
+        if class
+            .expression
+            .shape
+            .fits_in_one_line(self.remaining_width)
+            || class.expression.is_diagonal()
+        {
             self.push(' ');
-            self.format(&class.expr, ctx);
-            self.write_trailing_comment(&class.expr.trailing_trivia);
+            self.format(&class.expression, ctx);
+            self.write_trailing_comment(&class.expression.trailing_trivia);
         } else {
             self.indent();
             self.indent();
             self.break_line(ctx);
             self.write_leading_trivia(
-                &class.expr.leading_trivia,
+                &class.expression.leading_trivia,
                 ctx,
                 EmptyLineHandling::Trim {
                     start: false,
@@ -2357,8 +2371,8 @@ impl Formatter {
                 },
             );
             self.put_indent();
-            self.format(&class.expr, ctx);
-            self.write_trailing_comment(&class.expr.trailing_trivia);
+            self.format(&class.expression, ctx);
+            self.write_trailing_comment(&class.expression.trailing_trivia);
             self.dedent();
             self.dedent();
         }
@@ -2445,8 +2459,8 @@ impl Formatter {
                             let value = String::from_utf8_lossy(&str.value);
                             self.push_str(&value);
                         }
-                        HeredocPart::Exprs(embedded) => {
-                            self.format_embedded_exprs(embedded, ctx);
+                        HeredocPart::Statements(embedded) => {
+                            self.format_embedded_statements(embedded, ctx);
                         }
                         HeredocPart::Variable(var) => {
                             self.format_embedded_variable(var);
@@ -2466,8 +2480,8 @@ impl Formatter {
                             let value = String::from_utf8_lossy(&str.value);
                             self.push_str(&value);
                         }
-                        HeredocPart::Exprs(embedded) => {
-                            self.format_embedded_exprs(embedded, ctx);
+                        HeredocPart::Statements(embedded) => {
+                            self.format_embedded_statements(embedded, ctx);
                         }
                         HeredocPart::Variable(var) => {
                             self.format_embedded_variable(var);
