@@ -602,6 +602,14 @@ impl FmtNodeBuilder<'_> {
                 }
             }
 
+            prism::Node::RescueModifierNode { .. } => {
+                let node = node.as_rescue_modifier_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let postmod = self.visit_rescue_modifier(node);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Postmodifier(postmod), trailing)
+            }
+
             prism::Node::CallNode { .. } => {
                 let node = node.as_call_node().unwrap();
                 let loc = node.location();
@@ -1592,7 +1600,7 @@ impl FmtNodeBuilder<'_> {
     }
 
     fn visit_postmodifier(&mut self, postmod: Postmodifier, next_loc_start: usize) -> fmt::Node {
-        let if_leading = self.take_leading_trivia(postmod.loc.start_offset());
+        let leading = self.take_leading_trivia(postmod.loc.start_offset());
 
         let kwd_loc = postmod.keyword_loc;
         let statements = self.visit_statements(postmod.statements, kwd_loc.start_offset());
@@ -1607,8 +1615,24 @@ impl FmtNodeBuilder<'_> {
             fmt::Conditional::new(keyword_trailing, predicate, statements),
         );
 
-        let if_trailing = self.take_trailing_comment(next_loc_start);
-        fmt::Node::new(if_leading, fmt::Kind::Postmodifier(postmod), if_trailing)
+        let trailing = self.take_trailing_comment(next_loc_start);
+        fmt::Node::new(leading, fmt::Kind::Postmodifier(postmod), trailing)
+    }
+
+    fn visit_rescue_modifier(&mut self, node: prism::RescueModifierNode) -> fmt::Postmodifier {
+        let kwd_loc = node.keyword_loc();
+        let expr = self.visit(node.expression(), kwd_loc.start_offset());
+        let statements = self.wrap_as_statements(Some(expr), kwd_loc.start_offset());
+
+        let rescue_expr = node.rescue_expression();
+        let rescue_expr_loc = rescue_expr.location();
+        let keyword_trailing = self.take_trailing_comment(rescue_expr_loc.start_offset());
+        let rescue_expr = self.visit(rescue_expr, rescue_expr_loc.end_offset());
+
+        fmt::Postmodifier::new(
+            "rescue".to_string(),
+            fmt::Conditional::new(keyword_trailing, rescue_expr, statements),
+        )
     }
 
     fn visit_call_root<C: CallRoot>(
