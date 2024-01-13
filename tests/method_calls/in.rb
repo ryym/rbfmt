@@ -51,8 +51,6 @@ foo(
   2
 ).bar
 
-# for now no special handling
-1 + 2 + 3
 foo bar
 
 a {}.b(1)&.c(1, 2) { d(e {}) {} }.f
@@ -109,3 +107,25 @@ foo
   .bar =
     # a
     2 # b
+
+1 + 2
+1 + 2 - 3
+1 + (2 * 3 / (a % b)) / 4
+9 * foo.bar(3)[8] - baz
+
+1 +
+  # a
+  2 - # b
+  3 # c
+# d
+
+1 + [
+  1 # a
+  # b
+] + 3
+
+[
+  # 0
+  1 + 2, # 3
+  nil
+]

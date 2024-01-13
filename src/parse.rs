@@ -581,6 +581,9 @@ impl FmtNodeBuilder<'_> {
                 let kind = if method_name.last().map_or(false, |c| *c == b'=') {
                     let assign = self.visit_call_write(node);
                     fmt::Kind::Assign(assign)
+                } else if Self::is_infix_op(&node) {
+                    let chain = self.visit_infix_op(node);
+                    fmt::Kind::InfixChain(chain)
                 } else {
                     let chain = self.visit_call_root(&node, next_loc_start, None);
                     fmt::Kind::MethodChain(chain)
@@ -1770,6 +1773,34 @@ impl FmtNodeBuilder<'_> {
         let trailing = self.take_trailing_comment(next_loc_start);
         block_params.set_closing_trailing(trailing);
         block_params
+    }
+
+    fn is_infix_op(call: &prism::CallNode) -> bool {
+        call.receiver().is_some()
+            && call.call_operator_loc().is_none()
+            && call.opening_loc().is_none()
+    }
+
+    fn visit_infix_op(&mut self, call: prism::CallNode) -> fmt::InfixChain {
+        let msg_loc = call
+            .message_loc()
+            .expect("infix operation must have message");
+        let receiver = call.receiver().expect("infix operation must have receiver");
+        let left = self.visit(receiver, msg_loc.start_offset());
+        let right = call
+            .arguments()
+            .and_then(|args| args.arguments().iter().next())
+            .expect("infix operation must have argument");
+        let right_end = right.location().end_offset();
+        let right = self.visit(right, right_end);
+        let infix_op = Self::source_lossy_at(&msg_loc);
+
+        let mut chain = match left.kind {
+            fmt::Kind::InfixChain(chain) => chain,
+            _ => fmt::InfixChain::new(left),
+        };
+        chain.append_right(infix_op, right);
+        chain
     }
 
     fn visit_variable_assign(

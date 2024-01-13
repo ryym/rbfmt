@@ -138,6 +138,7 @@ pub(crate) enum Kind {
     IfExpr(IfExpr),
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
+    InfixChain(InfixChain),
     Assign(Assign),
     MultiAssignTarget(MultiAssignTarget),
     Splat(Splat),
@@ -162,6 +163,7 @@ impl Kind {
             Self::IfExpr(_) => IfExpr::shape(),
             Self::Postmodifier(pmod) => pmod.shape,
             Self::MethodChain(chain) => chain.shape,
+            Self::InfixChain(chain) => chain.shape,
             Self::Assign(assign) => assign.shape,
             Self::MultiAssignTarget(multi) => multi.shape,
             Self::Splat(splat) => splat.shape,
@@ -194,6 +196,7 @@ impl Kind {
             Self::IfExpr(_) => false,
             Self::Postmodifier(_) => true,
             Self::MethodChain(_) => true,
+            Self::InfixChain(_) => true,
             Self::Assign(_) => true,
             Self::MultiAssignTarget(_) => true,
             Self::Splat(_) => false,
@@ -635,6 +638,47 @@ impl MethodChain {
     pub(crate) fn append_call(&mut self, call: MethodCall) {
         self.shape.append(&call.shape);
         self.calls.push(call);
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct InfixChain {
+    shape: Shape,
+    left: Box<Node>,
+    rights: Vec<InfixRight>,
+}
+
+impl InfixChain {
+    pub(crate) fn new(left: Node) -> Self {
+        Self {
+            shape: left.shape,
+            left: Box::new(left),
+            rights: vec![],
+        }
+    }
+
+    pub(crate) fn append_right(&mut self, op: String, right: Node) {
+        let right = InfixRight::new(op, right);
+        self.shape.append(&right.shape);
+        self.rights.push(right);
+    }
+}
+
+#[derive(Debug)]
+struct InfixRight {
+    shape: Shape,
+    operator: String,
+    value: Box<Node>,
+}
+
+impl InfixRight {
+    fn new(operator: String, value: Node) -> Self {
+        let shape = Shape::inline(operator.len() + "  ".len()).add(&value.shape);
+        Self {
+            shape,
+            operator,
+            value: Box::new(value),
+        }
     }
 }
 
@@ -1196,6 +1240,7 @@ impl Formatter {
             Kind::IfExpr(expr) => self.format_if_expr(expr, ctx),
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
+            Kind::InfixChain(chain) => self.format_infix_chain(chain, ctx),
             Kind::Assign(assign) => self.format_assign(assign, ctx),
             Kind::MultiAssignTarget(multi) => self.format_multi_assign_target(multi, ctx),
             Kind::Splat(splat) => self.format_splat(splat, ctx),
@@ -1598,6 +1643,36 @@ impl Formatter {
             self.break_line(ctx);
             self.put_indent();
             self.push_str("end");
+        }
+    }
+
+    fn format_infix_chain(&mut self, chain: &InfixChain, ctx: &FormatContext) {
+        self.format(&chain.left, ctx);
+        if chain.shape.fits_in_one_line(self.remaining_width) {
+            for right in &chain.rights {
+                self.push(' ');
+                self.push_str(&right.operator);
+                self.push(' ');
+                self.format(&right.value, ctx);
+            }
+        } else {
+            for right in &chain.rights {
+                self.push(' ');
+                self.push_str(&right.operator);
+                self.indent();
+                self.break_line(ctx);
+                self.write_leading_trivia(
+                    &right.value.leading_trivia,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: false,
+                        end: false,
+                    },
+                );
+                self.put_indent();
+                self.format(&right.value, ctx);
+                self.dedent();
+            }
         }
     }
 
