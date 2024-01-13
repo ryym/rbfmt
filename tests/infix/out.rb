@@ -22,3 +22,18 @@
   1 + 2, # 3
   nil,
 ]
+
+a && b
+a and b
+a || b
+a or b
+
+a && b && c && d
+a && (b || c) && d
+
+foo(1, 2, 3) &&
+  # 1
+  aa &&
+  bb ||
+  # 2
+  cc # cc

@@ -582,7 +582,7 @@ impl FmtNodeBuilder<'_> {
                     let assign = self.visit_call_write(node);
                     fmt::Kind::Assign(assign)
                 } else if Self::is_infix_op(&node) {
-                    let chain = self.visit_infix_op(node);
+                    let chain = self.visit_infix_call(node);
                     fmt::Kind::InfixChain(chain)
                 } else {
                     let chain = self.visit_call_root(&node, next_loc_start, None);
@@ -591,6 +591,23 @@ impl FmtNodeBuilder<'_> {
 
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, kind, trailing)
+            }
+
+            prism::Node::AndNode { .. } => {
+                let node = node.as_and_node().unwrap();
+                let loc = node.location();
+                let leading = self.take_leading_trivia(loc.start_offset());
+                let chain = self.visit_infix_op(node.left(), node.operator_loc(), node.right());
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::InfixChain(chain), trailing)
+            }
+            prism::Node::OrNode { .. } => {
+                let node = node.as_or_node().unwrap();
+                let loc = node.location();
+                let leading = self.take_leading_trivia(loc.start_offset());
+                let chain = self.visit_infix_op(node.left(), node.operator_loc(), node.right());
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::InfixChain(chain), trailing)
             }
 
             prism::Node::LocalVariableWriteNode { .. } => {
@@ -1781,25 +1798,33 @@ impl FmtNodeBuilder<'_> {
             && call.opening_loc().is_none()
     }
 
-    fn visit_infix_op(&mut self, call: prism::CallNode) -> fmt::InfixChain {
+    fn visit_infix_call(&mut self, call: prism::CallNode) -> fmt::InfixChain {
         let msg_loc = call
             .message_loc()
             .expect("infix operation must have message");
         let receiver = call.receiver().expect("infix operation must have receiver");
-        let left = self.visit(receiver, msg_loc.start_offset());
         let right = call
             .arguments()
             .and_then(|args| args.arguments().iter().next())
             .expect("infix operation must have argument");
-        let right_end = right.location().end_offset();
-        let right = self.visit(right, right_end);
-        let infix_op = Self::source_lossy_at(&msg_loc);
+        self.visit_infix_op(receiver, msg_loc, right)
+    }
 
+    fn visit_infix_op(
+        &mut self,
+        left: prism::Node,
+        operator_loc: prism::Location,
+        right: prism::Node,
+    ) -> fmt::InfixChain {
+        let left = self.visit(left, operator_loc.start_offset());
         let mut chain = match left.kind {
             fmt::Kind::InfixChain(chain) => chain,
             _ => fmt::InfixChain::new(left),
         };
-        chain.append_right(infix_op, right);
+        let operator = Self::source_lossy_at(&operator_loc);
+        let right_end = right.location().end_offset();
+        let right = self.visit(right, right_end);
+        chain.append_right(operator, right);
         chain
     }
 
