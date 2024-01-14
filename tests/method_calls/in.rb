@@ -130,6 +130,15 @@ def supers
   super do |a, b; c|
     a(b, c)
   end
+
+  super() # super
+  super(1, 2, 3) # 4
+  super 1, 2, 3 # 4
+  super 1,
+    # 2
+    2 # 3
+  super(1) {}
+  super 1 { _1 }
 end
 
 -a

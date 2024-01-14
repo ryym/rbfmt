@@ -345,6 +345,35 @@ impl<'src> CallRoot for prism::ForwardingSuperNode<'src> {
         self.block().map(|b| b.as_node())
     }
 }
+impl<'src> CallRoot for prism::SuperNode<'src> {
+    fn location(&self) -> prism::Location {
+        self.location()
+    }
+    fn receiver(&self) -> Option<prism::Node> {
+        None
+    }
+    fn message_loc(&self) -> Option<prism::Location> {
+        Some(self.location())
+    }
+    fn call_operator_loc(&self) -> Option<prism::Location> {
+        None
+    }
+    fn name(&self) -> &[u8] {
+        b"super"
+    }
+    fn arguments(&self) -> Option<prism::ArgumentsNode> {
+        self.arguments()
+    }
+    fn opening_loc(&self) -> Option<prism::Location> {
+        self.lparen_loc()
+    }
+    fn closing_loc(&self) -> Option<prism::Location> {
+        self.rparen_loc()
+    }
+    fn block(&self) -> Option<prism::Node> {
+        self.block()
+    }
+}
 
 struct Postmodifier<'src> {
     keyword: String,
@@ -649,6 +678,13 @@ impl FmtNodeBuilder<'_> {
             }
             prism::Node::ForwardingSuperNode { .. } => {
                 let node = node.as_forwarding_super_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let chain = self.visit_call_root(&node, next_loc_start, None);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::MethodChain(chain), trailing)
+            }
+            prism::Node::SuperNode { .. } => {
+                let node = node.as_super_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
                 let chain = self.visit_call_root(&node, next_loc_start, None);
                 let trailing = self.take_trailing_comment(next_loc_start);
