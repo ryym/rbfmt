@@ -354,6 +354,13 @@ struct Postmodifier<'src> {
     statements: Option<prism::StatementsNode<'src>>,
 }
 
+enum MethodType {
+    Normal,      // foo(a)
+    Binary,      // a - b
+    Assign,      // a = b
+    IndexAssign, // a[b] = c
+}
+
 struct FmtNodeBuilder<'src> {
     src: &'src [u8],
     comments: Peekable<prism::Comments<'src>>,
@@ -614,15 +621,23 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_call_node().unwrap();
                 let loc = node.location();
                 let leading = self.take_leading_trivia(loc.start_offset());
-                let kind = if Self::is_infix_call(&node) {
-                    let chain = self.visit_infix_call(node);
-                    fmt::Kind::InfixChain(chain)
-                } else if Self::is_write_call(&node) {
-                    let assign = self.visit_call_write(node);
-                    fmt::Kind::Assign(assign)
-                } else {
-                    let chain = self.visit_call_root(&node, next_loc_start, None);
-                    fmt::Kind::MethodChain(chain)
+                let kind = match Self::detect_method_type(&node) {
+                    MethodType::Normal => {
+                        let chain = self.visit_call_root(&node, next_loc_start, None);
+                        fmt::Kind::MethodChain(chain)
+                    }
+                    MethodType::Binary => {
+                        let chain = self.visit_infix_call(node);
+                        fmt::Kind::InfixChain(chain)
+                    }
+                    MethodType::Assign => {
+                        let assign = self.visit_write_call(node);
+                        fmt::Kind::Assign(assign)
+                    }
+                    MethodType::IndexAssign => {
+                        let assign = self.visit_index_write_call(node);
+                        fmt::Kind::Assign(assign)
+                    }
                 };
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, kind, trailing)
@@ -1848,26 +1863,30 @@ impl FmtNodeBuilder<'_> {
         method_block
     }
 
-    fn is_infix_call(call: &prism::CallNode) -> bool {
-        call.receiver().is_some()
+    fn detect_method_type(call: &prism::CallNode) -> MethodType {
+        if call.receiver().is_some()
             && call.call_operator_loc().is_none()
             && call.opening_loc().is_none()
-    }
-
-    fn is_write_call(call: &prism::CallNode) -> bool {
+        {
+            return MethodType::Binary;
+        }
         let method_name = call.name().as_slice();
-        method_name[method_name.len() - 1] == b'='
+        if method_name[method_name.len() - 1] == b'='
             && method_name != b"=="
             && method_name != b"==="
             && method_name != b"<="
             && method_name != b">="
+        {
+            return if method_name == b"[]=" {
+                MethodType::IndexAssign
+            } else {
+                MethodType::Assign
+            };
+        }
+        MethodType::Normal
     }
 
-    fn visit_call_write(&mut self, call: prism::CallNode) -> fmt::Assign {
-        if call.name().as_slice() == b"[]=" {
-            return self.visit_index_write(call);
-        }
-
+    fn visit_write_call(&mut self, call: prism::CallNode) -> fmt::Assign {
         let msg_loc = call.message_loc().expect("call write must have message");
         let receiver = call.receiver().expect("call write must have receiver");
         let receiver = self.visit(receiver, msg_loc.start_offset());
@@ -1892,7 +1911,7 @@ impl FmtNodeBuilder<'_> {
         fmt::Assign::new(left, operator, right)
     }
 
-    fn visit_index_write(&mut self, call: prism::CallNode) -> fmt::Assign {
+    fn visit_index_write_call(&mut self, call: prism::CallNode) -> fmt::Assign {
         let (opening_loc, closing_loc) = match (call.opening_loc(), call.closing_loc()) {
             (Some(op), Some(cl)) => (op, cl),
             _ => panic!("index write must have opening and closing"),
