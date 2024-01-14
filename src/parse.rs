@@ -1038,7 +1038,7 @@ impl FmtNodeBuilder<'_> {
                 // XXX: I cannot find the case where the expression is None.
                 let expr = node.expression().expect("SplatNode must have expression");
                 let expr = self.visit(expr, loc.end_offset());
-                let splat = fmt::Prefix::new(operator, expr);
+                let splat = fmt::Prefix::new(operator, Some(expr));
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::Prefix(splat), trailing)
             }
@@ -1050,9 +1050,14 @@ impl FmtNodeBuilder<'_> {
                 // XXX: I cannot find the case where the value is None.
                 let value = node.value().expect("AssocSplatNode must have value");
                 let value = self.visit(value, loc.end_offset());
-                let splat = fmt::Prefix::new(operator, value);
+                let splat = fmt::Prefix::new(operator, Some(value));
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::Prefix(splat), trailing)
+            }
+            prism::Node::BlockArgumentNode { .. } => {
+                let node = node.as_block_argument_node().unwrap();
+                let (leading, prefix, trailing) = self.visit_block_arg(node, next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Prefix(prefix), trailing)
             }
 
             prism::Node::ArrayNode { .. } => {
@@ -1684,12 +1689,14 @@ impl FmtNodeBuilder<'_> {
             .unwrap_or(next_loc_start);
         let (args, block) = match block {
             Some(node) => match node {
+                // method call with block literal (e.g. "foo { a }", "foo(a) { b }")
                 prism::Node::BlockNode { .. } => {
                     let args = self.visit_arguments(args, None, closing_start, closing_next_start);
                     let block = node.as_block_node().unwrap();
                     let block = self.visit_block(block);
                     (args, Some(block))
                 }
+                // method call with a block argument (e.g. "foo(&a)", "foo(a, &b)")
                 prism::Node::BlockArgumentNode { .. } => {
                     let block_arg = node.as_block_argument_node().unwrap();
                     let args = self.visit_arguments(
@@ -1702,6 +1709,7 @@ impl FmtNodeBuilder<'_> {
                 }
                 _ => panic!("unexpected block node of call: {:?}", node),
             },
+            // method call without block (e.g. "foo", "foo(a)")
             None => {
                 let args = self.visit_arguments(args, None, closing_start, closing_next_start);
                 (args, None)
@@ -1727,28 +1735,44 @@ impl FmtNodeBuilder<'_> {
     fn visit_arguments(
         &mut self,
         node: Option<prism::ArgumentsNode>,
-        _block_arg: Option<prism::BlockArgumentNode>,
+        block_arg: Option<prism::BlockArgumentNode>,
         closing_start: Option<usize>,
         closing_next_start: usize,
     ) -> Option<fmt::Arguments> {
         match node {
             None => {
-                if let Some(closing_start) = closing_start {
-                    let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
-                    virtual_end.map(|end| {
+                let block_arg = block_arg.map(|block_arg| {
+                    let next_start = closing_start.unwrap_or(closing_next_start);
+                    let (leading, prefix, trailing) = self.visit_block_arg(block_arg, next_start);
+                    fmt::Node::new(leading, fmt::Kind::Prefix(prefix), trailing)
+                });
+                let virtual_end = closing_start.and_then(|closing_start| {
+                    self.take_end_trivia_as_virtual_end(Some(closing_start))
+                });
+                match (block_arg, virtual_end) {
+                    (None, None) => None,
+                    (block_arg, virtual_end) => {
                         let mut args = fmt::Arguments::new();
-                        args.set_virtual_end(Some(end));
-                        args
-                    })
-                } else {
-                    None
+                        if let Some(block_arg) = block_arg {
+                            args.append_node(block_arg);
+                            args.last_comma_allowed = false;
+                        }
+                        if virtual_end.is_some() {
+                            args.set_virtual_end(virtual_end)
+                        }
+                        Some(args)
+                    }
                 }
             }
             Some(args_node) => {
                 let mut args = fmt::Arguments::new();
                 let next_loc_start = closing_start.unwrap_or(closing_next_start);
+                let mut nodes = args_node.arguments().iter().collect::<Vec<_>>();
+                if let Some(block_arg) = block_arg {
+                    nodes.push(block_arg.as_node());
+                }
                 Self::each_node_with_next_start(
-                    args_node.arguments().iter(),
+                    nodes.into_iter(),
                     next_loc_start,
                     |node, next_start| {
                         if next_start == next_loc_start {
@@ -1762,13 +1786,27 @@ impl FmtNodeBuilder<'_> {
                         args.append_node(fmt_node);
                     },
                 );
-
                 let virtual_end = self.take_end_trivia_as_virtual_end(closing_start);
                 args.set_virtual_end(virtual_end);
-
                 Some(args)
             }
         }
+    }
+
+    fn visit_block_arg(
+        &mut self,
+        node: prism::BlockArgumentNode,
+        next_loc_start: usize,
+    ) -> (fmt::LeadingTrivia, fmt::Prefix, fmt::TrailingTrivia) {
+        let leading = self.take_leading_trivia(node.location().start_offset());
+        let operator = Self::source_lossy_at(&node.operator_loc());
+        let expr = node.expression().map(|expr| {
+            let expr_end = expr.location().end_offset();
+            self.visit(expr, expr_end)
+        });
+        let trailing = self.take_trailing_comment(next_loc_start);
+        let prefix = fmt::Prefix::new(operator, expr);
+        (leading, prefix, trailing)
     }
 
     fn visit_block(&mut self, node: prism::BlockNode) -> fmt::MethodBlock {

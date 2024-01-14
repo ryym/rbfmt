@@ -828,16 +828,19 @@ impl Array {
 pub(crate) struct Prefix {
     shape: Shape,
     operator: String,
-    expression: Box<Node>,
+    expression: Option<Box<Node>>,
 }
 
 impl Prefix {
-    pub(crate) fn new(operator: String, expression: Node) -> Self {
-        let shape = Shape::inline(operator.len()).add(&expression.shape);
+    pub(crate) fn new(operator: String, expression: Option<Node>) -> Self {
+        let mut shape = Shape::inline(operator.len());
+        if let Some(expr) = &expression {
+            shape.append(&expr.shape);
+        }
         Self {
             shape,
             operator,
-            expression: Box::new(expression),
+            expression: expression.map(Box::new),
         }
     }
 }
@@ -1806,7 +1809,9 @@ impl Formatter {
 
     fn format_prefix(&mut self, prefix: &Prefix, ctx: &FormatContext) {
         self.push_str(&prefix.operator);
-        self.format(&prefix.expression, ctx);
+        if let Some(expr) = &prefix.expression {
+            self.format(expr, ctx);
+        }
     }
 
     fn format_array(&mut self, array: &Array, ctx: &FormatContext) {

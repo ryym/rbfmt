@@ -1,3 +1,31 @@
+foo(&a)
+foo(&a)
+foo(a, b.c, &d.e)
+foo(
+  a,
+  # 0
+  b,
+  # 1
+  &block # 2
+  # 3
+) # 4
+foo(
+  a,
+  b,
+  # c
+  &c
+)
+
+def foo(&)
+  a(&)
+  b(
+    # 1
+    & # 2
+    # 3
+  )
+  c(x, *xs, y:, **yz, &)
+end
+
 foo {}
 foo do
 end
