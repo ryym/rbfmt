@@ -1667,30 +1667,33 @@ impl Formatter {
             }
         } else if !args.nodes.is_empty() {
             self.push(' ');
-            let last_idx = args.nodes.len() - 1;
-            for (i, arg) in args.nodes.iter().enumerate() {
-                if i > 0 {
-                    if i == 1 {
-                        self.indent();
-                    }
-                    self.break_line(ctx);
-                }
-                self.write_leading_trivia(
-                    &arg.leading_trivia,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: i == 0,
-                        end: false,
-                    },
-                );
-                self.put_indent();
-                self.format(arg, ctx);
-                if i < last_idx {
-                    self.push(',');
-                }
-                self.write_trailing_comment(&arg.trailing_trivia);
+            self.format(&args.nodes[0], ctx);
+            if args.nodes.len() > 1 {
+                self.push(',');
             }
-            self.dedent();
+            self.write_trailing_comment(&args.nodes[0].trailing_trivia);
+            if args.nodes.len() > 1 {
+                self.indent();
+                let last_idx = args.nodes.len() - 1;
+                for (i, arg) in args.nodes.iter().enumerate().skip(1) {
+                    self.break_line(ctx);
+                    self.write_leading_trivia(
+                        &arg.leading_trivia,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: i == 0,
+                            end: false,
+                        },
+                    );
+                    self.put_indent();
+                    self.format(arg, ctx);
+                    if i < last_idx {
+                        self.push(',');
+                    }
+                    self.write_trailing_comment(&arg.trailing_trivia);
+                }
+                self.dedent();
+            }
         }
     }
 
@@ -2131,30 +2134,33 @@ impl Formatter {
                 }
             } else {
                 self.push(' ');
-                let last_idx = rescue.exceptions.len() - 1;
-                for (i, exception) in rescue.exceptions.iter().enumerate() {
-                    if i > 0 {
-                        if i == 1 {
-                            self.indent();
-                        }
-                        self.break_line(ctx);
-                    }
-                    self.write_leading_trivia(
-                        &exception.leading_trivia,
-                        ctx,
-                        EmptyLineHandling::Trim {
-                            start: false,
-                            end: false,
-                        },
-                    );
-                    self.put_indent();
-                    self.format(exception, ctx);
-                    if i < last_idx {
-                        self.push(',');
-                    }
-                    self.write_trailing_comment(&exception.trailing_trivia);
+                self.format(&rescue.exceptions[0], ctx);
+                if rescue.exceptions.len() > 1 {
+                    self.push(',');
                 }
-                self.dedent();
+                self.write_trailing_comment(&rescue.exceptions[0].trailing_trivia);
+                if rescue.exceptions.len() > 1 {
+                    self.indent();
+                    let last_idx = rescue.exceptions.len() - 1;
+                    for (i, exception) in rescue.exceptions.iter().enumerate().skip(1) {
+                        self.break_line(ctx);
+                        self.write_leading_trivia(
+                            &exception.leading_trivia,
+                            ctx,
+                            EmptyLineHandling::Trim {
+                                start: false,
+                                end: false,
+                            },
+                        );
+                        self.put_indent();
+                        self.format(exception, ctx);
+                        if i < last_idx {
+                            self.push(',');
+                        }
+                        self.write_trailing_comment(&exception.trailing_trivia);
+                    }
+                    self.dedent();
+                }
             }
         }
         if let Some(reference) = &rescue.reference {

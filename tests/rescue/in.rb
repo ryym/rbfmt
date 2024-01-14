@@ -10,3 +10,12 @@ foo.bar(2) rescue # a
 a do
   1
 end rescue "2" # b
+
+if true
+  begin
+  rescue a, b, c
+  rescue foo,
+    # bar
+    bar
+  end
+end

@@ -56,6 +56,12 @@ foo a, # 1
   c # 5
 # 6
 
+if true
+  foo a,
+    # 2
+    b
+end
+
 foo(1, 2).bar 3
 expect(foo).to be(true)
 
