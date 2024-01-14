@@ -48,7 +48,7 @@ foo(
 )
   .bar
 
-foo bar
+foo bar, baz # foo
 foo a, # 1
   # 2
   b, # 3

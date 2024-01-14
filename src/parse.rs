@@ -1813,6 +1813,7 @@ impl FmtNodeBuilder<'_> {
                 }
             }
             Some(args_node) => {
+                let has_closing = closing.is_some();
                 let mut args = fmt::Arguments::new(opening, closing);
                 let next_loc_start = closing_start.unwrap_or(closing_next_start);
                 let mut nodes = args_node.arguments().iter().collect::<Vec<_>>();
@@ -1823,13 +1824,19 @@ impl FmtNodeBuilder<'_> {
                     nodes.into_iter(),
                     next_loc_start,
                     |node, next_start| {
-                        if next_start == next_loc_start {
+                        let is_last = next_start == next_loc_start;
+                        if is_last {
                             args.last_comma_allowed = !matches!(
                                 node,
                                 prism::Node::ForwardingArgumentsNode { .. }
                                     | prism::Node::BlockArgumentNode { .. }
                             );
                         }
+                        let next_start = if is_last && !has_closing {
+                            node.location().end_offset()
+                        } else {
+                            next_start
+                        };
                         let fmt_node = self.visit(node, next_start);
                         args.append_node(fmt_node);
                     },
