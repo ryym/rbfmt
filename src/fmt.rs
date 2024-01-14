@@ -141,7 +141,7 @@ pub(crate) enum Kind {
     InfixChain(InfixChain),
     Assign(Assign),
     MultiAssignTarget(MultiAssignTarget),
-    Splat(Splat),
+    Prefix(Prefix),
     Array(Array),
     Hash(Hash),
     KeywordHash(KeywordHash),
@@ -167,7 +167,7 @@ impl Kind {
             Self::InfixChain(chain) => chain.shape,
             Self::Assign(assign) => assign.shape,
             Self::MultiAssignTarget(multi) => multi.shape,
-            Self::Splat(splat) => splat.shape,
+            Self::Prefix(prefix) => prefix.shape,
             Self::Array(array) => array.shape,
             Self::Hash(hash) => hash.shape,
             Self::KeywordHash(khash) => khash.shape,
@@ -201,7 +201,7 @@ impl Kind {
             Self::InfixChain(_) => true,
             Self::Assign(_) => true,
             Self::MultiAssignTarget(_) => true,
-            Self::Splat(_) => false,
+            Self::Prefix(_) => false,
             Self::Array(_) => true,
             Self::Hash(_) => true,
             Self::KeywordHash(_) => true,
@@ -825,13 +825,13 @@ impl Array {
 }
 
 #[derive(Debug)]
-pub(crate) struct Splat {
+pub(crate) struct Prefix {
     shape: Shape,
     operator: String,
     expression: Box<Node>,
 }
 
-impl Splat {
+impl Prefix {
     pub(crate) fn new(operator: String, expression: Node) -> Self {
         let shape = Shape::inline(operator.len()).add(&expression.shape);
         Self {
@@ -1279,7 +1279,7 @@ impl Formatter {
             Kind::InfixChain(chain) => self.format_infix_chain(chain, ctx),
             Kind::Assign(assign) => self.format_assign(assign, ctx),
             Kind::MultiAssignTarget(multi) => self.format_multi_assign_target(multi, ctx),
-            Kind::Splat(splat) => self.format_splat(splat, ctx),
+            Kind::Prefix(prefix) => self.format_prefix(prefix, ctx),
             Kind::Array(array) => self.format_array(array, ctx),
             Kind::Hash(hash) => self.format_hash(hash, ctx),
             Kind::KeywordHash(khash) => self.format_keyword_hash(khash, ctx),
@@ -1804,9 +1804,9 @@ impl Formatter {
         }
     }
 
-    fn format_splat(&mut self, splat: &Splat, ctx: &FormatContext) {
-        self.push_str(&splat.operator);
-        self.format(&splat.expression, ctx);
+    fn format_prefix(&mut self, prefix: &Prefix, ctx: &FormatContext) {
+        self.push_str(&prefix.operator);
+        self.format(&prefix.expression, ctx);
     }
 
     fn format_array(&mut self, array: &Array, ctx: &FormatContext) {

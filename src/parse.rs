@@ -1038,9 +1038,9 @@ impl FmtNodeBuilder<'_> {
                 // XXX: I cannot find the case where the expression is None.
                 let expr = node.expression().expect("SplatNode must have expression");
                 let expr = self.visit(expr, loc.end_offset());
-                let splat = fmt::Splat::new(operator, expr);
+                let splat = fmt::Prefix::new(operator, expr);
                 let trailing = self.take_trailing_comment(next_loc_start);
-                fmt::Node::new(leading, fmt::Kind::Splat(splat), trailing)
+                fmt::Node::new(leading, fmt::Kind::Prefix(splat), trailing)
             }
             prism::Node::AssocSplatNode { .. } => {
                 let node = node.as_assoc_splat_node().unwrap();
@@ -1050,9 +1050,9 @@ impl FmtNodeBuilder<'_> {
                 // XXX: I cannot find the case where the value is None.
                 let value = node.value().expect("AssocSplatNode must have value");
                 let value = self.visit(value, loc.end_offset());
-                let splat = fmt::Splat::new(operator, value);
+                let splat = fmt::Prefix::new(operator, value);
                 let trailing = self.take_trailing_comment(next_loc_start);
-                fmt::Node::new(leading, fmt::Kind::Splat(splat), trailing)
+                fmt::Node::new(leading, fmt::Kind::Prefix(splat), trailing)
             }
 
             prism::Node::ArrayNode { .. } => {
