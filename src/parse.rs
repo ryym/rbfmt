@@ -356,6 +356,7 @@ struct Postmodifier<'src> {
 
 enum MethodType {
     Normal,      // foo(a)
+    Unary,       // -a
     Binary,      // a - b
     Assign,      // a = b
     IndexAssign, // a[b] = c
@@ -625,6 +626,10 @@ impl FmtNodeBuilder<'_> {
                     MethodType::Normal => {
                         let chain = self.visit_call_root(&node, next_loc_start, None);
                         fmt::Kind::MethodChain(chain)
+                    }
+                    MethodType::Unary => {
+                        let prefix = self.visit_prefix_call(node);
+                        fmt::Kind::Prefix(prefix)
                     }
                     MethodType::Binary => {
                         let chain = self.visit_infix_call(node);
@@ -1868,7 +1873,11 @@ impl FmtNodeBuilder<'_> {
             && call.call_operator_loc().is_none()
             && call.opening_loc().is_none()
         {
-            return MethodType::Binary;
+            return if call.arguments().is_some() {
+                MethodType::Binary
+            } else {
+                MethodType::Unary
+            };
         }
         let method_name = call.name().as_slice();
         if method_name[method_name.len() - 1] == b'='
@@ -1986,6 +1995,19 @@ impl FmtNodeBuilder<'_> {
         let trailing = self.take_trailing_comment(next_loc_start);
         block_params.set_closing_trailing(trailing);
         block_params
+    }
+
+    fn visit_prefix_call(&mut self, call: prism::CallNode) -> fmt::Prefix {
+        let msg_loc = call
+            .message_loc()
+            .expect("prefix operation must have message");
+        let operator = Self::source_lossy_at(&msg_loc);
+        let receiver = call
+            .receiver()
+            .expect("prefix operation must have receiver");
+        let receiver_end = receiver.location().end_offset();
+        let receiver = self.visit(receiver, receiver_end);
+        fmt::Prefix::new(operator, Some(receiver))
     }
 
     fn visit_infix_call(&mut self, call: prism::CallNode) -> fmt::InfixChain {

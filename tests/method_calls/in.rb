@@ -116,3 +116,11 @@ def supers
     a(b, c)
   end
 end
+
+-a
+!a.b(1).c # d
+~(
+  # 1
+  a.b # 2
+  # 3
+) # 4
