@@ -2099,50 +2099,29 @@ impl Formatter {
                     self.write_trailing_comment(&exception.trailing_trivia);
                 }
             } else {
-                let exception = &rescue.exceptions[0];
-                if exception.shape.fits_in_one_line(self.remaining_width) || exception.is_diagonal()
-                {
-                    self.push(' ');
-                    self.format(exception, ctx);
-                    self.indent();
-                } else {
-                    self.push_str(" \\");
-                    self.indent();
-                    self.break_line(ctx);
+                self.push(' ');
+                let last_idx = rescue.exceptions.len() - 1;
+                for (i, exception) in rescue.exceptions.iter().enumerate() {
+                    if i == 1 {
+                        self.indent();
+                    }
+                    if i > 0 {
+                        self.break_line(ctx);
+                    }
                     self.write_leading_trivia(
                         &exception.leading_trivia,
                         ctx,
                         EmptyLineHandling::Trim {
-                            start: true,
+                            start: false,
                             end: false,
                         },
                     );
                     self.put_indent();
                     self.format(exception, ctx);
-                }
-                if rescue.exceptions.len() > 1 {
-                    self.push(',');
-                }
-                self.write_trailing_comment(&exception.trailing_trivia);
-                if rescue.exceptions.len() > 1 {
-                    let last_idx = rescue.exceptions.len() - 1;
-                    for (i, exception) in rescue.exceptions.iter().enumerate().skip(1) {
-                        self.break_line(ctx);
-                        self.write_leading_trivia(
-                            &exception.leading_trivia,
-                            ctx,
-                            EmptyLineHandling::Trim {
-                                start: false,
-                                end: false,
-                            },
-                        );
-                        self.put_indent();
-                        self.format(exception, ctx);
-                        if i < last_idx {
-                            self.push(',');
-                        }
-                        self.write_trailing_comment(&exception.trailing_trivia);
+                    if i < last_idx {
+                        self.push(',');
                     }
+                    self.write_trailing_comment(&exception.trailing_trivia);
                 }
                 self.dedent();
             }
