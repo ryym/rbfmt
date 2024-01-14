@@ -20,7 +20,7 @@ class Foo
 end
 
 class Foo # foo
-  extend(Some)
+  extend Some
 end
 
 # a

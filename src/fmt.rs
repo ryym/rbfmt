@@ -80,7 +80,14 @@ impl Shape {
         let shape = match self {
             Self::Inline { len: len1 } => match other {
                 Self::Inline { len: len2 } => Self::Inline { len: *len1 + *len2 },
-                Self::LineEnd { .. } | Self::Multilines => Self::Multilines,
+                Self::LineEnd { len: len2 } => {
+                    if *len1 == 0 {
+                        Self::LineEnd { len: *len2 }
+                    } else {
+                        Self::Multilines
+                    }
+                }
+                Self::Multilines => Self::Multilines,
             },
             Self::LineEnd { .. } | Self::Multilines => Self::Multilines,
         };
@@ -519,6 +526,8 @@ pub(crate) struct Else {
 
 #[derive(Debug)]
 pub(crate) struct Arguments {
+    opening: Option<String>,
+    closing: Option<String>,
     shape: Shape,
     nodes: Vec<Node>,
     pub last_comma_allowed: bool,
@@ -526,9 +535,13 @@ pub(crate) struct Arguments {
 }
 
 impl Arguments {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new(opening: Option<String>, closing: Option<String>) -> Self {
+        let opening_len = opening.as_ref().map_or(0, |o| o.len());
+        let closing_len = closing.as_ref().map_or(0, |o| o.len());
         Self {
-            shape: Shape::inline(0),
+            opening,
+            closing,
+            shape: Shape::inline(opening_len + closing_len),
             nodes: vec![],
             last_comma_allowed: true,
             virtual_end: None,
@@ -536,16 +549,16 @@ impl Arguments {
     }
 
     pub(crate) fn append_node(&mut self, node: Node) {
-        self.shape.append(&node.shape);
+        self.shape.insert(&node.shape);
         if !self.nodes.is_empty() {
-            self.shape.append(&Shape::inline(", ".len()));
+            self.shape.insert(&Shape::inline(", ".len()));
         }
         self.nodes.push(node);
     }
 
     pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
         if let Some(end) = &end {
-            self.shape.append(&end.shape);
+            self.shape.insert(&end.shape);
         }
         self.virtual_end = end;
     }
@@ -1560,28 +1573,17 @@ impl Formatter {
             self.format(recv, ctx);
             self.write_trailing_comment(&recv.trailing_trivia);
         }
-
         if chain.shape.fits_in_inline(self.remaining_width) {
             for call in chain.calls.iter() {
                 if let Some(call_op) = &call.call_op {
                     self.push_str(call_op);
                 }
-                let args_parens = if call.name == "[]" {
-                    ('[', ']')
-                } else {
+                if call.name != "[]" {
                     self.push_str(&call.name);
-                    ('(', ')')
-                };
+                }
 
                 if let Some(args) = &call.args {
-                    self.push(args_parens.0);
-                    for (i, arg) in args.nodes.iter().enumerate() {
-                        if i > 0 {
-                            self.push_str(", ");
-                        }
-                        self.format(arg, ctx);
-                    }
-                    self.push(args_parens.1);
+                    self.format_arguments(args, ctx);
                 }
                 if let Some(block) = &call.block {
                     self.format_method_block(block, ctx);
@@ -1600,58 +1602,12 @@ impl Formatter {
                     self.put_indent();
                     self.push_str(call_op);
                 }
-                let args_parens = if call.name == "[]" {
-                    ('[', ']')
-                } else {
+                if call.name != "[]" {
                     self.push_str(&call.name);
-                    ('(', ')')
-                };
-
-                if let Some(args) = &call.args {
-                    self.push(args_parens.0);
-                    let remaining = self.remaining_width.saturating_sub(1);
-                    if args.shape.fits_in_inline(remaining) {
-                        for (i, arg) in args.nodes.iter().enumerate() {
-                            if i > 0 {
-                                self.push_str(", ");
-                            }
-                            self.format(arg, ctx);
-                        }
-                    } else {
-                        self.indent();
-                        if !args.nodes.is_empty() {
-                            let last_idx = args.nodes.len() - 1;
-                            for (i, arg) in args.nodes.iter().enumerate() {
-                                self.break_line(ctx);
-                                self.write_leading_trivia(
-                                    &arg.leading_trivia,
-                                    ctx,
-                                    EmptyLineHandling::Trim {
-                                        start: i == 0,
-                                        end: false,
-                                    },
-                                );
-                                self.put_indent();
-                                self.format(arg, ctx);
-                                if i < last_idx || args.last_comma_allowed {
-                                    self.push(',');
-                                }
-                                self.write_trailing_comment(&arg.trailing_trivia);
-                            }
-                        }
-                        self.write_trivia_at_virtual_end(
-                            ctx,
-                            &args.virtual_end,
-                            true,
-                            args.nodes.is_empty(),
-                        );
-                        self.dedent();
-                        self.break_line(ctx);
-                        self.put_indent();
-                    }
-                    self.push(args_parens.1);
                 }
-
+                if let Some(args) = &call.args {
+                    self.format_arguments(args, ctx);
+                }
                 if let Some(block) = &call.block {
                     self.format_method_block(block, ctx);
                 }
@@ -1660,6 +1616,81 @@ impl Formatter {
             if indented {
                 self.dedent();
             }
+        }
+    }
+
+    fn format_arguments(&mut self, args: &Arguments, ctx: &FormatContext) {
+        if args.shape.fits_in_inline(self.remaining_width) {
+            if let Some(opening) = &args.opening {
+                self.push_str(opening);
+            } else {
+                self.push(' ');
+            }
+            for (i, arg) in args.nodes.iter().enumerate() {
+                if i > 0 {
+                    self.push_str(", ");
+                }
+                self.format(arg, ctx);
+            }
+            if let Some(closing) = &args.closing {
+                self.push_str(closing);
+            }
+        } else if let Some(opening) = &args.opening {
+            self.push_str(opening);
+            self.indent();
+            if !args.nodes.is_empty() {
+                let last_idx = args.nodes.len() - 1;
+                for (i, arg) in args.nodes.iter().enumerate() {
+                    self.break_line(ctx);
+                    self.write_leading_trivia(
+                        &arg.leading_trivia,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: i == 0,
+                            end: false,
+                        },
+                    );
+                    self.put_indent();
+                    self.format(arg, ctx);
+                    if i < last_idx || args.last_comma_allowed {
+                        self.push(',');
+                    }
+                    self.write_trailing_comment(&arg.trailing_trivia);
+                }
+            }
+            self.write_trivia_at_virtual_end(ctx, &args.virtual_end, true, args.nodes.is_empty());
+            self.dedent();
+            self.break_line(ctx);
+            self.put_indent();
+            if let Some(closing) = &args.closing {
+                self.push_str(closing);
+            }
+        } else if !args.nodes.is_empty() {
+            self.push(' ');
+            let last_idx = args.nodes.len() - 1;
+            for (i, arg) in args.nodes.iter().enumerate() {
+                if i > 0 {
+                    if i == 1 {
+                        self.indent();
+                    }
+                    self.break_line(ctx);
+                }
+                self.write_leading_trivia(
+                    &arg.leading_trivia,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: i == 0,
+                        end: false,
+                    },
+                );
+                self.put_indent();
+                self.format(arg, ctx);
+                if i < last_idx {
+                    self.push(',');
+                }
+                self.write_trailing_comment(&arg.trailing_trivia);
+            }
+            self.dedent();
         }
     }
 
@@ -2102,10 +2133,10 @@ impl Formatter {
                 self.push(' ');
                 let last_idx = rescue.exceptions.len() - 1;
                 for (i, exception) in rescue.exceptions.iter().enumerate() {
-                    if i == 1 {
-                        self.indent();
-                    }
                     if i > 0 {
+                        if i == 1 {
+                            self.indent();
+                        }
                         self.break_line(ctx);
                     }
                     self.write_leading_trivia(

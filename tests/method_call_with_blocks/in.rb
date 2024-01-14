@@ -53,6 +53,23 @@ a&.foo(1, "abc") do
   true
 end
 
+foo(
+  # 1
+  a,
+) do
+  b
+end
+
+foo 1, 2, 3 do
+  4
+end
+
+foo a,
+  # 1
+  b do
+  c
+end
+
 foo { |a, b| a(b).c } # trailing
 
 [[1, 2]].collect { |x,| x }

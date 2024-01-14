@@ -1700,18 +1700,26 @@ impl FmtNodeBuilder<'_> {
         let name = String::from_utf8_lossy(call.name()).to_string();
         let mut method_call = fmt::MethodCall::new(call_leading, call_op, name);
 
-        let args = call.arguments();
+        let arguments = call.arguments();
         let block = call.block();
-        let closing_start = call.closing_loc().map(|l| l.start_offset());
-        let closing_next_start = closing_start
-            .or_else(|| block.as_ref().map(|n| n.location().start_offset()))
+        let opening_loc = call.opening_loc();
+        let closing_loc = call.closing_loc();
+        let closing_next_start = block
+            .as_ref()
+            .map(|b| b.location().start_offset())
             .or(next_msg_start)
             .unwrap_or(next_loc_start);
         let (args, block) = match block {
             Some(node) => match node {
                 // method call with block literal (e.g. "foo { a }", "foo(a) { b }")
                 prism::Node::BlockNode { .. } => {
-                    let args = self.visit_arguments(args, None, closing_start, closing_next_start);
+                    let args = self.visit_arguments(
+                        arguments,
+                        None,
+                        opening_loc,
+                        closing_loc,
+                        closing_next_start,
+                    );
                     let block = node.as_block_node().unwrap();
                     let block = self.visit_block(block);
                     (args, Some(block))
@@ -1720,9 +1728,10 @@ impl FmtNodeBuilder<'_> {
                 prism::Node::BlockArgumentNode { .. } => {
                     let block_arg = node.as_block_argument_node().unwrap();
                     let args = self.visit_arguments(
-                        args,
+                        arguments,
                         Some(block_arg),
-                        closing_start,
+                        opening_loc,
+                        closing_loc,
                         closing_next_start,
                     );
                     (args, None)
@@ -1731,7 +1740,13 @@ impl FmtNodeBuilder<'_> {
             },
             // method call without block (e.g. "foo", "foo(a)")
             None => {
-                let args = self.visit_arguments(args, None, closing_start, closing_next_start);
+                let args = self.visit_arguments(
+                    arguments,
+                    None,
+                    opening_loc,
+                    closing_loc,
+                    closing_next_start,
+                );
                 (args, None)
             }
         };
@@ -1756,9 +1771,13 @@ impl FmtNodeBuilder<'_> {
         &mut self,
         node: Option<prism::ArgumentsNode>,
         block_arg: Option<prism::BlockArgumentNode>,
-        closing_start: Option<usize>,
+        opening_loc: Option<prism::Location>,
+        closing_loc: Option<prism::Location>,
         closing_next_start: usize,
     ) -> Option<fmt::Arguments> {
+        let opening = opening_loc.as_ref().map(Self::source_lossy_at);
+        let closing = closing_loc.as_ref().map(Self::source_lossy_at);
+        let closing_start = closing_loc.as_ref().map(|l| l.start_offset());
         match node {
             None => {
                 let block_arg = block_arg.map(|block_arg| {
@@ -1769,10 +1788,10 @@ impl FmtNodeBuilder<'_> {
                 let virtual_end = closing_start.and_then(|closing_start| {
                     self.take_end_trivia_as_virtual_end(Some(closing_start))
                 });
-                match (block_arg, virtual_end) {
-                    (None, None) => None,
-                    (block_arg, virtual_end) => {
-                        let mut args = fmt::Arguments::new();
+                match (block_arg, virtual_end, &opening) {
+                    (None, None, None) => None,
+                    (block_arg, virtual_end, _) => {
+                        let mut args = fmt::Arguments::new(opening, closing);
                         if let Some(block_arg) = block_arg {
                             args.append_node(block_arg);
                             args.last_comma_allowed = false;
@@ -1785,7 +1804,7 @@ impl FmtNodeBuilder<'_> {
                 }
             }
             Some(args_node) => {
-                let mut args = fmt::Arguments::new();
+                let mut args = fmt::Arguments::new(opening, closing);
                 let next_loc_start = closing_start.unwrap_or(closing_next_start);
                 let mut nodes = args_node.arguments().iter().collect::<Vec<_>>();
                 if let Some(block_arg) = block_arg {
@@ -1938,7 +1957,7 @@ impl FmtNodeBuilder<'_> {
 
         let index_call_leading = fmt::LeadingTrivia::new();
         let mut index_call = fmt::MethodCall::new(index_call_leading, None, "[]".to_string());
-        let mut left_args = fmt::Arguments::new();
+        let mut left_args = fmt::Arguments::new(Some("[".to_string()), Some("]".to_string()));
         let closing_start = closing_loc.start_offset();
         left_args.append_node(self.visit(arg1, closing_start));
         let left_args_end = self.take_end_trivia_as_virtual_end(Some(closing_start));

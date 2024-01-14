@@ -7,7 +7,7 @@ foo do
   true
 end
 
-1.foo(2).bar.baz
+1.foo(2).bar().baz
 
 a&.b.c&.d
 
@@ -48,7 +48,16 @@ foo(
 )
   .bar
 
-foo(bar)
+foo bar
+foo a, # 1
+  # 2
+  b, # 3
+  # 4
+  c # 5
+# 6
+
+foo(1, 2).bar 3
+expect(foo).to be(true)
 
 a {}.b(1)&.c(1, 2) { d(e {}) {} }.f
 

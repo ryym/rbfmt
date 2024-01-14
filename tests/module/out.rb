@@ -20,7 +20,7 @@ module Foo
 end
 
 module Foo # foo
-  extend(Some)
+  extend Some
 end
 
 # a
