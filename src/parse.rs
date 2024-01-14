@@ -1675,10 +1675,66 @@ impl FmtNodeBuilder<'_> {
         let name = String::from_utf8_lossy(call.name()).to_string();
         let mut method_call = fmt::MethodCall::new(call_leading, call_op, name);
 
-        let args = match call.arguments() {
+        let args = call.arguments();
+        let block = call.block();
+        let closing_start = call.closing_loc().map(|l| l.start_offset());
+        let closing_next_start = closing_start
+            .or_else(|| block.as_ref().map(|n| n.location().start_offset()))
+            .or(next_msg_start)
+            .unwrap_or(next_loc_start);
+        let (args, block) = match block {
+            Some(node) => match node {
+                prism::Node::BlockNode { .. } => {
+                    let args = self.visit_arguments(args, None, closing_start, closing_next_start);
+                    let block = node.as_block_node().unwrap();
+                    let block = self.visit_block(block);
+                    (args, Some(block))
+                }
+                prism::Node::BlockArgumentNode { .. } => {
+                    let block_arg = node.as_block_argument_node().unwrap();
+                    let args = self.visit_arguments(
+                        args,
+                        Some(block_arg),
+                        closing_start,
+                        closing_next_start,
+                    );
+                    (args, None)
+                }
+                _ => panic!("unexpected block node of call: {:?}", node),
+            },
             None => {
-                if let Some(closing_loc) = call.closing_loc().map(|l| l.start_offset()) {
-                    let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_loc));
+                let args = self.visit_arguments(args, None, closing_start, closing_next_start);
+                (args, None)
+            }
+        };
+        if let Some(args) = args {
+            method_call.set_args(args);
+        }
+        if let Some(block) = block {
+            method_call.set_block(block);
+        }
+
+        if let Some(next_msg_start) = next_msg_start {
+            let call_trailing = self.take_trailing_comment(next_msg_start);
+            method_call.set_trailing_trivia(call_trailing);
+        }
+
+        chain.append_call(method_call);
+        self.last_loc_end = call.location().end_offset();
+        chain
+    }
+
+    fn visit_arguments(
+        &mut self,
+        node: Option<prism::ArgumentsNode>,
+        _block_arg: Option<prism::BlockArgumentNode>,
+        closing_start: Option<usize>,
+        closing_next_start: usize,
+    ) -> Option<fmt::Arguments> {
+        match node {
+            None => {
+                if let Some(closing_start) = closing_start {
+                    let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
                     virtual_end.map(|end| {
                         let mut args = fmt::Arguments::new();
                         args.set_virtual_end(Some(end));
@@ -1690,11 +1746,7 @@ impl FmtNodeBuilder<'_> {
             }
             Some(args_node) => {
                 let mut args = fmt::Arguments::new();
-                let closing_start = call.closing_loc().map(|l| l.start_offset());
-                let next_loc_start = closing_start
-                    .or_else(|| call.block().map(|a| a.location().start_offset()))
-                    .or(next_msg_start)
-                    .unwrap_or(next_loc_start);
+                let next_loc_start = closing_start.unwrap_or(closing_next_start);
                 Self::each_node_with_next_start(
                     args_node.arguments().iter(),
                     next_loc_start,
@@ -1716,67 +1768,46 @@ impl FmtNodeBuilder<'_> {
 
                 Some(args)
             }
-        };
-        if let Some(args) = args {
-            method_call.set_args(args);
         }
+    }
 
-        let block = call.block().map(|node| match node {
-            prism::Node::BlockNode { .. } => {
-                let node = node.as_block_node().unwrap();
+    fn visit_block(&mut self, node: prism::BlockNode) -> fmt::MethodBlock {
+        let loc = node.location();
+        let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
+        let mut method_block = fmt::MethodBlock::new(was_flat);
 
-                let loc = node.location();
-                let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
-                let mut method_block = fmt::MethodBlock::new(was_flat);
+        let body = node.body();
+        let body_start = body.as_ref().map(|b| b.location().start_offset());
+        let params = node.parameters();
+        let params_start = params.as_ref().map(|p| p.location().start_offset());
+        let closing_loc = node.closing_loc();
 
-                let body = node.body();
-                let body_start = body.as_ref().map(|b| b.location().start_offset());
-                let params = node.parameters();
-                let params_start = params.as_ref().map(|p| p.location().start_offset());
-                let closing_loc = node.closing_loc();
+        let opening_next_loc = params_start
+            .or(body_start)
+            .unwrap_or(closing_loc.start_offset());
+        let opening_trailing = self.take_trailing_comment(opening_next_loc);
+        method_block.set_opening_trailing(opening_trailing);
 
-                let opening_next_loc = params_start
-                    .or(body_start)
-                    .unwrap_or(closing_loc.start_offset());
-                let opening_trailing = self.take_trailing_comment(opening_next_loc);
-                method_block.set_opening_trailing(opening_trailing);
-
-                if let Some(params) = params {
-                    let params_next_loc = body_start.unwrap_or(closing_loc.start_offset());
-                    match params {
-                        prism::Node::BlockParametersNode { .. } => {
-                            let node = params.as_block_parameters_node().unwrap();
-                            let params = self.visit_block_parameters(node, params_next_loc);
-                            method_block.set_parameters(params);
-                        }
-                        prism::Node::NumberedParametersNode { .. } => {}
-                        _ => panic!("unexpected node for call block params: {:?}", node),
-                    }
+        if let Some(params) = params {
+            let params_next_loc = body_start.unwrap_or(closing_loc.start_offset());
+            match params {
+                prism::Node::BlockParametersNode { .. } => {
+                    let node = params.as_block_parameters_node().unwrap();
+                    let params = self.visit_block_parameters(node, params_next_loc);
+                    method_block.set_parameters(params);
                 }
-
-                let body_end_loc = closing_loc.start_offset();
-                let body = body.map(|n| self.visit(n, body_end_loc));
-                // XXX: Is this necessary? I cannot find the case where the body is not a StatementNode.
-                let body = self.wrap_as_statements(body, body_end_loc);
-                method_block.set_body(body);
-
-                method_block
+                prism::Node::NumberedParametersNode { .. } => {}
+                _ => panic!("unexpected node for call block params: {:?}", node),
             }
-            _ => panic!("unexpected node for call block: {:?}", node),
-        });
-        if let Some(block) = block {
-            method_call.set_block(block);
         }
 
-        if let Some(next_msg_start) = next_msg_start {
-            let call_trailing = self.take_trailing_comment(next_msg_start);
-            method_call.set_trailing_trivia(call_trailing);
-        }
+        let body_end_loc = closing_loc.start_offset();
+        let body = body.map(|n| self.visit(n, body_end_loc));
+        // XXX: Is this necessary? I cannot find the case where the body is not a StatementNode.
+        let body = self.wrap_as_statements(body, body_end_loc);
+        method_block.set_body(body);
 
-        chain.append_call(method_call);
-
-        self.last_loc_end = call.location().end_offset();
-        chain
+        method_block
     }
 
     fn is_infix_call(call: &prism::CallNode) -> bool {
