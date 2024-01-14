@@ -146,6 +146,7 @@ pub(crate) enum Kind {
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
     InfixChain(InfixChain),
+    CallLike(CallLike),
     Assign(Assign),
     MultiAssignTarget(MultiAssignTarget),
     Prefix(Prefix),
@@ -172,6 +173,7 @@ impl Kind {
             Self::Postmodifier(pmod) => pmod.shape,
             Self::MethodChain(chain) => chain.shape,
             Self::InfixChain(chain) => chain.shape,
+            Self::CallLike(call) => call.shape,
             Self::Assign(assign) => assign.shape,
             Self::MultiAssignTarget(multi) => multi.shape,
             Self::Prefix(prefix) => prefix.shape,
@@ -206,6 +208,7 @@ impl Kind {
             Self::Postmodifier(_) => true,
             Self::MethodChain(_) => true,
             Self::InfixChain(_) => true,
+            Self::CallLike(_) => true,
             Self::Assign(_) => true,
             Self::MultiAssignTarget(_) => true,
             Self::Prefix(_) => false,
@@ -725,6 +728,28 @@ pub(crate) struct Assign {
     target: Box<Node>,
     operator: String,
     value: Box<Node>,
+}
+
+#[derive(Debug)]
+pub(crate) struct CallLike {
+    shape: Shape,
+    name: String,
+    arguments: Option<Arguments>,
+}
+
+impl CallLike {
+    pub(crate) fn new(name: String) -> Self {
+        Self {
+            shape: Shape::inline(name.len()),
+            name,
+            arguments: None,
+        }
+    }
+
+    pub(crate) fn set_arguments(&mut self, args: Arguments) {
+        self.shape.append(&args.shape);
+        self.arguments = Some(args);
+    }
 }
 
 impl Assign {
@@ -1292,6 +1317,7 @@ impl Formatter {
             Kind::If(ifexpr) => self.format_if(ifexpr, ctx),
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
+            Kind::CallLike(call) => self.format_call_like(call, ctx),
             Kind::InfixChain(chain) => self.format_infix_chain(chain, ctx),
             Kind::Assign(assign) => self.format_assign(assign, ctx),
             Kind::MultiAssignTarget(multi) => self.format_multi_assign_target(multi, ctx),
@@ -1616,6 +1642,13 @@ impl Formatter {
             if indented {
                 self.dedent();
             }
+        }
+    }
+
+    fn format_call_like(&mut self, call: &CallLike, ctx: &FormatContext) {
+        self.push_str(&call.name);
+        if let Some(args) = &call.arguments {
+            self.format_arguments(args, ctx);
         }
     }
 

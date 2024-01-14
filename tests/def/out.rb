@@ -112,6 +112,21 @@ end
 def foo(a, b) # foo
 end
 
+def foo
+  return
+end
+
+def foo
+  if Date.current > foo
+    return 1,
+      2,
+      # 3
+      3 # 4
+  else
+    return foo.bar(4, 5) # 6
+  end
+end
+
 def self.foo(a, b) # foo
 end
 

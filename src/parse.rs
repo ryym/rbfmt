@@ -655,6 +655,15 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::MethodChain(chain), trailing)
             }
 
+            prism::Node::ReturnNode { .. } => {
+                let node = node.as_return_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let call_like =
+                    self.parse_call_like(node.keyword_loc(), node.arguments(), next_loc_start);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::CallLike(call_like), trailing)
+            }
+
             prism::Node::AndNode { .. } => {
                 let node = node.as_and_node().unwrap();
                 let loc = node.location();
@@ -2057,6 +2066,21 @@ impl FmtNodeBuilder<'_> {
         let right = self.visit(right, right_end);
         chain.append_right(operator, right);
         chain
+    }
+
+    fn parse_call_like(
+        &mut self,
+        name_loc: prism::Location,
+        arguments: Option<prism::ArgumentsNode>,
+        next_loc_start: usize,
+    ) -> fmt::CallLike {
+        let name = Self::source_lossy_at(&name_loc);
+        let mut call_like = fmt::CallLike::new(name);
+        let args = self.visit_arguments(arguments, None, None, None, next_loc_start);
+        if let Some(args) = args {
+            call_like.set_arguments(args);
+        }
+        call_like
     }
 
     fn visit_variable_assign(
