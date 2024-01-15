@@ -141,6 +141,24 @@ def supers
   super 1 { _1 }
 end
 
+def yields
+  # y
+  yield # y
+  yield 1, 2
+  yield 1,
+    # 2
+    2 # 3
+  yield(foo, bar(1, 2), 3)
+  yield(
+    # foo
+    foo,
+    bar(1, 2),
+    3,
+    # 4
+  )
+  yield(*args)
+end
+
 -a
 !a.b(1).c # d
 ~(
