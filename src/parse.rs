@@ -668,6 +668,23 @@ impl FmtNodeBuilder<'_> {
                 }
             }
 
+            prism::Node::WhileNode { .. } => {
+                let node = node.as_while_node().unwrap();
+                if let Some(closing_loc) = node.closing_loc() {
+                    let leading = self.take_leading_trivia(node.location().start_offset());
+                    let whle = self.visit_while_or_until(
+                        true,
+                        node.predicate(),
+                        node.statements(),
+                        closing_loc,
+                    );
+                    let trailing = self.take_trailing_comment(next_loc_start);
+                    fmt::Node::new(leading, fmt::Kind::While(whle), trailing)
+                } else {
+                    todo!("while modifier: {:?}", node);
+                }
+            }
+
             prism::Node::RescueModifierNode { .. } => {
                 let node = node.as_rescue_modifier_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
@@ -1703,6 +1720,23 @@ impl FmtNodeBuilder<'_> {
                 panic!("unexpected node in IfNode: {:?}", node);
             }
         }
+    }
+
+    fn visit_while_or_until(
+        &mut self,
+        is_while: bool,
+        predicate: prism::Node,
+        body: Option<prism::StatementsNode>,
+        closing_loc: prism::Location,
+    ) -> fmt::While {
+        let predicate_next = body
+            .as_ref()
+            .map(|b| b.location().start_offset())
+            .unwrap_or(closing_loc.start_offset());
+        let predicate = self.visit(predicate, predicate_next);
+        let body = self.visit_statements(body, closing_loc.start_offset());
+        let content = fmt::Conditional::new(fmt::TrailingTrivia::none(), predicate, body);
+        fmt::While { is_while, content }
     }
 
     fn visit_postmodifier(&mut self, postmod: Postmodifier, next_loc_start: usize) -> fmt::Node {

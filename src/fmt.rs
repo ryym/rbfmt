@@ -143,6 +143,7 @@ pub(crate) enum Kind {
     Statements(Statements),
     Parens(Parens),
     If(If),
+    While(While),
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
     InfixChain(InfixChain),
@@ -170,6 +171,7 @@ impl Kind {
             Self::Statements(statements) => statements.shape,
             Self::Parens(parens) => parens.shape,
             Self::If(_) => If::shape(),
+            Self::While(_) => While::shape(),
             Self::Postmodifier(pmod) => pmod.shape,
             Self::MethodChain(chain) => chain.shape,
             Self::InfixChain(chain) => chain.shape,
@@ -205,6 +207,7 @@ impl Kind {
             Self::HeredocOpening(_) => false,
             Self::Parens(_) => true,
             Self::If(_) => false,
+            Self::While(_) => false,
             Self::Postmodifier(_) => true,
             Self::MethodChain(_) => true,
             Self::InfixChain(_) => true,
@@ -483,6 +486,18 @@ impl If {
 }
 
 #[derive(Debug)]
+pub(crate) struct While {
+    pub is_while: bool,
+    pub content: Conditional,
+}
+
+impl While {
+    pub(crate) fn shape() -> Shape {
+        Shape::Multilines
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Postmodifier {
     pub shape: Shape,
     pub keyword: String,
@@ -503,10 +518,10 @@ impl Postmodifier {
 
 #[derive(Debug)]
 pub(crate) struct Conditional {
-    pub shape: Shape,
-    pub keyword_trailing: TrailingTrivia,
-    pub predicate: Box<Node>,
-    pub body: Statements,
+    shape: Shape,
+    keyword_trailing: TrailingTrivia,
+    predicate: Box<Node>,
+    body: Statements,
 }
 
 impl Conditional {
@@ -1318,6 +1333,7 @@ impl Formatter {
             Kind::Statements(statements) => self.format_statements(statements, ctx, false),
             Kind::Parens(parens) => self.format_parens(parens, ctx),
             Kind::If(ifexpr) => self.format_if(ifexpr, ctx),
+            Kind::While(whle) => self.format_while(whle, ctx),
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
             Kind::CallLike(call) => self.format_call_like(call, ctx),
@@ -1562,6 +1578,44 @@ impl Formatter {
 
         self.break_line(ctx);
         self.dedent();
+        self.put_indent();
+        self.push_str("end");
+    }
+
+    fn format_while(&mut self, expr: &While, ctx: &FormatContext) {
+        if expr.is_while {
+            self.push_str("while");
+        } else {
+            self.push_str("until");
+        }
+        let pred = &expr.content.predicate;
+        if pred.shape.fits_in_one_line(self.remaining_width) || pred.is_diagonal() {
+            self.push(' ');
+            self.format(pred, ctx);
+            self.write_trailing_comment(&pred.trailing_trivia);
+        } else {
+            self.indent();
+            self.break_line(ctx);
+            self.write_leading_trivia(
+                &pred.leading_trivia,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: true,
+                    end: true,
+                },
+            );
+            self.put_indent();
+            self.format(pred, ctx);
+            self.write_trailing_comment(&pred.trailing_trivia);
+            self.dedent();
+        }
+        if !expr.content.body.shape().is_empty() {
+            self.indent();
+            self.break_line(ctx);
+            self.format_statements(&expr.content.body, ctx, true);
+            self.dedent();
+        }
+        self.break_line(ctx);
         self.put_indent();
         self.push_str("end");
     }
