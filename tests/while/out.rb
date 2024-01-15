@@ -23,3 +23,31 @@ while
   true # 3
   # 4
 end # 5
+
+## until
+
+until true
+end
+
+until false
+  if true
+    nil
+  end
+end
+
+if true
+  until false
+    :foo
+  end
+end
+
+until foo(1, 2)
+  # nil
+end
+
+until
+  # 1
+  # 2
+  true # 3
+  # 4
+end # 5

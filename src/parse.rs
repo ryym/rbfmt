@@ -684,6 +684,22 @@ impl FmtNodeBuilder<'_> {
                     todo!("while modifier: {:?}", node);
                 }
             }
+            prism::Node::UntilNode { .. } => {
+                let node = node.as_until_node().unwrap();
+                if let Some(closing_loc) = node.closing_loc() {
+                    let leading = self.take_leading_trivia(node.location().start_offset());
+                    let whle = self.visit_while_or_until(
+                        false,
+                        node.predicate(),
+                        node.statements(),
+                        closing_loc,
+                    );
+                    let trailing = self.take_trailing_comment(next_loc_start);
+                    fmt::Node::new(leading, fmt::Kind::While(whle), trailing)
+                } else {
+                    todo!("until modifier: {:?}", node);
+                }
+            }
 
             prism::Node::RescueModifierNode { .. } => {
                 let node = node.as_rescue_modifier_node().unwrap();
