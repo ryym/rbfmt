@@ -13,6 +13,10 @@ if true
   end
 end
 
+while a < 5
+  redo if b # c
+end
+
 while foo(1, 2)
   # nil
 end

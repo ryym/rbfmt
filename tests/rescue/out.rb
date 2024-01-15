@@ -19,3 +19,11 @@ if true
     bar
   end
 end
+
+begin
+  if foo(bar)
+    raise baz
+  end
+rescue => e
+  retry if e.retry? # e
+end

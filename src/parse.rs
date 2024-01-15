@@ -494,6 +494,8 @@ impl FmtNodeBuilder<'_> {
             }
             prism::Node::BlockLocalVariableNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ForwardingArgumentsNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::RedoNode { .. } => self.parse_atom(node, next_loc_start),
+            prism::Node::RetryNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::SourceFileNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::SourceLineNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::SourceEncodingNode { .. } => self.parse_atom(node, next_loc_start),
