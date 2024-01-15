@@ -505,17 +505,20 @@ impl Postmodifier {
 pub(crate) struct Conditional {
     pub shape: Shape,
     pub keyword_trailing: TrailingTrivia,
-    pub cond: Box<Node>,
+    pub predicate: Box<Node>,
     pub body: Statements,
 }
 
 impl Conditional {
-    pub(crate) fn new(keyword_trailing: TrailingTrivia, cond: Node, body: Statements) -> Self {
-        let shape = keyword_trailing.shape.add(&cond.shape).add(&body.shape);
+    pub(crate) fn new(keyword_trailing: TrailingTrivia, predicate: Node, body: Statements) -> Self {
+        let shape = keyword_trailing
+            .shape
+            .add(&predicate.shape)
+            .add(&body.shape);
         Self {
             shape,
             keyword_trailing,
-            cond: Box::new(cond),
+            predicate: Box::new(predicate),
             body,
         }
     }
@@ -1522,7 +1525,11 @@ impl Formatter {
             self.push_str("unless");
         }
 
-        self.format_node_after_keyword(ctx, &expr.if_first.keyword_trailing, &expr.if_first.cond);
+        self.format_node_after_keyword(
+            ctx,
+            &expr.if_first.keyword_trailing,
+            &expr.if_first.predicate,
+        );
         if !expr.if_first.body.shape.is_empty() {
             self.break_line(ctx);
             self.format_statements(&expr.if_first.body, ctx, true);
@@ -1533,7 +1540,7 @@ impl Formatter {
             self.dedent();
             self.put_indent();
             self.push_str("elsif");
-            self.format_node_after_keyword(ctx, &elsif.keyword_trailing, &elsif.cond);
+            self.format_node_after_keyword(ctx, &elsif.keyword_trailing, &elsif.predicate);
             if !elsif.body.shape.is_empty() {
                 self.break_line(ctx);
                 self.format_statements(&elsif.body, ctx, true);
@@ -1566,7 +1573,7 @@ impl Formatter {
         self.format_node_after_keyword(
             ctx,
             &modifier.conditional.keyword_trailing,
-            &modifier.conditional.cond,
+            &modifier.conditional.predicate,
         );
         self.dedent();
     }
