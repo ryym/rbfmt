@@ -144,6 +144,7 @@ pub(crate) enum Kind {
     Parens(Parens),
     If(If),
     While(While),
+    For(For),
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
     InfixChain(InfixChain),
@@ -172,6 +173,7 @@ impl Kind {
             Self::Parens(parens) => parens.shape,
             Self::If(_) => If::shape(),
             Self::While(_) => While::shape(),
+            Self::For(_) => For::shape(),
             Self::Postmodifier(pmod) => pmod.shape,
             Self::MethodChain(chain) => chain.shape,
             Self::InfixChain(chain) => chain.shape,
@@ -208,6 +210,7 @@ impl Kind {
             Self::Parens(_) => true,
             Self::If(_) => false,
             Self::While(_) => false,
+            Self::For(_) => false,
             Self::Postmodifier(_) => true,
             Self::MethodChain(_) => true,
             Self::InfixChain(_) => true,
@@ -492,6 +495,19 @@ pub(crate) struct While {
 }
 
 impl While {
+    pub(crate) fn shape() -> Shape {
+        Shape::Multilines
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct For {
+    pub index: Box<Node>,
+    pub collection: Box<Node>,
+    pub body: Statements,
+}
+
+impl For {
     pub(crate) fn shape() -> Shape {
         Shape::Multilines
     }
@@ -1334,6 +1350,7 @@ impl Formatter {
             Kind::Parens(parens) => self.format_parens(parens, ctx),
             Kind::If(ifexpr) => self.format_if(ifexpr, ctx),
             Kind::While(whle) => self.format_while(whle, ctx),
+            Kind::For(expr) => self.format_for(expr, ctx),
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
             Kind::CallLike(call) => self.format_call_like(call, ctx),
@@ -1613,6 +1630,59 @@ impl Formatter {
             self.indent();
             self.break_line(ctx);
             self.format_statements(&expr.content.body, ctx, true);
+            self.dedent();
+        }
+        self.break_line(ctx);
+        self.put_indent();
+        self.push_str("end");
+    }
+
+    fn format_for(&mut self, expr: &For, ctx: &FormatContext) {
+        self.push_str("for");
+        if expr.index.shape.fits_in_inline(self.remaining_width) || expr.index.is_diagonal() {
+            self.push(' ');
+            self.format(&expr.index, ctx);
+        } else {
+            self.indent();
+            self.break_line(ctx);
+            self.write_leading_trivia(
+                &expr.index.leading_trivia,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: true,
+                    end: true,
+                },
+            );
+            self.put_indent();
+            self.format(&expr.index, ctx);
+            self.dedent();
+        }
+        self.push_str(" in");
+        let collection = &expr.collection;
+        if collection.shape.fits_in_inline(self.remaining_width) || collection.is_diagonal() {
+            self.push(' ');
+            self.format(collection, ctx);
+            self.write_trailing_comment(&collection.trailing_trivia);
+        } else {
+            self.indent();
+            self.break_line(ctx);
+            self.write_leading_trivia(
+                &collection.leading_trivia,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: true,
+                    end: true,
+                },
+            );
+            self.put_indent();
+            self.format(collection, ctx);
+            self.write_trailing_comment(&collection.trailing_trivia);
+            self.dedent();
+        }
+        if !expr.body.shape().is_empty() {
+            self.indent();
+            self.break_line(ctx);
+            self.format_statements(&expr.body, ctx, true);
             self.dedent();
         }
         self.break_line(ctx);
