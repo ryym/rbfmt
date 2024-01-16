@@ -683,7 +683,16 @@ impl FmtNodeBuilder<'_> {
                     let trailing = self.take_trailing_comment(next_loc_start);
                     fmt::Node::new(leading, fmt::Kind::While(whle), trailing)
                 } else {
-                    todo!("while modifier: {:?}", node);
+                    self.visit_postmodifier(
+                        Postmodifier {
+                            keyword: "while".to_string(),
+                            loc: node.location(),
+                            keyword_loc: node.keyword_loc(),
+                            predicate: node.predicate(),
+                            statements: node.statements(),
+                        },
+                        next_loc_start,
+                    )
                 }
             }
             prism::Node::UntilNode { .. } => {
@@ -699,7 +708,16 @@ impl FmtNodeBuilder<'_> {
                     let trailing = self.take_trailing_comment(next_loc_start);
                     fmt::Node::new(leading, fmt::Kind::While(whle), trailing)
                 } else {
-                    todo!("until modifier: {:?}", node);
+                    self.visit_postmodifier(
+                        Postmodifier {
+                            keyword: "until".to_string(),
+                            loc: node.location(),
+                            keyword_loc: node.keyword_loc(),
+                            predicate: node.predicate(),
+                            statements: node.statements(),
+                        },
+                        next_loc_start,
+                    )
                 }
             }
 

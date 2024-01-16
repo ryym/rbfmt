@@ -47,6 +47,18 @@ while a.b!
   end
 end
 
+a while b
+a while # b
+  b
+a while foo [
+  1, # 1
+  2, # 2
+]
+begin
+  foo
+  bar
+end while a(1).b
+
 ## until
 
 until true
@@ -75,3 +87,16 @@ until # 1
   true # 3
   # 4
 end # 5
+
+a until b
+a until # b
+  b
+a until foo [
+  1, # 1
+  2, # 2
+]
+begin
+  foo
+  bar
+end until a(1).b
+
