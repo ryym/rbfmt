@@ -143,7 +143,9 @@ def supers
     # 2
     2 # 3
   super(1) {}
-  super 1 { _1 }
+  super 1 do
+    _1
+  end
 end
 
 def yields
