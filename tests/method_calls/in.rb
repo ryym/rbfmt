@@ -155,7 +155,7 @@ def yields
     # foo
     foo,
     bar(1, 2),
-    3,
+    3
     # 4
   )
   yield(*args)

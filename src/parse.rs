@@ -374,35 +374,6 @@ impl<'src> CallRoot for prism::SuperNode<'src> {
         self.block()
     }
 }
-impl<'src> CallRoot for prism::YieldNode<'src> {
-    fn location(&self) -> prism::Location {
-        self.location()
-    }
-    fn receiver(&self) -> Option<prism::Node> {
-        None
-    }
-    fn message_loc(&self) -> Option<prism::Location> {
-        Some(self.location())
-    }
-    fn call_operator_loc(&self) -> Option<prism::Location> {
-        None
-    }
-    fn name(&self) -> &[u8] {
-        b"yield"
-    }
-    fn arguments(&self) -> Option<prism::ArgumentsNode> {
-        self.arguments()
-    }
-    fn opening_loc(&self) -> Option<prism::Location> {
-        self.lparen_loc()
-    }
-    fn closing_loc(&self) -> Option<prism::Location> {
-        self.rparen_loc()
-    }
-    fn block(&self) -> Option<prism::Node> {
-        None
-    }
-}
 
 struct Postmodifier<'src> {
     keyword: String,
@@ -783,9 +754,9 @@ impl FmtNodeBuilder<'_> {
             prism::Node::YieldNode { .. } => {
                 let node = node.as_yield_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let chain = self.visit_call_root(&node, next_loc_start, None);
+                let call_like = self.visit_yield(node, next_loc_start);
                 let trailing = self.take_trailing_comment(next_loc_start);
-                fmt::Node::new(leading, fmt::Kind::MethodChain(chain), trailing)
+                fmt::Node::new(leading, fmt::Kind::CallLike(call_like), trailing)
             }
 
             prism::Node::BreakNode { .. } => {
@@ -2285,6 +2256,22 @@ impl FmtNodeBuilder<'_> {
         let mut call_like = fmt::CallLike::new(name);
         let args = self.visit_arguments(arguments, None, None, None, next_loc_start);
         if let Some(args) = args {
+            call_like.set_arguments(args);
+        }
+        call_like
+    }
+
+    fn visit_yield(&mut self, node: prism::YieldNode, next_loc_start: usize) -> fmt::CallLike {
+        let args = self.visit_arguments(
+            node.arguments(),
+            None,
+            node.lparen_loc(),
+            node.rparen_loc(),
+            next_loc_start,
+        );
+        let mut call_like = fmt::CallLike::new("yield".to_string());
+        if let Some(mut args) = args {
+            args.last_comma_allowed = false;
             call_like.set_arguments(args);
         }
         call_like
