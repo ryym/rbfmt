@@ -1380,6 +1380,13 @@ impl FmtNodeBuilder<'_> {
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::CallLike(call_like), trailing)
             }
+            prism::Node::DefinedNode { .. } => {
+                let node = node.as_defined_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let call_like = self.visit_defined(node);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::CallLike(call_like), trailing)
+            }
 
             prism::Node::BeginNode { .. } => {
                 let node = node.as_begin_node().unwrap();
@@ -2293,6 +2300,32 @@ impl FmtNodeBuilder<'_> {
             args.append_node(node);
         });
         let mut call_like = fmt::CallLike::new("undef".to_string());
+        call_like.set_arguments(args);
+        call_like
+    }
+
+    fn visit_defined(&mut self, defined: prism::DefinedNode) -> fmt::CallLike {
+        let lparen_loc = defined.lparen_loc();
+        let rparen_loc = defined.rparen_loc();
+
+        let value = defined.value();
+        let value_next = rparen_loc
+            .as_ref()
+            .map(|l| l.start_offset())
+            .unwrap_or(value.location().end_offset());
+        let value = self.visit(value, value_next);
+
+        let lparen = lparen_loc.as_ref().map(Self::source_lossy_at);
+        let rparen = rparen_loc.as_ref().map(Self::source_lossy_at);
+        let mut args = fmt::Arguments::new(lparen, rparen);
+        args.last_comma_allowed = false;
+        args.append_node(value);
+
+        let rparen_start = rparen_loc.as_ref().map(|l| l.start_offset());
+        let virutla_end = self.take_end_trivia_as_virtual_end(rparen_start);
+        args.set_virtual_end(virutla_end);
+
+        let mut call_like = fmt::CallLike::new("defined?".to_string());
         call_like.set_arguments(args);
         call_like
     }
