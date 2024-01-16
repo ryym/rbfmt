@@ -609,7 +609,7 @@ pub(crate) struct MethodCall {
     pub call_op: Option<String>,
     pub name: String,
     pub args: Option<Arguments>,
-    pub block: Option<MethodBlock>,
+    pub block: Option<Block>,
 }
 
 impl MethodCall {
@@ -640,7 +640,7 @@ impl MethodCall {
         self.args = Some(args);
     }
 
-    pub(crate) fn set_block(&mut self, block: MethodBlock) {
+    pub(crate) fn set_block(&mut self, block: Block) {
         self.shape.append(&Shape::inline(" ".len()));
         self.shape.append(&block.shape);
         self.block = Some(block);
@@ -653,14 +653,14 @@ impl MethodCall {
 }
 
 #[derive(Debug)]
-pub(crate) struct MethodBlock {
+pub(crate) struct Block {
     shape: Shape,
     opening_trailing: TrailingTrivia,
     parameters: Option<BlockParameters>,
     body: Statements,
 }
 
-impl MethodBlock {
+impl Block {
     pub(crate) fn new(was_flat: bool) -> Self {
         let shape = if was_flat {
             Shape::inline("{}".len())
@@ -1861,7 +1861,7 @@ impl Formatter {
         }
     }
 
-    fn format_method_block(&mut self, block: &MethodBlock, ctx: &FormatContext) {
+    fn format_method_block(&mut self, block: &Block, ctx: &FormatContext) {
         if block.shape.fits_in_one_line(self.remaining_width) {
             self.push_str(" {");
             if let Some(params) = &block.parameters {

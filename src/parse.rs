@@ -2035,10 +2035,10 @@ impl FmtNodeBuilder<'_> {
         (leading, prefix, trailing)
     }
 
-    fn visit_block(&mut self, node: prism::BlockNode) -> fmt::MethodBlock {
+    fn visit_block(&mut self, node: prism::BlockNode) -> fmt::Block {
         let loc = node.location();
         let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
-        let mut method_block = fmt::MethodBlock::new(was_flat);
+        let mut method_block = fmt::Block::new(was_flat);
 
         let body = node.body();
         let body_start = body.as_ref().map(|b| b.location().start_offset());
