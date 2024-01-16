@@ -1373,6 +1373,14 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::Assoc(assoc), trailing)
             }
 
+            prism::Node::UndefNode { .. } => {
+                let node = node.as_undef_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let call_like = self.visit_undef(node);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::CallLike(call_like), trailing)
+            }
+
             prism::Node::BeginNode { .. } => {
                 let node = node.as_begin_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
@@ -2272,6 +2280,20 @@ impl FmtNodeBuilder<'_> {
         if let Some(args) = args {
             call_like.set_arguments(args);
         }
+        call_like
+    }
+
+    fn visit_undef(&mut self, undef: prism::UndefNode) -> fmt::CallLike {
+        let mut args = fmt::Arguments::new(None, None);
+        Self::each_node_with_next_start(undef.names().iter(), 0, |node, mut next_start| {
+            if next_start == 0 {
+                next_start = node.location().start_offset();
+            }
+            let node = self.visit(node, next_start);
+            args.append_node(node);
+        });
+        let mut call_like = fmt::CallLike::new("undef".to_string());
+        call_like.set_arguments(args);
         call_like
     }
 
