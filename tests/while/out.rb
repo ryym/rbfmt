@@ -28,6 +28,24 @@ while
   # 4
 end # 5
 
+while a.b!
+  if foo(3)
+    # 1
+    break # 2
+    # 3
+  elsif bar.baz
+    break [1], 2 # 3
+  elsif foo
+    # 1
+    next # 2
+    # 3
+  elsif foo < 10
+    next { a: 1 },
+      # 2
+      2 # 3
+  end
+end
+
 ## until
 
 until true

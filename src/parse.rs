@@ -762,6 +762,22 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::MethodChain(chain), trailing)
             }
 
+            prism::Node::BreakNode { .. } => {
+                let node = node.as_break_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let call_like =
+                    self.parse_call_like(node.keyword_loc(), node.arguments(), next_loc_start);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::CallLike(call_like), trailing)
+            }
+            prism::Node::NextNode { .. } => {
+                let node = node.as_next_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let call_like =
+                    self.parse_call_like(node.keyword_loc(), node.arguments(), next_loc_start);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::CallLike(call_like), trailing)
+            }
             prism::Node::ReturnNode { .. } => {
                 let node = node.as_return_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
