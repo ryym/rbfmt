@@ -151,3 +151,15 @@ foo { _1 + _2 }
 foo do
   _1.foo(_2)
 end
+
+foo do # 0.5
+  1
+rescue # 1.5
+  2
+rescue Foo => foo # 2.5
+  3
+else # 3.5
+  4
+ensure # 4.5
+  5
+end

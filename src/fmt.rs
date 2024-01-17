@@ -657,7 +657,7 @@ pub(crate) struct Block {
     shape: Shape,
     opening_trailing: TrailingTrivia,
     parameters: Option<BlockParameters>,
-    body: Statements,
+    body: BlockBody,
 }
 
 impl Block {
@@ -671,7 +671,7 @@ impl Block {
             shape,
             opening_trailing: TrailingTrivia::none(),
             parameters: None,
-            body: Statements::new(),
+            body: BlockBody::new(Statements::new()),
         }
     }
 
@@ -686,7 +686,7 @@ impl Block {
         self.parameters = Some(parameters);
     }
 
-    pub(crate) fn set_body(&mut self, body: Statements) {
+    pub(crate) fn set_body(&mut self, body: BlockBody) {
         self.shape.insert(&Shape::inline("  ".len()));
         self.shape.insert(&body.shape);
         self.body = body;
@@ -1889,7 +1889,7 @@ impl Formatter {
             }
             if !block.body.shape.is_empty() {
                 self.push(' ');
-                self.format_statements(&block.body, ctx, false);
+                self.format_block_body(&block.body, ctx, false);
                 self.push(' ');
             }
             self.push_str("}");
@@ -1908,12 +1908,9 @@ impl Formatter {
                     self.dedent();
                 }
             }
-            self.indent();
             if !block.body.shape.is_empty() {
-                self.break_line(ctx);
-                self.format_statements(&block.body, ctx, true);
+                self.format_block_body(&block.body, ctx, true);
             }
-            self.dedent();
             self.break_line(ctx);
             self.put_indent();
             self.push_str("end");
@@ -2187,7 +2184,7 @@ impl Formatter {
     fn format_begin(&mut self, begin: &Begin, ctx: &FormatContext) {
         self.push_str("begin");
         self.write_trailing_comment(&begin.keyword_trailing);
-        self.format_block_body(&begin.body, ctx);
+        self.format_block_body(&begin.body, ctx, true);
         self.break_line(ctx);
         self.put_indent();
         self.push_str("end");
@@ -2254,7 +2251,7 @@ impl Formatter {
                 body,
             } => {
                 self.write_trailing_comment(head_trailing);
-                self.format_block_body(body, ctx);
+                self.format_block_body(body, ctx, true);
                 self.break_line(ctx);
                 self.put_indent();
                 self.push_str("end");
@@ -2262,7 +2259,12 @@ impl Formatter {
         }
     }
 
-    fn format_block_body(&mut self, body: &BlockBody, ctx: &FormatContext) {
+    fn format_block_body(&mut self, body: &BlockBody, ctx: &FormatContext, block_always: bool) {
+        if body.shape.fits_in_inline(self.remaining_width) && !block_always {
+            self.format_statements(&body.statements, ctx, block_always);
+            return;
+        }
+
         if !body.statements.shape().is_empty() {
             self.indent();
             self.break_line(ctx);
@@ -2545,7 +2547,7 @@ impl Formatter {
         } else {
             self.write_trailing_comment(&class.head_trailing);
         }
-        self.format_block_body(&class.body, ctx);
+        self.format_block_body(&class.body, ctx, true);
         self.break_line(ctx);
         self.put_indent();
         self.push_str("end");
@@ -2580,7 +2582,7 @@ impl Formatter {
             self.dedent();
             self.dedent();
         }
-        self.format_block_body(&class.body, ctx);
+        self.format_block_body(&class.body, ctx, true);
         self.break_line(ctx);
         self.put_indent();
         self.push_str("end");

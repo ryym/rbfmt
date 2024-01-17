@@ -2066,9 +2066,7 @@ impl FmtNodeBuilder<'_> {
         }
 
         let body_end_loc = closing_loc.start_offset();
-        let body = body.map(|n| self.visit(n, body_end_loc));
-        // XXX: Is this necessary? I cannot find the case where the body is not a StatementNode.
-        let body = self.wrap_as_statements(body, body_end_loc);
+        let body = self.parse_block_body(body, body_end_loc);
         method_block.set_body(body);
 
         method_block
