@@ -160,8 +160,7 @@ end
 
 foo do # 0.5
   1
-rescue
-  # 1.5
+rescue # 1.5
   2
 rescue Foo => foo # 2.5
   3

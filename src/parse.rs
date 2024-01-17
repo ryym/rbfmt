@@ -2632,11 +2632,15 @@ impl FmtNodeBuilder<'_> {
             rescue.append_exception(fmt_node);
         });
 
-        if let Some(reference) = node.reference() {
+        if let Some(reference) = reference {
             let reference_next = statements_start.or(consequent_start).unwrap_or(final_next);
             let reference = self.visit(reference, reference_next);
             rescue.set_reference(reference);
         }
+
+        let head_next = statements_start.or(consequent_start).unwrap_or(final_next);
+        let head_trailing = self.take_trailing_comment(head_next);
+        rescue.set_head_trailing(head_trailing);
 
         let statements_next = consequent_start.unwrap_or(final_next);
         let statements = self.visit_statements(statements, statements_next);

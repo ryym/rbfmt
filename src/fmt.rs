@@ -1116,6 +1116,7 @@ pub(crate) struct Rescue {
     exceptions: Vec<Node>,
     exceptions_shape: Shape,
     reference: Option<Box<Node>>,
+    head_trailing: TrailingTrivia,
     statements: Statements,
 }
 
@@ -1125,6 +1126,7 @@ impl Rescue {
             exceptions: vec![],
             exceptions_shape: Shape::inline(0),
             reference: None,
+            head_trailing: TrailingTrivia::none(),
             statements: Statements::new(),
         }
     }
@@ -1136,6 +1138,10 @@ impl Rescue {
 
     pub(crate) fn set_reference(&mut self, reference: Node) {
         self.reference = Some(Box::new(reference))
+    }
+
+    pub(crate) fn set_head_trailing(&mut self, trailing: TrailingTrivia) {
+        self.head_trailing = trailing;
     }
 
     pub(crate) fn set_statements(&mut self, statements: Statements) {
@@ -2371,6 +2377,7 @@ impl Formatter {
                 self.dedent();
             }
         }
+        self.write_trailing_comment(&rescue.head_trailing);
         if !rescue.statements.shape().is_empty() {
             self.indent();
             self.break_line(ctx);

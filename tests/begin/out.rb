@@ -167,3 +167,12 @@ if true
     2
   end
 end
+
+foo do
+rescue # 1
+rescue Foo # 2
+rescue Foo => foo # 3
+rescue => foo # 4
+else # 5
+ensure # 6
+end
