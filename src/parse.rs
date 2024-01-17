@@ -1344,6 +1344,14 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::Assoc(assoc), trailing)
             }
 
+            prism::Node::LambdaNode { .. } => {
+                let node = node.as_lambda_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let lambda = self.visit_lambda(node);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Lambda(lambda), trailing)
+            }
+
             prism::Node::UndefNode { .. } => {
                 let node = node.as_undef_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
@@ -2244,6 +2252,33 @@ impl FmtNodeBuilder<'_> {
         let right = self.visit(right, right_end);
         chain.append_right(operator, right);
         chain
+    }
+
+    fn visit_lambda(&mut self, node: prism::LambdaNode) -> fmt::Lambda {
+        let params = node.parameters().map(|params| match params {
+            prism::Node::BlockParametersNode { .. } => {
+                let params = params.as_block_parameters_node().unwrap();
+                let params_end = params.location().end_offset();
+                self.visit_block_parameters(params, params_end)
+            }
+            _ => panic!("unexpected node for lambda params: {:?}", node),
+        });
+
+        let body_end = node.closing_loc().start_offset();
+        let body_opening_trailing = self.take_trailing_comment(body_end);
+        let body = self.parse_block_body(node.body(), body_end);
+
+        let was_flat = !self.does_line_break_exist_in(
+            node.opening_loc().end_offset(),
+            node.closing_loc().start_offset(),
+        );
+        let opening = Self::source_lossy_at(&node.opening_loc());
+        let closing = Self::source_lossy_at(&node.closing_loc());
+        let mut block = fmt::Block::new(was_flat, opening, closing);
+        block.set_opening_trailing(body_opening_trailing);
+        block.set_body(body);
+
+        fmt::Lambda::new(params, block)
     }
 
     fn parse_call_like(

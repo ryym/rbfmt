@@ -148,6 +148,7 @@ pub(crate) enum Kind {
     Postmodifier(Postmodifier),
     MethodChain(MethodChain),
     InfixChain(InfixChain),
+    Lambda(Lambda),
     CallLike(CallLike),
     Assign(Assign),
     MultiAssignTarget(MultiAssignTarget),
@@ -177,6 +178,7 @@ impl Kind {
             Self::Postmodifier(pmod) => pmod.shape,
             Self::MethodChain(chain) => chain.shape,
             Self::InfixChain(chain) => chain.shape,
+            Self::Lambda(lambda) => lambda.shape,
             Self::CallLike(call) => call.shape,
             Self::Assign(assign) => assign.shape,
             Self::MultiAssignTarget(multi) => multi.shape,
@@ -214,6 +216,7 @@ impl Kind {
             Self::Postmodifier(_) => true,
             Self::MethodChain(_) => true,
             Self::InfixChain(_) => true,
+            Self::Lambda(_) => true,
             Self::CallLike(_) => true,
             Self::Assign(_) => true,
             Self::MultiAssignTarget(_) => true,
@@ -756,6 +759,29 @@ impl InfixRight {
             shape,
             operator,
             value: Box::new(value),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Lambda {
+    shape: Shape,
+    parameters: Option<BlockParameters>,
+    block: Block,
+}
+
+impl Lambda {
+    pub(crate) fn new(params: Option<BlockParameters>, block: Block) -> Self {
+        let mut shape = Shape::inline("->".len());
+        if let Some(params) = &params {
+            shape.append(&params.shape);
+        }
+        shape.append(&Shape::inline(1));
+        shape.append(&block.shape);
+        Self {
+            shape,
+            parameters: params,
+            block,
         }
     }
 }
@@ -1382,6 +1408,7 @@ impl Formatter {
             Kind::For(expr) => self.format_for(expr, ctx),
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
+            Kind::Lambda(lambda) => self.format_lambda(lambda, ctx),
             Kind::CallLike(call) => self.format_call_like(call, ctx),
             Kind::InfixChain(chain) => self.format_infix_chain(chain, ctx),
             Kind::Assign(assign) => self.format_assign(assign, ctx),
@@ -1772,7 +1799,7 @@ impl Formatter {
                     self.format_arguments(args, ctx);
                 }
                 if let Some(block) = &call.block {
-                    self.format_method_block(block, ctx);
+                    self.format_block(block, ctx);
                 }
             }
         } else {
@@ -1795,7 +1822,7 @@ impl Formatter {
                     self.format_arguments(args, ctx);
                 }
                 if let Some(block) = &call.block {
-                    self.format_method_block(block, ctx);
+                    self.format_block(block, ctx);
                 }
                 self.write_trailing_comment(&call.trailing_trivia);
             }
@@ -1890,7 +1917,7 @@ impl Formatter {
         }
     }
 
-    fn format_method_block(&mut self, block: &Block, ctx: &FormatContext) {
+    fn format_block(&mut self, block: &Block, ctx: &FormatContext) {
         if block.shape.fits_in_one_line(self.remaining_width) {
             self.push(' ');
             self.push_str(&block.opening);
@@ -1930,6 +1957,14 @@ impl Formatter {
             self.put_indent();
             self.push_str(&block.closing);
         }
+    }
+
+    fn format_lambda(&mut self, lambda: &Lambda, ctx: &FormatContext) {
+        self.push_str("->");
+        if let Some(params) = &lambda.parameters {
+            self.format_block_parameters(params, ctx);
+        }
+        self.format_block(&lambda.block, ctx);
     }
 
     fn format_infix_chain(&mut self, chain: &InfixChain, ctx: &FormatContext) {
