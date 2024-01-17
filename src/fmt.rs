@@ -1075,20 +1075,39 @@ impl DefBody {
 
 #[derive(Debug)]
 pub(crate) struct BlockBody {
-    pub statements: Statements,
-    pub rescues: Vec<Rescue>,
-    pub rescue_else: Option<Else>,
-    pub ensure: Option<Else>,
+    shape: Shape,
+    statements: Statements,
+    rescues: Vec<Rescue>,
+    rescue_else: Option<Else>,
+    ensure: Option<Else>,
 }
 
 impl BlockBody {
     pub(crate) fn new(statements: Statements) -> Self {
         Self {
+            shape: statements.shape(),
             statements,
             rescues: vec![],
             rescue_else: None,
             ensure: None,
         }
+    }
+
+    pub(crate) fn set_rescues(&mut self, rescues: Vec<Rescue>) {
+        if !rescues.is_empty() {
+            self.shape = Shape::Multilines;
+        }
+        self.rescues = rescues;
+    }
+
+    pub(crate) fn set_rescue_else(&mut self, rescue_else: Else) {
+        self.shape = Shape::Multilines;
+        self.rescue_else = Some(rescue_else);
+    }
+
+    pub(crate) fn set_ensure(&mut self, ensure: Else) {
+        self.shape = Shape::Multilines;
+        self.ensure = Some(ensure);
     }
 }
 

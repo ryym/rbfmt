@@ -2572,7 +2572,7 @@ impl FmtNodeBuilder<'_> {
                 .unwrap_or(end_loc.start_offset());
             let mut rescues = vec![];
             self.visit_rescue_chain(rescue_node, &mut rescues, rescues_next);
-            body.rescues = rescues;
+            body.set_rescues(rescues);
         }
 
         if let Some(else_node) = node.else_clause() {
@@ -2585,7 +2585,7 @@ impl FmtNodeBuilder<'_> {
             let else_trailing = self.take_trailing_comment(keyword_next);
             let else_next = ensure_start.unwrap_or(end_loc.start_offset());
             let else_statements = self.visit_statements(statements, else_next);
-            body.rescue_else = Some(fmt::Else {
+            body.set_rescue_else(fmt::Else {
                 keyword_trailing: else_trailing,
                 body: else_statements,
             });
@@ -2599,7 +2599,7 @@ impl FmtNodeBuilder<'_> {
                 .unwrap_or(end_loc.start_offset());
             let ensure_trailing = self.take_trailing_comment(keyword_next);
             let ensure_statements = self.visit_statements(statements, end_loc.start_offset());
-            body.ensure = Some(fmt::Else {
+            body.set_ensure(fmt::Else {
                 keyword_trailing: ensure_trailing,
                 body: ensure_statements,
             });
