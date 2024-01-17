@@ -25,7 +25,18 @@ def foo(&)
 end
 
 foo {}
+foo do end
+
+foo {
+}
 foo do
+end
+
+foo {
+  1
+}
+foo do
+  1
 end
 
 foo do

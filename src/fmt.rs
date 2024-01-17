@@ -655,20 +655,24 @@ impl MethodCall {
 #[derive(Debug)]
 pub(crate) struct Block {
     shape: Shape,
+    opening: String,
+    closing: String,
     opening_trailing: TrailingTrivia,
     parameters: Option<BlockParameters>,
     body: BlockBody,
 }
 
 impl Block {
-    pub(crate) fn new(was_flat: bool) -> Self {
+    pub(crate) fn new(was_flat: bool, opening: String, closing: String) -> Self {
         let shape = if was_flat {
-            Shape::inline("{}".len())
+            Shape::inline(opening.len() + closing.len())
         } else {
             Shape::Multilines
         };
         Self {
             shape,
+            opening,
+            closing,
             opening_trailing: TrailingTrivia::none(),
             parameters: None,
             body: BlockBody::new(Statements::new()),
@@ -1888,7 +1892,8 @@ impl Formatter {
 
     fn format_method_block(&mut self, block: &Block, ctx: &FormatContext) {
         if block.shape.fits_in_one_line(self.remaining_width) {
-            self.push_str(" {");
+            self.push(' ');
+            self.push_str(&block.opening);
             if let Some(params) = &block.parameters {
                 self.push(' ');
                 self.format_block_parameters(params, ctx);
@@ -1898,9 +1903,13 @@ impl Formatter {
                 self.format_block_body(&block.body, ctx, false);
                 self.push(' ');
             }
-            self.push_str("}");
+            if &block.closing == "end" {
+                self.push(' ');
+            }
+            self.push_str(&block.closing);
         } else {
-            self.push_str(" do");
+            self.push(' ');
+            self.push_str(&block.opening);
             self.write_trailing_comment(&block.opening_trailing);
             if let Some(params) = &block.parameters {
                 if block.opening_trailing.is_none() {
@@ -1919,7 +1928,7 @@ impl Formatter {
             }
             self.break_line(ctx);
             self.put_indent();
-            self.push_str("end");
+            self.push_str(&block.closing);
         }
     }
 
