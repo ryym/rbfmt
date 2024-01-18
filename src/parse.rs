@@ -2173,38 +2173,43 @@ impl FmtNodeBuilder<'_> {
         node: prism::BlockParametersNode,
         next_loc_start: usize,
     ) -> fmt::BlockParameters {
-        // XXX: I cannot find the case where the block parameters bars don't exist.
-        let (opening_loc, closing_loc) = match (node.opening_loc(), node.closing_loc()) {
-            (Some(op), Some(cl)) => (op, cl),
-            _ => panic!("block parameters must have opening and closing"),
-        };
-        let opening = Self::source_lossy_at(&opening_loc);
-        let closing = Self::source_lossy_at(&closing_loc);
+        let opening_loc = node.opening_loc();
+        let closing_loc = node.closing_loc();
+
+        // In lambda literal, parentheses can be omitted (e.g. "-> a, b {}").
+        let opening = opening_loc
+            .as_ref()
+            .map(Self::source_lossy_at)
+            .unwrap_or_else(|| "(".to_string());
+        let closing = closing_loc
+            .as_ref()
+            .map(Self::source_lossy_at)
+            .unwrap_or_else(|| ")".to_string());
         let mut block_params = fmt::BlockParameters::new(opening, closing);
 
+        let closing_start = closing_loc.map(|l| l.start_offset());
+
         let locals = node.locals();
-        let params_next = locals
-            .iter()
-            .next()
-            .map(|n| n.location().start_offset())
-            .unwrap_or(closing_loc.start_offset());
 
         if let Some(params) = node.parameters() {
+            let params_next = locals
+                .iter()
+                .next()
+                .map(|n| n.location().start_offset())
+                .or(closing_start);
             self.visit_parameter_nodes(params, params_next, |node| {
                 block_params.append_param(node);
             });
         }
-        Self::each_node_with_next_start(
-            locals.iter(),
-            closing_loc.start_offset(),
-            |node, next_start| {
+
+        if let Some(closing_start) = closing_start {
+            Self::each_node_with_next_start(locals.iter(), closing_start, |node, next_start| {
                 let fmt_node = self.visit(node, next_start);
                 block_params.append_local(fmt_node);
-            },
-        );
-
-        let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_loc.start_offset()));
-        block_params.set_virtual_end(virtual_end);
+            });
+            let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
+            block_params.set_virtual_end(virtual_end);
+        }
 
         let trailing = self.take_trailing_comment(next_loc_start);
         block_params.set_closing_trailing(trailing);
@@ -2509,11 +2514,11 @@ impl FmtNodeBuilder<'_> {
             let lparen = lparen_loc.as_ref().map(Self::source_lossy_at);
             let rparen = rparen_loc.as_ref().map(Self::source_lossy_at);
             let mut parameters = fmt::MethodParameters::new(lparen, rparen);
-            let params_next = rparen_loc.as_ref().map(|l| l.start_offset()).unwrap_or(0);
+            let params_next = rparen_loc.as_ref().map(|l| l.start_offset());
             self.visit_parameter_nodes(params, params_next, |node| {
                 parameters.append_param(node);
             });
-            let virtual_end = self.take_end_trivia_as_virtual_end(Some(params_next));
+            let virtual_end = self.take_end_trivia_as_virtual_end(params_next);
             parameters.set_virtual_end(virtual_end);
             def.set_parameters(parameters);
         } else if let (Some(lparen_loc), Some(rparen_loc)) = (&lparen_loc, &rparen_loc) {
@@ -2692,7 +2697,7 @@ impl FmtNodeBuilder<'_> {
     fn visit_parameter_nodes(
         &mut self,
         params: prism::ParametersNode,
-        next_loc_start: usize,
+        next_loc_start: Option<usize>,
         mut f: impl FnMut(fmt::Node),
     ) {
         let mut nodes = vec![];
@@ -2717,7 +2722,11 @@ impl FmtNodeBuilder<'_> {
         if let Some(block) = params.block() {
             nodes.push(block.as_node());
         }
-        Self::each_node_with_next_start(nodes.into_iter(), next_loc_start, |node, next_start| {
+        let final_next = next_loc_start.unwrap_or(0);
+        Self::each_node_with_next_start(nodes.into_iter(), final_next, |node, mut next_start| {
+            if next_start == 0 {
+                next_start = node.location().end_offset();
+            }
             let fmt_node = self.visit(node, next_start);
             f(fmt_node);
         });
