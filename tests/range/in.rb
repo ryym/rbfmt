@@ -33,3 +33,17 @@ foo.bar..[
     # 8
   ) # 9
 # 10
+
+## flip-flop
+
+if a==1..a==3
+  true
+end
+
+if foo
+  # bar
+  .bar..a
+  # b
+  .b
+  c
+end

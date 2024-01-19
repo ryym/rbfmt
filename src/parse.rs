@@ -1446,6 +1446,21 @@ impl FmtNodeBuilder<'_> {
                 let range = fmt::RangeLike::new(left, operator, right);
                 fmt::Node::new(leading, fmt::Kind::RangeLike(range), trailing)
             }
+            prism::Node::FlipFlopNode { .. } => {
+                let node = node.as_flip_flop_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let op_loc = node.operator_loc();
+                let left = node.left().map(|n| self.visit(n, op_loc.start_offset()));
+                let operator = Self::source_lossy_at(&op_loc);
+                let right = node.right().map(|n| {
+                    let loc = n.location();
+                    let n_end = loc.end_offset();
+                    self.visit(n, n_end)
+                });
+                let trailing = self.take_trailing_comment(next_loc_start);
+                let flipflop = fmt::RangeLike::new(left, operator, right);
+                fmt::Node::new(leading, fmt::Kind::RangeLike(flipflop), trailing)
+            }
 
             _ => todo!("parse {:?}", node),
         };
