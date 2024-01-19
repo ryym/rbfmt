@@ -1431,6 +1431,22 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::SingletonClass(class), trailing)
             }
 
+            prism::Node::RangeNode { .. } => {
+                let node = node.as_range_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let op_loc = node.operator_loc();
+                let left = node.left().map(|n| self.visit(n, op_loc.start_offset()));
+                let operator = Self::source_lossy_at(&op_loc);
+                let right = node.right().map(|n| {
+                    let loc = n.location();
+                    let n_end = loc.end_offset();
+                    self.visit(n, n_end)
+                });
+                let trailing = self.take_trailing_comment(next_loc_start);
+                let range = fmt::RangeLike::new(left, operator, right);
+                fmt::Node::new(leading, fmt::Kind::RangeLike(range), trailing)
+            }
+
             _ => todo!("parse {:?}", node),
         };
 

@@ -161,6 +161,7 @@ pub(crate) enum Kind {
     Def(Def),
     ClassLike(ClassLike),
     SingletonClass(SingletonClass),
+    RangeLike(RangeLike),
 }
 
 impl Kind {
@@ -191,6 +192,7 @@ impl Kind {
             Self::Def(def) => def.shape,
             Self::ClassLike(_) => ClassLike::shape(),
             Self::SingletonClass(_) => SingletonClass::shape(),
+            Self::RangeLike(range) => range.shape,
         }
     }
 
@@ -229,6 +231,7 @@ impl Kind {
             Self::Def(_) => false,
             Self::ClassLike(_) => false,
             Self::SingletonClass(_) => false,
+            Self::RangeLike(_) => true,
         }
     }
 }
@@ -1294,6 +1297,33 @@ impl SingletonClass {
 }
 
 #[derive(Debug)]
+pub(crate) struct RangeLike {
+    shape: Shape,
+    left: Option<Box<Node>>,
+    operator: String,
+    right: Option<Box<Node>>,
+}
+
+impl RangeLike {
+    pub(crate) fn new(left: Option<Node>, operator: String, right: Option<Node>) -> Self {
+        let mut shape = Shape::inline(0);
+        if let Some(left) = &left {
+            shape.append(&left.shape);
+        }
+        shape.append(&Shape::inline(operator.len()));
+        if let Some(right) = &right {
+            shape.append(&right.shape);
+        }
+        Self {
+            shape,
+            left: left.map(Box::new),
+            operator,
+            right: right.map(Box::new),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct LeadingTrivia {
     lines: Vec<LineTrivia>,
     shape: Shape,
@@ -1422,6 +1452,7 @@ impl Formatter {
             Kind::Def(def) => self.format_def(def, ctx),
             Kind::ClassLike(class) => self.format_class_like(class, ctx),
             Kind::SingletonClass(class) => self.format_singleton_class(class, ctx),
+            Kind::RangeLike(range) => self.format_range_like(range, ctx),
         }
     }
 
@@ -2637,6 +2668,39 @@ impl Formatter {
         self.break_line(ctx);
         self.put_indent();
         self.push_str("end");
+    }
+
+    fn format_range_like(&mut self, range: &RangeLike, ctx: &FormatContext) {
+        if let Some(left) = &range.left {
+            self.format(left, ctx);
+        }
+        self.push_str(&range.operator);
+        if let Some(right) = &range.right {
+            if right.is_diagonal() {
+                let need_space = match &right.kind {
+                    Kind::RangeLike(range) => range.left.is_none(),
+                    _ => false,
+                };
+                if need_space {
+                    self.push(' ');
+                }
+                self.format(right, ctx);
+            } else {
+                self.indent();
+                self.break_line(ctx);
+                self.write_leading_trivia(
+                    &right.leading_trivia,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: true,
+                        end: true,
+                    },
+                );
+                self.put_indent();
+                self.format(right, ctx);
+                self.dedent();
+            }
+        }
     }
 
     fn write_leading_trivia(
