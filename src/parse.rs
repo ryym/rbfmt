@@ -1462,6 +1462,31 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::RangeLike(flipflop), trailing)
             }
 
+            prism::Node::PreExecutionNode { .. } => {
+                let node = node.as_pre_execution_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let exec = self.visit_pre_post_exec(
+                    node.keyword_loc(),
+                    node.opening_loc(),
+                    node.statements(),
+                    node.closing_loc(),
+                );
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::PrePostExec(exec), trailing)
+            }
+            prism::Node::PostExecutionNode { .. } => {
+                let node = node.as_post_execution_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let exec = self.visit_pre_post_exec(
+                    node.keyword_loc(),
+                    node.opening_loc(),
+                    node.statements(),
+                    node.closing_loc(),
+                );
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::PrePostExec(exec), trailing)
+            }
+
             _ => todo!("parse {:?}", node),
         };
 
@@ -2797,6 +2822,20 @@ impl FmtNodeBuilder<'_> {
             body,
         };
         (leading, class, trailing)
+    }
+
+    fn visit_pre_post_exec(
+        &mut self,
+        keyword_loc: prism::Location,
+        opening_loc: prism::Location,
+        statements: Option<prism::StatementsNode>,
+        closing_loc: prism::Location,
+    ) -> fmt::PrePostExec {
+        let keyword = Self::source_lossy_at(&keyword_loc);
+        let closing_start = closing_loc.start_offset();
+        let was_flat = !self.does_line_break_exist_in(opening_loc.end_offset(), closing_start);
+        let statements = self.visit_statements(statements, closing_start);
+        fmt::PrePostExec::new(keyword, statements, was_flat)
     }
 
     fn wrap_as_statements(&mut self, node: Option<fmt::Node>, end: usize) -> fmt::Statements {

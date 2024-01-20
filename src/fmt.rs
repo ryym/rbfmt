@@ -162,6 +162,7 @@ pub(crate) enum Kind {
     ClassLike(ClassLike),
     SingletonClass(SingletonClass),
     RangeLike(RangeLike),
+    PrePostExec(PrePostExec),
 }
 
 impl Kind {
@@ -193,6 +194,7 @@ impl Kind {
             Self::ClassLike(_) => ClassLike::shape(),
             Self::SingletonClass(_) => SingletonClass::shape(),
             Self::RangeLike(range) => range.shape,
+            Self::PrePostExec(exec) => exec.shape,
         }
     }
 
@@ -232,6 +234,7 @@ impl Kind {
             Self::ClassLike(_) => false,
             Self::SingletonClass(_) => false,
             Self::RangeLike(_) => true,
+            Self::PrePostExec(_) => true,
         }
     }
 }
@@ -1324,6 +1327,28 @@ impl RangeLike {
 }
 
 #[derive(Debug)]
+pub(crate) struct PrePostExec {
+    shape: Shape,
+    keyword: String,
+    statements: Statements,
+}
+
+impl PrePostExec {
+    pub(crate) fn new(keyword: String, statements: Statements, was_flat: bool) -> Self {
+        let shape = if was_flat {
+            Shape::inline(keyword.len()).add(&statements.shape())
+        } else {
+            Shape::Multilines
+        };
+        Self {
+            shape,
+            keyword,
+            statements,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct LeadingTrivia {
     lines: Vec<LineTrivia>,
     shape: Shape,
@@ -1453,6 +1478,7 @@ impl Formatter {
             Kind::ClassLike(class) => self.format_class_like(class, ctx),
             Kind::SingletonClass(class) => self.format_singleton_class(class, ctx),
             Kind::RangeLike(range) => self.format_range_like(range, ctx),
+            Kind::PrePostExec(exec) => self.format_pre_post_exec(exec, ctx),
         }
     }
 
@@ -2700,6 +2726,31 @@ impl Formatter {
                 self.format(right, ctx);
                 self.dedent();
             }
+        }
+    }
+
+    fn format_pre_post_exec(&mut self, exec: &PrePostExec, ctx: &FormatContext) {
+        if exec.shape.fits_in_one_line(self.remaining_width) {
+            self.push_str(&exec.keyword);
+            self.push_str(" {");
+            if !exec.statements.shape.is_empty() {
+                self.push(' ');
+                self.format_statements(&exec.statements, ctx, false);
+                self.push(' ');
+            }
+            self.push('}');
+        } else {
+            self.push_str(&exec.keyword);
+            self.push_str(" {");
+            if !exec.statements.shape.is_empty() {
+                self.indent();
+                self.break_line(ctx);
+                self.format_statements(&exec.statements, ctx, true);
+                self.dedent();
+            }
+            self.break_line(ctx);
+            self.put_indent();
+            self.push('}');
         }
     }
 
