@@ -163,6 +163,7 @@ pub(crate) enum Kind {
     SingletonClass(SingletonClass),
     RangeLike(RangeLike),
     PrePostExec(PrePostExec),
+    Alias(Alias),
 }
 
 impl Kind {
@@ -195,6 +196,7 @@ impl Kind {
             Self::SingletonClass(_) => SingletonClass::shape(),
             Self::RangeLike(range) => range.shape,
             Self::PrePostExec(exec) => exec.shape,
+            Self::Alias(alias) => alias.shape,
         }
     }
 
@@ -235,6 +237,7 @@ impl Kind {
             Self::SingletonClass(_) => false,
             Self::RangeLike(_) => true,
             Self::PrePostExec(_) => true,
+            Self::Alias(_) => true,
         }
     }
 }
@@ -1349,6 +1352,24 @@ impl PrePostExec {
 }
 
 #[derive(Debug)]
+pub(crate) struct Alias {
+    shape: Shape,
+    new_name: Box<Node>,
+    old_name: Box<Node>,
+}
+
+impl Alias {
+    pub(crate) fn new(new_name: Node, old_name: Node) -> Self {
+        let shape = new_name.shape.add(&old_name.shape);
+        Self {
+            shape,
+            new_name: Box::new(new_name),
+            old_name: Box::new(old_name),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct LeadingTrivia {
     lines: Vec<LineTrivia>,
     shape: Shape,
@@ -1479,6 +1500,7 @@ impl Formatter {
             Kind::SingletonClass(class) => self.format_singleton_class(class, ctx),
             Kind::RangeLike(range) => self.format_range_like(range, ctx),
             Kind::PrePostExec(exec) => self.format_pre_post_exec(exec, ctx),
+            Kind::Alias(alias) => self.format_alias(alias, ctx),
         }
     }
 
@@ -2752,6 +2774,13 @@ impl Formatter {
             self.put_indent();
             self.push('}');
         }
+    }
+
+    fn format_alias(&mut self, alias: &Alias, ctx: &FormatContext) {
+        self.push_str("alias ");
+        self.format(&alias.new_name, ctx);
+        self.push(' ');
+        self.format(&alias.old_name, ctx);
     }
 
     fn write_leading_trivia(

@@ -1487,6 +1487,19 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::PrePostExec(exec), trailing)
             }
 
+            prism::Node::AliasMethodNode { .. } => {
+                let node = node.as_alias_method_node().unwrap();
+                let (leading, alias, trailing) =
+                    self.visit_alias(node.new_name(), node.old_name(), next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Alias(alias), trailing)
+            }
+            prism::Node::AliasGlobalVariableNode { .. } => {
+                let node = node.as_alias_global_variable_node().unwrap();
+                let (leading, alias, trailing) =
+                    self.visit_alias(node.new_name(), node.old_name(), next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Alias(alias), trailing)
+            }
+
             _ => todo!("parse {:?}", node),
         };
 
@@ -2836,6 +2849,21 @@ impl FmtNodeBuilder<'_> {
         let was_flat = !self.does_line_break_exist_in(opening_loc.end_offset(), closing_start);
         let statements = self.visit_statements(statements, closing_start);
         fmt::PrePostExec::new(keyword, statements, was_flat)
+    }
+
+    fn visit_alias(
+        &mut self,
+        new_name: prism::Node,
+        old_name: prism::Node,
+        next_loc_start: usize,
+    ) -> (fmt::LeadingTrivia, fmt::Alias, fmt::TrailingTrivia) {
+        let leading = self.take_leading_trivia(new_name.location().start_offset());
+        let old_loc = old_name.location();
+        let new_name = self.visit(new_name, old_loc.start_offset());
+        let old_name = self.visit(old_name, old_loc.end_offset());
+        let alias = fmt::Alias::new(new_name, old_name);
+        let trailing = self.take_trailing_comment(next_loc_start);
+        (leading, alias, trailing)
     }
 
     fn wrap_as_statements(&mut self, node: Option<fmt::Node>, end: usize) -> fmt::Statements {

@@ -47,3 +47,29 @@ END {
   foo.bar(1, 2, 3) # 4
   baz # baz
 }
+
+alias a b
+
+# 0
+alias # 1
+  # 2
+  a b # 3
+# 4
+
+alias aa :"bb#{
+  1 + 2 # 3
+}"
+
+alias :"a#{
+  # a
+}" :"b#{
+  # b
+}"
+
+alias :"a
+b" :'a
+b'
+
+alias $new $old
+alias # a
+  $new $old
