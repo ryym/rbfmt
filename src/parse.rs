@@ -647,8 +647,8 @@ impl FmtNodeBuilder<'_> {
                         },
                         next_loc_start,
                     )
-                } else if node.then_keyword_loc().map(|l| l.as_slice()) == Some(b":") {
-                    todo!("ternery if: {:?}", node);
+                } else if node.then_keyword_loc().map(|l| l.as_slice()) == Some(b"?") {
+                    todo!("ternary if: {:?}", node);
                 } else {
                     self.visit_postmodifier(
                         Postmodifier {
@@ -676,8 +676,6 @@ impl FmtNodeBuilder<'_> {
                         },
                         next_loc_start,
                     )
-                } else if node.then_keyword_loc().map(|l| l.as_slice()) == Some(b":") {
-                    todo!("ternery if: {:?}", node);
                 } else {
                     self.visit_postmodifier(
                         Postmodifier {
