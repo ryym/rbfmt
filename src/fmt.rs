@@ -1617,7 +1617,7 @@ impl Formatter {
         } else {
             self.break_line(ctx);
             self.indent();
-            self.format_statements(&embedded.statements, ctx, false);
+            self.format_statements(&embedded.statements, ctx, true);
             self.break_line(ctx);
             self.dedent();
             self.put_indent();
