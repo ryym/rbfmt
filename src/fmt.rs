@@ -2927,7 +2927,7 @@ impl Formatter {
         }
         self.push_str(&range.operator);
         if let Some(right) = &range.right {
-            if right.is_diagonal() {
+            if right.shape.fits_in_one_line(self.remaining_width) || right.is_diagonal() {
                 let need_space = match &right.kind {
                     Kind::RangeLike(range) => range.left.is_none(),
                     _ => false,
