@@ -143,6 +143,7 @@ pub(crate) enum Kind {
     Statements(Statements),
     Parens(Parens),
     If(If),
+    Case(Case),
     While(While),
     For(For),
     Postmodifier(Postmodifier),
@@ -176,6 +177,7 @@ impl Kind {
             Self::Statements(statements) => statements.shape,
             Self::Parens(parens) => parens.shape,
             Self::If(_) => If::shape(),
+            Self::Case(_) => Case::shape(),
             Self::While(_) => While::shape(),
             Self::For(_) => For::shape(),
             Self::Postmodifier(pmod) => pmod.shape,
@@ -217,6 +219,7 @@ impl Kind {
             Self::HeredocOpening(_) => false,
             Self::Parens(_) => true,
             Self::If(_) => false,
+            Self::Case(_) => false,
             Self::While(_) => false,
             Self::For(_) => false,
             Self::Postmodifier(_) => true,
@@ -497,6 +500,56 @@ impl If {
 
     pub(crate) fn shape() -> Shape {
         Shape::Multilines
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Case {
+    pub predicate: Option<Box<Node>>,
+    pub case_trailing: TrailingTrivia,
+    pub first_branch_leading: LeadingTrivia,
+    pub branches: Vec<CaseWhen>,
+    pub otherwise: Option<Else>,
+}
+
+impl Case {
+    pub(crate) fn shape() -> Shape {
+        Shape::Multilines
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct CaseWhen {
+    shape: Shape,
+    conditions: Vec<Node>,
+    conditions_shape: Shape,
+    body: Statements,
+}
+
+impl CaseWhen {
+    pub(crate) fn new(was_flat: bool) -> Self {
+        let shape = if was_flat {
+            Shape::inline(0)
+        } else {
+            Shape::Multilines
+        };
+        Self {
+            shape,
+            conditions: vec![],
+            conditions_shape: Shape::inline(0),
+            body: Statements::new(),
+        }
+    }
+
+    pub(crate) fn append_condition(&mut self, cond: Node) {
+        self.shape.append(&cond.shape);
+        self.conditions_shape.append(&cond.shape);
+        self.conditions.push(cond);
+    }
+
+    pub(crate) fn set_body(&mut self, body: Statements) {
+        self.shape.append(&body.shape);
+        self.body = body;
     }
 }
 
@@ -1480,6 +1533,7 @@ impl Formatter {
             Kind::Statements(statements) => self.format_statements(statements, ctx, false),
             Kind::Parens(parens) => self.format_parens(parens, ctx),
             Kind::If(ifexpr) => self.format_if(ifexpr, ctx),
+            Kind::Case(case) => self.format_case(case, ctx),
             Kind::While(whle) => self.format_while(whle, ctx),
             Kind::For(expr) => self.format_for(expr, ctx),
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
@@ -1732,6 +1786,155 @@ impl Formatter {
         self.dedent();
         self.put_indent();
         self.push_str("end");
+    }
+
+    fn format_case(&mut self, case: &Case, ctx: &FormatContext) {
+        self.push_str("case");
+        match &case.predicate {
+            Some(pred) => {
+                if pred.shape.fits_in_one_line(self.remaining_width) || pred.is_diagonal() {
+                    self.push(' ');
+                    self.format(pred, ctx);
+                    self.write_trailing_comment(&pred.trailing_trivia);
+                } else {
+                    self.indent();
+                    self.break_line(ctx);
+                    self.write_leading_trivia(
+                        &pred.leading_trivia,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: true,
+                            end: true,
+                        },
+                    );
+                    self.put_indent();
+                    self.format(pred, ctx);
+                    self.write_trailing_comment(&pred.trailing_trivia);
+                    self.dedent();
+                }
+            }
+            None => {
+                self.write_trailing_comment(&case.case_trailing);
+            }
+        }
+        if case.first_branch_leading.is_empty() {
+            self.break_line(ctx);
+        } else {
+            self.indent();
+            self.break_line(ctx);
+            self.write_leading_trivia(
+                &case.first_branch_leading,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: true,
+                    end: true,
+                },
+            );
+            self.dedent();
+        }
+        for (i, branch) in case.branches.iter().enumerate() {
+            if i > 0 {
+                self.break_line(ctx);
+            }
+            self.put_indent();
+            self.format_case_when(branch, ctx);
+        }
+        if let Some(otherwise) = &case.otherwise {
+            self.break_line(ctx);
+            self.put_indent();
+            self.push_str("else");
+            self.write_trailing_comment(&otherwise.keyword_trailing);
+            if !otherwise.body.shape.is_empty() {
+                self.indent();
+                self.break_line(ctx);
+                self.format_statements(&otherwise.body, ctx, true);
+                self.dedent();
+            }
+        }
+        self.break_line(ctx);
+        self.put_indent();
+        self.push_str("end");
+    }
+
+    fn format_case_when(&mut self, when: &CaseWhen, ctx: &FormatContext) {
+        self.push_str("when");
+        if when.shape.fits_in_one_line(self.remaining_width) {
+            self.push(' ');
+            for (i, cond) in when.conditions.iter().enumerate() {
+                if i > 0 {
+                    self.push_str(", ");
+                }
+                self.format(cond, ctx);
+                self.write_trailing_comment(&cond.trailing_trivia);
+            }
+            if !when.body.shape.is_empty() {
+                self.push_str(" then ");
+                self.format_statements(&when.body, ctx, false);
+            }
+        } else {
+            if when.conditions_shape.fits_in_one_line(self.remaining_width) {
+                for (i, cond) in when.conditions.iter().enumerate() {
+                    if i == 0 {
+                        self.push(' ');
+                    } else {
+                        self.push_str(", ");
+                    }
+                    self.format(cond, ctx);
+                    self.write_trailing_comment(&cond.trailing_trivia);
+                }
+            } else {
+                if when.conditions[0].is_diagonal() {
+                    self.push(' ');
+                    self.format(&when.conditions[0], ctx);
+                } else {
+                    self.indent();
+                    self.break_line(ctx);
+                    self.write_leading_trivia(
+                        &when.conditions[0].leading_trivia,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: true,
+                            end: true,
+                        },
+                    );
+                    self.put_indent();
+                    self.format(&when.conditions[0], ctx);
+                    self.dedent();
+                }
+                if when.conditions.len() > 1 {
+                    self.push(',');
+                }
+                self.write_trailing_comment(&when.conditions[0].trailing_trivia);
+                if when.conditions.len() > 1 {
+                    self.indent();
+                    let last_idx = when.conditions.len() - 1;
+                    for (i, cond) in when.conditions.iter().enumerate().skip(1) {
+                        self.break_line(ctx);
+                        self.write_leading_trivia(
+                            &cond.leading_trivia,
+                            ctx,
+                            EmptyLineHandling::Trim {
+                                start: false,
+                                end: false,
+                            },
+                        );
+                        self.put_indent();
+                        self.format(cond, ctx);
+                        if i < last_idx {
+                            self.push(',');
+                        }
+                        self.write_trailing_comment(&cond.trailing_trivia);
+                    }
+                    self.dedent();
+                }
+            }
+            if !when.body.shape.is_empty() {
+                self.indent();
+                self.break_line(ctx);
+                self.format_statements(&when.body, ctx, true);
+                self.dedent();
+            }
+        }
     }
 
     fn format_while(&mut self, expr: &While, ctx: &FormatContext) {

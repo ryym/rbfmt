@@ -692,6 +692,14 @@ impl FmtNodeBuilder<'_> {
                 }
             }
 
+            prism::Node::CaseNode { .. } => {
+                let node = node.as_case_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let case = self.visit_case(node);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Case(case), trailing)
+            }
+
             prism::Node::WhileNode { .. } => {
                 let node = node.as_while_node().unwrap();
                 if let Some(closing_loc) = node.closing_loc() {
@@ -1872,28 +1880,105 @@ impl FmtNodeBuilder<'_> {
             // else
             prism::Node::ElseNode { .. } => {
                 let node = node.as_else_node().unwrap();
-
                 let end_loc = node
                     .end_keyword_loc()
                     .expect("if/unless expression must have end");
-
-                let else_next_loc = node
-                    .statements()
-                    .as_ref()
-                    .map(|s| s.location().start_offset())
-                    .unwrap_or(end_loc.start_offset());
-                let keyword_trailing = self.take_trailing_comment(else_next_loc);
-
-                let body = self.visit_statements(node.statements(), end_loc.start_offset());
-                ifexpr.if_last = Some(fmt::Else {
-                    keyword_trailing,
-                    body,
-                });
+                let if_last = self.visit_else(node, end_loc.start_offset());
+                ifexpr.if_last = Some(if_last);
             }
             _ => {
                 panic!("unexpected node in IfNode: {:?}", node);
             }
         }
+    }
+
+    fn visit_else(&mut self, node: prism::ElseNode, next_loc_start: usize) -> fmt::Else {
+        let else_next_loc = node
+            .statements()
+            .as_ref()
+            .map(|s| s.location().start_offset())
+            .unwrap_or(next_loc_start);
+        let keyword_trailing = self.take_trailing_comment(else_next_loc);
+        let body = self.visit_statements(node.statements(), next_loc_start);
+        fmt::Else {
+            keyword_trailing,
+            body,
+        }
+    }
+
+    fn visit_case(&mut self, node: prism::CaseNode) -> fmt::Case {
+        let conditions = node.conditions();
+        let consequent = node.consequent();
+        let end_loc = node.end_keyword_loc();
+        let first_branch_start = conditions
+            .iter()
+            .next()
+            .map(|n| n.location().start_offset());
+
+        let pred_next = first_branch_start
+            .or(consequent.as_ref().map(|c| c.location().start_offset()))
+            .unwrap_or(end_loc.start_offset());
+        let predicate = node.predicate().map(|n| self.visit(n, pred_next));
+        let case_trailing = if predicate.is_some() {
+            fmt::TrailingTrivia::none()
+        } else {
+            self.take_trailing_comment(pred_next)
+        };
+
+        let first_branch_leading = match first_branch_start {
+            Some(first_branch_start) => self.take_leading_trivia(first_branch_start),
+            None => fmt::LeadingTrivia::new(),
+        };
+
+        let mut branches = vec![];
+        let conditions_next = consequent
+            .as_ref()
+            .map(|c| c.location().start_offset())
+            .unwrap_or(end_loc.start_offset());
+        Self::each_node_with_next_start(conditions.iter(), conditions_next, |node, next_start| {
+            let condition = match node {
+                prism::Node::WhenNode { .. } => {
+                    let node = node.as_when_node().unwrap();
+                    self.visit_case_when(node, next_start)
+                }
+                _ => panic!("unexpected case expression branch: {:?}", node),
+            };
+            branches.push(condition);
+        });
+
+        let otherwise = consequent.map(|node| self.visit_else(node, end_loc.start_offset()));
+
+        fmt::Case {
+            case_trailing,
+            predicate: predicate.map(Box::new),
+            first_branch_leading,
+            branches,
+            otherwise,
+        }
+    }
+
+    fn visit_case_when(&mut self, node: prism::WhenNode, next_loc_start: usize) -> fmt::CaseWhen {
+        let loc = node.location();
+        let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
+        let mut when = fmt::CaseWhen::new(was_flat);
+
+        let conditions_next = node
+            .statements()
+            .as_ref()
+            .map(|n| n.location().start_offset())
+            .unwrap_or(next_loc_start);
+        Self::each_node_with_next_start(
+            node.conditions().iter(),
+            conditions_next,
+            |node, next_start| {
+                let cond = self.visit(node, next_start);
+                when.append_condition(cond);
+            },
+        );
+
+        let body = self.visit_statements(node.statements(), next_loc_start);
+        when.set_body(body);
+        when
     }
 
     fn visit_while_or_until(
