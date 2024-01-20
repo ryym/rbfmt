@@ -29,3 +29,19 @@ b # comment
 spaces|ignored
   #{2}
 /x
+
+## match last lines
+
+if /abc/
+  true
+end
+
+if /ab#{1}c/i
+  true
+end
+
+if /ab
+  cd # e
+  /x
+  true
+end
