@@ -582,6 +582,32 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, kind, trailing)
             }
 
+            prism::Node::RegularExpressionNode { .. } => {
+                let node = node.as_regular_expression_node().unwrap();
+                let loc = node.location();
+                let leading = self.take_leading_trivia(loc.start_offset());
+                let str = self.visit_string_like(
+                    Some(node.opening_loc()),
+                    node.content_loc(),
+                    Some(node.closing_loc()),
+                );
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::StringLike(str), trailing)
+            }
+            prism::Node::InterpolatedRegularExpressionNode { .. } => {
+                let node = node.as_interpolated_regular_expression_node().unwrap();
+                let loc = node.location();
+                let leading = self.take_leading_trivia(loc.start_offset());
+                let str = self.visit_interpolated(
+                    Some(node.opening_loc()),
+                    node.parts(),
+                    Some(node.closing_loc()),
+                );
+                let kind = fmt::Kind::DynStringLike(str);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, kind, trailing)
+            }
+
             prism::Node::IfNode { .. } => {
                 let node = node.as_if_node().unwrap();
                 if node.end_keyword_loc().is_some() {
