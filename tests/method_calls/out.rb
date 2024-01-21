@@ -173,3 +173,5 @@ end
   a.b # 2
   # 3
 ) # 4
+
+aaaaaaaa || Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.new(cccc, dddddddd)

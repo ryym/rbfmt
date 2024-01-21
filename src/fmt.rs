@@ -803,6 +803,7 @@ pub(crate) struct MethodChain {
     shape: Shape,
     receiver: Option<Box<Node>>,
     calls: Vec<MethodCall>,
+    calls_shape: Shape,
 }
 
 impl MethodChain {
@@ -811,11 +812,13 @@ impl MethodChain {
             shape: receiver.as_ref().map_or(Shape::inline(0), |r| r.shape),
             receiver: receiver.map(Box::new),
             calls: vec![],
+            calls_shape: Shape::inline(0),
         }
     }
 
     pub(crate) fn append_call(&mut self, call: MethodCall) {
         self.shape.append(&call.shape);
+        self.calls_shape.append(&call.shape);
         self.calls.push(call);
     }
 }
@@ -2172,7 +2175,7 @@ impl Formatter {
             self.format(recv, ctx);
             self.write_trailing_comment(&recv.trailing_trivia);
         }
-        if chain.shape.fits_in_inline(self.remaining_width) {
+        if chain.calls_shape.fits_in_inline(self.remaining_width) {
             for call in chain.calls.iter() {
                 if let Some(call_op) = &call.call_op {
                     self.push_str(call_op);
