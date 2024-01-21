@@ -45,8 +45,7 @@ foo(
 foo(
   1, # 1
   2,
-)
-  .bar
+).bar
 
 foo bar, baz # foo
 foo a, # 1
@@ -110,12 +109,11 @@ foo(
 
 foo.bar(1, 2)[1] = 2
 
-foo
-  .bar(
-    # 1
-    1,
-    2,
-  )[1] = 2
+foo.bar(
+  # 1
+  1,
+  2,
+)[1] = 2
 
 [1].map { |n| n.abs }[0] = 1
 

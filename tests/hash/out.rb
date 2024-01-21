@@ -21,12 +21,18 @@
   a:
     # a
     4, # 2
-  5 => foo
-    .bar(
-      1,
-      2,
-      3, # 3
-    ),
+  5 => foo.bar(
+    1,
+    2,
+    3, # 3
+  ),
+  6 => foo
+    .bar do
+      :bar
+    end
+    .baz do
+      :baz
+    end,
   b:
     if true
       1

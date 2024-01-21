@@ -64,6 +64,27 @@ a&.foo(1, "abc") do
   true
 end
 
+foo.bar(1).baz(2, 3) do
+  nil
+end
+
+foo(1) do
+  nil
+end.bar(2).baz(3, 4)
+
+foo(1)
+  .bar do
+    2
+  end
+  .baz(3) do
+    4
+  end
+
+foo
+  .flat_map(&:get_some_value_of_foo)
+  .filter(&:really_foo?)
+  .sum { |value| quantify_something_from(value) }
+
 foo(
   # 1
   a,

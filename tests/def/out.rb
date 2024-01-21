@@ -75,13 +75,12 @@ end
 
 def optionals(
   a = 1, # a
-  b = foo
-    .bar(
-      1,
-      2,
-      # 3
-      3,
-    ),
+  b = foo.bar(
+    1,
+    2,
+    # 3
+    3,
+  ),
   # c
   c = d = e,
   f = [1, 2, 3]
@@ -317,11 +316,10 @@ def foo(b) = [
   3,
 ]
 
-def foo(c) = foo
-  .bar(
-    # a
-    a,
-  )
+def foo(c) = foo.bar(
+  # a
+  a,
+)
 
 def (a).foo = 1 # 1
 
