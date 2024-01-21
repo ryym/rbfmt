@@ -23,21 +23,25 @@ elsif true
 else
 end
 
-if 0 # 0
-  # 0.9
-  1.0
-  # 1.1
-elsif 3
-  # 1.9
-  2.0
-  # 2.1
-elsif 3
-  # 2.9
-  3.0
-  # 3.1
-else # else
-  999
-end
+# 0
+if a # 1
+  # 2
+  b # 3
+  # 4
+elsif b # 5
+  # 6
+  c # 7
+  # 8
+elsif d # 9
+  # 10
+  d # 11
+  # 12
+else # 13
+  # 14
+  e # 15
+  # 16
+end # 17
+# 18
 
 if true
   nil # a

@@ -1850,23 +1850,20 @@ impl FmtNodeBuilder<'_> {
                     .end_keyword_loc()
                     .expect("if/unless expression must have end");
 
-                let elsif_next_loc = node
+                let predicate = node.predicate();
+                let consequent = node.consequent();
+
+                let keyword_next = predicate.location().start_offset();
+                let keyword_trailing = self.take_trailing_comment(keyword_next);
+
+                let predicate_next = node
                     .statements()
-                    .as_ref()
                     .map(|s| s.location().start_offset())
+                    .or_else(|| consequent.as_ref().map(|c| c.location().start_offset()))
                     .unwrap_or(end_loc.start_offset());
-                let keyword_trailing = self.take_trailing_comment(elsif_next_loc);
+                let predicate = self.visit(predicate, predicate_next);
 
-                let conseq = node.consequent();
-                let next_loc_start = node
-                    .statements()
-                    .map(|s| s.location())
-                    .or_else(|| conseq.as_ref().map(|c| c.location()))
-                    .map(|l| l.start_offset())
-                    .unwrap_or(end_loc.start_offset());
-                let predicate = self.visit(node.predicate(), next_loc_start);
-
-                let body_end_loc = conseq
+                let body_end_loc = consequent
                     .as_ref()
                     .map(|n| n.location().start_offset())
                     .unwrap_or(end_loc.start_offset());
@@ -1874,8 +1871,8 @@ impl FmtNodeBuilder<'_> {
 
                 let conditional = fmt::Conditional::new(keyword_trailing, predicate, body);
                 ifexpr.elsifs.push(conditional);
-                if let Some(conseq) = conseq {
-                    self.visit_ifelse(conseq, ifexpr);
+                if let Some(consequent) = consequent {
+                    self.visit_ifelse(consequent, ifexpr);
                 }
             }
             // else
