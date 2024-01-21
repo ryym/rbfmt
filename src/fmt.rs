@@ -4,7 +4,10 @@ use std::{
 };
 
 pub(crate) fn format(node: Node, heredoc_map: HeredocMap) -> String {
-    let config = FormatConfig { line_width: 100 };
+    let config = FormatConfig {
+        line_width: 100,
+        indent_size: 2,
+    };
     let ctx = FormatContext { heredoc_map };
     let mut formatter = Formatter {
         remaining_width: config.line_width,
@@ -1549,6 +1552,7 @@ pub(crate) type HeredocMap = HashMap<Pos, Heredoc>;
 #[derive(Debug)]
 struct FormatConfig {
     line_width: usize,
+    indent_size: usize,
 }
 
 #[derive(Debug)]
@@ -3147,11 +3151,11 @@ impl Formatter {
     }
 
     fn indent(&mut self) {
-        self.indent += 2;
+        self.indent += self.config.indent_size;
     }
 
     fn dedent(&mut self) {
-        self.indent = self.indent.saturating_sub(2);
+        self.indent = self.indent.saturating_sub(self.config.indent_size);
     }
 
     fn break_line(&mut self, ctx: &FormatContext) {
