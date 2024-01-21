@@ -648,7 +648,10 @@ impl FmtNodeBuilder<'_> {
                         next_loc_start,
                     )
                 } else if node.then_keyword_loc().map(|l| l.as_slice()) == Some(b"?") {
-                    todo!("ternary if: {:?}", node);
+                    let leading = self.take_leading_trivia(node.location().start_offset());
+                    let ternary = self.visit_ternary(node);
+                    let trailing = self.take_trailing_comment(next_loc_start);
+                    fmt::Node::new(leading, fmt::Kind::Ternary(ternary), trailing)
                 } else {
                     self.visit_postmodifier(
                         Postmodifier {
@@ -2012,6 +2015,33 @@ impl FmtNodeBuilder<'_> {
             index: Box::new(index),
             collection: Box::new(collection),
             body,
+        }
+    }
+
+    fn visit_ternary(&mut self, node: prism::IfNode) -> fmt::Ternary {
+        let question_loc = node.then_keyword_loc().expect("ternary if must have ?");
+        let predicate = self.visit(node.predicate(), question_loc.start_offset());
+        let then = node
+            .statements()
+            .and_then(|s| s.body().iter().next())
+            .expect("ternary if must have then statement");
+        match node.consequent() {
+            Some(consequent) => match consequent {
+                prism::Node::ElseNode { .. } => {
+                    let consequent = consequent.as_else_node().unwrap();
+                    let otherwise = consequent
+                        .statements()
+                        .and_then(|s| s.body().iter().next())
+                        .expect("ternary if must have else statement");
+                    let pred_trailing = self.take_trailing_comment(then.location().start_offset());
+                    let loc = consequent.location();
+                    let then = self.visit(then, loc.start_offset());
+                    let otherwise = self.visit(otherwise, loc.end_offset());
+                    fmt::Ternary::new(predicate, pred_trailing, then, otherwise)
+                }
+                _ => panic!("ternary if consequent must be ElseNode: {:?}", node),
+            },
+            _ => panic!("ternary if must have consequent"),
         }
     }
 

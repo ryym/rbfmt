@@ -143,6 +143,7 @@ pub(crate) enum Kind {
     Statements(Statements),
     Parens(Parens),
     If(If),
+    Ternary(Ternary),
     Case(Case),
     While(While),
     For(For),
@@ -177,6 +178,7 @@ impl Kind {
             Self::Statements(statements) => statements.shape,
             Self::Parens(parens) => parens.shape,
             Self::If(_) => If::shape(),
+            Self::Ternary(ternary) => ternary.shape,
             Self::Case(_) => Case::shape(),
             Self::While(_) => While::shape(),
             Self::For(_) => For::shape(),
@@ -219,6 +221,7 @@ impl Kind {
             Self::HeredocOpening(_) => false,
             Self::Parens(_) => true,
             Self::If(_) => false,
+            Self::Ternary(_) => true,
             Self::Case(_) => false,
             Self::While(_) => false,
             Self::For(_) => false,
@@ -500,6 +503,39 @@ impl If {
 
     pub(crate) fn shape() -> Shape {
         Shape::Multilines
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Ternary {
+    shape: Shape,
+    predicate: Box<Node>,
+    predicate_trailing: TrailingTrivia,
+    then: Box<Node>,
+    otherwise: Box<Node>,
+}
+
+impl Ternary {
+    pub(crate) fn new(
+        predicate: Node,
+        predicate_trailing: TrailingTrivia,
+        then: Node,
+        otherwise: Node,
+    ) -> Self {
+        let shape = predicate
+            .shape
+            .add(&Shape::inline(" ? ".len()))
+            .add(&predicate_trailing.shape)
+            .add(&then.shape)
+            .add(&Shape::inline(" : ".len()))
+            .add(&otherwise.shape);
+        Self {
+            shape,
+            predicate: Box::new(predicate),
+            predicate_trailing,
+            then: Box::new(then),
+            otherwise: Box::new(otherwise),
+        }
     }
 }
 
@@ -1533,6 +1569,7 @@ impl Formatter {
             Kind::Statements(statements) => self.format_statements(statements, ctx, false),
             Kind::Parens(parens) => self.format_parens(parens, ctx),
             Kind::If(ifexpr) => self.format_if(ifexpr, ctx),
+            Kind::Ternary(ternary) => self.format_ternary(ternary, ctx),
             Kind::Case(case) => self.format_case(case, ctx),
             Kind::While(whle) => self.format_while(whle, ctx),
             Kind::For(expr) => self.format_for(expr, ctx),
@@ -1932,6 +1969,73 @@ impl Formatter {
                 self.indent();
                 self.break_line(ctx);
                 self.format_statements(&when.body, ctx, true);
+                self.dedent();
+            }
+        }
+    }
+
+    fn format_ternary(&mut self, tern: &Ternary, ctx: &FormatContext) {
+        // Format `predicate`.
+        self.format(&tern.predicate, ctx);
+        self.push_str(" ?");
+
+        // Format `then`.
+        if tern.predicate_trailing.is_none()
+            && tern.then.shape.fits_in_one_line(self.remaining_width)
+        {
+            self.push(' ');
+            self.format(&tern.then, ctx);
+            self.write_trailing_comment(&tern.then.trailing_trivia);
+        } else {
+            self.write_trailing_comment(&tern.predicate_trailing);
+            self.indent();
+            self.break_line(ctx);
+            self.write_leading_trivia(
+                &tern.then.leading_trivia,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: true,
+                    end: true,
+                },
+            );
+            self.put_indent();
+            self.format(&tern.then, ctx);
+            self.write_trailing_comment(&tern.then.trailing_trivia);
+            self.dedent();
+        }
+
+        // Format `otherwise`.
+        if tern.predicate_trailing.is_none()
+            && tern.then.shape.is_inline()
+            && tern.otherwise.shape.fits_in_one_line(self.remaining_width)
+        {
+            self.push_str(" : ");
+            self.format(&tern.otherwise, ctx);
+            self.write_trailing_comment(&tern.otherwise.trailing_trivia);
+        } else {
+            self.break_line(ctx);
+            self.put_indent();
+            self.push(':');
+            if tern.otherwise.shape.fits_in_one_line(self.remaining_width)
+                || tern.otherwise.is_diagonal()
+            {
+                self.push(' ');
+                self.format(&tern.otherwise, ctx);
+                self.write_trailing_comment(&tern.otherwise.trailing_trivia);
+            } else {
+                self.indent();
+                self.break_line(ctx);
+                self.write_leading_trivia(
+                    &tern.otherwise.leading_trivia,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: true,
+                        end: true,
+                    },
+                );
+                self.put_indent();
+                self.format(&tern.otherwise, ctx);
+                self.write_trailing_comment(&tern.otherwise.trailing_trivia);
                 self.dedent();
             }
         }
