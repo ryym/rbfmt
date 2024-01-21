@@ -58,3 +58,5 @@ foo(1, 2, 3) &&
   bb ||
   # 2
   cc # cc
+
+-> { aaaaaaaaaaaaaaaaaaaaaaaaaa? && bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb }

@@ -2357,8 +2357,8 @@ impl Formatter {
     }
 
     fn format_infix_chain(&mut self, chain: &InfixChain, ctx: &FormatContext) {
-        self.format(&chain.left, ctx);
         if chain.shape.fits_in_one_line(self.remaining_width) {
+            self.format(&chain.left, ctx);
             for right in &chain.rights {
                 self.push(' ');
                 self.push_str(&right.operator);
@@ -2366,6 +2366,7 @@ impl Formatter {
                 self.format(&right.value, ctx);
             }
         } else {
+            self.format(&chain.left, ctx);
             for right in &chain.rights {
                 self.push(' ');
                 self.push_str(&right.operator);
