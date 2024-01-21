@@ -2559,14 +2559,16 @@ impl Formatter {
     fn format_hash(&mut self, hash: &Hash, ctx: &FormatContext) {
         if hash.shape.fits_in_one_line(self.remaining_width) {
             self.push_str(&hash.opening);
-            self.push(' ');
-            for (i, n) in hash.elements.iter().enumerate() {
-                if i > 0 {
-                    self.push_str(", ");
+            if !hash.elements.is_empty() {
+                self.push(' ');
+                for (i, n) in hash.elements.iter().enumerate() {
+                    if i > 0 {
+                        self.push_str(", ");
+                    }
+                    self.format(n, ctx);
                 }
-                self.format(n, ctx);
+                self.push(' ');
             }
-            self.push(' ');
             self.push_str(&hash.closing);
         } else {
             self.push_str(&hash.opening);
