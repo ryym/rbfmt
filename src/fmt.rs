@@ -720,17 +720,17 @@ impl MethodCall {
     pub(crate) fn new(
         leading_trivia: LeadingTrivia,
         call_op: Option<String>,
-        name: String,
+        message: MethodMessage,
     ) -> Self {
         let call_op_len = call_op.as_ref().map_or(0, |s| s.len());
-        let msg_shape = Shape::inline(name.len() + call_op_len);
+        let msg_shape = Shape::inline(message.len() + call_op_len);
         let shape = leading_trivia.shape.add(&msg_shape);
         Self {
             shape,
             leading_trivia,
             trailing_trivia: TrailingTrivia::none(),
             call_op,
-            message: MethodMessage::Normal { name },
+            message,
             args: None,
             block: None,
         }
@@ -759,7 +759,16 @@ impl MethodCall {
 #[derive(Debug)]
 pub(crate) enum MethodMessage {
     Normal { name: String },
-    // IndexAccess,
+    IndexAccess,
+}
+
+impl MethodMessage {
+    fn len(&self) -> usize {
+        match self {
+            Self::Normal { name } => name.len(),
+            Self::IndexAccess => "[]".len(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -770,7 +779,21 @@ struct CallUnit {
     call_op: Option<String>,
     subject: Box<Node>,
     args: Option<Arguments>,
+    index: Option<Arguments>,
     block: Option<Block>,
+}
+
+impl CallUnit {
+    fn append_index_access(&mut self, idx_access: MethodCall) {
+        if let Some(args) = &idx_access.args {
+            self.shape.append(&args.shape);
+        }
+        if let Some(block) = &idx_access.block {
+            self.shape.append(&block.shape);
+        }
+        self.index = idx_access.args;
+        self.block = idx_access.block;
+    }
 }
 
 #[derive(Debug)]
@@ -840,17 +863,43 @@ impl MethodChain {
         self.shape.append(&call.shape);
         self.calls_shape.append(&call.shape);
 
-        let subject = match call.message {
-            MethodMessage::Normal { name } => Node::without_trivia(Kind::Atom(name)),
-        };
-        let call_unit = CallUnit {
-            shape: call.shape,
-            leading_trivia: call.leading_trivia,
-            trailing_trivia: call.trailing_trivia,
-            call_op: call.call_op,
-            subject: Box::new(subject),
-            args: call.args,
-            block: call.block,
+        let call_unit = match call.message {
+            MethodMessage::Normal { name } => {
+                let node = Node::without_trivia(Kind::Atom(name));
+                CallUnit {
+                    shape: call.shape,
+                    leading_trivia: call.leading_trivia,
+                    trailing_trivia: call.trailing_trivia,
+                    call_op: call.call_op,
+                    subject: Box::new(node),
+                    args: call.args,
+                    index: None,
+                    block: call.block,
+                }
+            }
+            MethodMessage::IndexAccess => {
+                if self.calls.is_empty() {
+                    let mut receiver = self
+                        .receiver
+                        .take()
+                        .expect("receiver or previous call must exist before index access");
+                    let leading = mem::replace(&mut receiver.leading_trivia, LeadingTrivia::new());
+                    CallUnit {
+                        shape: receiver.shape.add(&call.shape),
+                        leading_trivia: leading,
+                        trailing_trivia: call.trailing_trivia,
+                        call_op: call.call_op,
+                        subject: receiver,
+                        args: call.args,
+                        index: None,
+                        block: call.block,
+                    }
+                } else {
+                    let mut prev = self.calls.remove(self.calls.len() - 1);
+                    prev.append_index_access(call);
+                    prev
+                }
+            }
         };
 
         self.calls.push(call_unit);
@@ -2257,16 +2306,12 @@ impl Formatter {
                 if let Some(call_op) = &call.call_op {
                     self.push_str(call_op);
                 }
-                match &call.subject.kind {
-                    Kind::Atom(value) => {
-                        if value != "[]" {
-                            self.format(&call.subject, ctx);
-                        }
-                    }
-                    _ => todo!(),
-                }
+                self.format(&call.subject, ctx);
                 if let Some(args) = &call.args {
                     self.format_arguments(args, ctx);
+                }
+                if let Some(index) = &call.index {
+                    self.format_arguments(index, ctx);
                 }
                 if let Some(block) = &call.block {
                     self.format_block(block, ctx);
@@ -2285,16 +2330,12 @@ impl Formatter {
                     self.put_indent();
                     self.push_str(call_op);
                 }
-                match &call.subject.kind {
-                    Kind::Atom(value) => {
-                        if value != "[]" {
-                            self.format(&call.subject, ctx);
-                        }
-                    }
-                    _ => todo!(),
-                }
+                self.format(&call.subject, ctx);
                 if let Some(args) = &call.args {
                     self.format_arguments(args, ctx);
+                }
+                if let Some(index) = &call.index {
+                    self.format_arguments(index, ctx);
                 }
                 if let Some(block) = &call.block {
                     self.format_block(block, ctx);

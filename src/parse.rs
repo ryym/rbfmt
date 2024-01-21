@@ -2119,7 +2119,11 @@ impl FmtNodeBuilder<'_> {
 
         let call_op = call.call_operator_loc().map(|l| Self::source_lossy_at(&l));
         let name = String::from_utf8_lossy(call.name()).to_string();
-        let mut method_call = fmt::MethodCall::new(call_leading, call_op, name);
+        let mut method_call = if name == "[]" {
+            fmt::MethodCall::new(call_leading, call_op, fmt::MethodMessage::IndexAccess)
+        } else {
+            fmt::MethodCall::new(call_leading, call_op, fmt::MethodMessage::Normal { name })
+        };
 
         let arguments = call.arguments();
         let block = call.block();
@@ -2351,7 +2355,8 @@ impl FmtNodeBuilder<'_> {
         let call_leading = self.take_leading_trivia(msg_loc.start_offset());
         let mut name = String::from_utf8_lossy(call.name().as_slice()).to_string();
         name.truncate(name.len() - 1); // Remove '='
-        let setter_call = fmt::MethodCall::new(call_leading, call_op, name);
+        let setter_call =
+            fmt::MethodCall::new(call_leading, call_op, fmt::MethodMessage::Normal { name });
 
         let arg = call
             .arguments()
@@ -2384,7 +2389,8 @@ impl FmtNodeBuilder<'_> {
         };
 
         let index_call_leading = fmt::LeadingTrivia::new();
-        let mut index_call = fmt::MethodCall::new(index_call_leading, None, "[]".to_string());
+        let mut index_call =
+            fmt::MethodCall::new(index_call_leading, None, fmt::MethodMessage::IndexAccess);
         let mut left_args = fmt::Arguments::new(Some("[".to_string()), Some("]".to_string()));
         let closing_start = closing_loc.start_offset();
         left_args.append_node(self.visit(arg1, closing_start));
