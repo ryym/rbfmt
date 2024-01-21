@@ -2195,19 +2195,23 @@ impl Formatter {
 
         let mut format_horizontal = chain.calls_shape.fits_in_inline(self.remaining_width);
         if !format_horizontal {
-            let width_on_vertical_format =
-                self.config.line_width - (self.indent + self.config.indent_size);
             let last_idx = chain.calls.len() - 1;
             let mut has_comments = false;
             let mut multiline_calls = 0;
             for (i, call) in chain.calls.iter().enumerate() {
+                let remaining_width = if i == 0 && chain.receiver.is_none() {
+                    self.remaining_width
+                } else {
+                    self.config.line_width - (self.indent + self.config.indent_size)
+                };
+
                 if !call.leading_trivia.is_empty()
                     || i < last_idx && !call.trailing_trivia.is_none()
                 {
                     has_comments = true;
                     break;
                 }
-                if !call.shape.fits_in_one_line(width_on_vertical_format) {
+                if !call.shape.fits_in_one_line(remaining_width) {
                     multiline_calls += 1;
                     if multiline_calls > 1 {
                         break;

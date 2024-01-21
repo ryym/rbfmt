@@ -173,3 +173,7 @@ end
 ) # 4
 
 aaaaaaaa || Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.new(cccc, dddddddd)
+
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa if foo(
+  :bbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+).bar
