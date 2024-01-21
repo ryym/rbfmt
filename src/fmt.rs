@@ -1305,6 +1305,9 @@ impl MethodParameters {
 
     pub(crate) fn append_param(&mut self, node: Node) {
         self.shape.insert(&node.shape);
+        if !self.params.is_empty() {
+            self.shape.insert(&Shape::inline(", ".len()));
+        }
         self.params.push(node);
     }
 

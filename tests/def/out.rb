@@ -324,3 +324,11 @@ def foo(c) = foo
   )
 
 def (a).foo = 1 # 1
+
+def aaaaaaaaaaaaaaaaaaaaaaaa!(
+  bbbbbbbbbbbbb:,
+  ccccccccccccccccccc: nil,
+  dddddddd: nil,
+  eeeeeeeeee: nil
+)
+end

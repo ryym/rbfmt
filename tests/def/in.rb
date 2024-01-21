@@ -309,3 +309,6 @@ def foo(c) = foo.bar(
 )
 
 def (a).foo = 1 # 1
+
+def aaaaaaaaaaaaaaaaaaaaaaaa!(bbbbbbbbbbbbb:, ccccccccccccccccccc: nil, dddddddd: nil, eeeeeeeeee: nil)
+end
