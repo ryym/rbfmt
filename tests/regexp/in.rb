@@ -3,7 +3,7 @@
 %r/ab cd /
 %r_ab cd ef_
 
-/\A[a-z]+(foo|bar?)*(?baz)\w+(?=<\/b>)/.match('test')
+/\A[a-z]+(foo|bar?)*(?:baz)\w+(?=<\/b>)/.match('test')
 
 /ab
   c d  
