@@ -768,7 +768,7 @@ struct CallUnit {
     leading_trivia: LeadingTrivia,
     trailing_trivia: TrailingTrivia,
     call_op: Option<String>,
-    name: String,
+    subject: Box<Node>,
     args: Option<Arguments>,
     block: Option<Block>,
 }
@@ -840,15 +840,15 @@ impl MethodChain {
         self.shape.append(&call.shape);
         self.calls_shape.append(&call.shape);
 
-        let name = match call.message {
-            MethodMessage::Normal { name } => name,
+        let subject = match call.message {
+            MethodMessage::Normal { name } => Node::without_trivia(Kind::Atom(name)),
         };
         let call_unit = CallUnit {
             shape: call.shape,
             leading_trivia: call.leading_trivia,
             trailing_trivia: call.trailing_trivia,
             call_op: call.call_op,
-            name,
+            subject: Box::new(subject),
             args: call.args,
             block: call.block,
         };
@@ -2257,10 +2257,14 @@ impl Formatter {
                 if let Some(call_op) = &call.call_op {
                     self.push_str(call_op);
                 }
-                if call.name != "[]" {
-                    self.push_str(&call.name);
+                match &call.subject.kind {
+                    Kind::Atom(value) => {
+                        if value != "[]" {
+                            self.format(&call.subject, ctx);
+                        }
+                    }
+                    _ => todo!(),
                 }
-
                 if let Some(args) = &call.args {
                     self.format_arguments(args, ctx);
                 }
@@ -2281,8 +2285,13 @@ impl Formatter {
                     self.put_indent();
                     self.push_str(call_op);
                 }
-                if call.name != "[]" {
-                    self.push_str(&call.name);
+                match &call.subject.kind {
+                    Kind::Atom(value) => {
+                        if value != "[]" {
+                            self.format(&call.subject, ctx);
+                        }
+                    }
+                    _ => todo!(),
                 }
                 if let Some(args) = &call.args {
                     self.format_arguments(args, ctx);
