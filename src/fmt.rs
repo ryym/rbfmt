@@ -711,7 +711,7 @@ pub(crate) struct MethodCall {
     pub leading_trivia: LeadingTrivia,
     pub trailing_trivia: TrailingTrivia,
     pub call_op: Option<String>,
-    pub name: String,
+    pub message: MethodMessage,
     pub args: Option<Arguments>,
     pub block: Option<Block>,
 }
@@ -730,7 +730,7 @@ impl MethodCall {
             leading_trivia,
             trailing_trivia: TrailingTrivia::none(),
             call_op,
-            name,
+            message: MethodMessage::Normal { name },
             args: None,
             block: None,
         }
@@ -754,6 +754,23 @@ impl MethodCall {
         self.shape.append(&trivia.shape);
         self.trailing_trivia = trivia;
     }
+}
+
+#[derive(Debug)]
+pub(crate) enum MethodMessage {
+    Normal { name: String },
+    // IndexAccess,
+}
+
+#[derive(Debug)]
+struct CallUnit {
+    shape: Shape,
+    leading_trivia: LeadingTrivia,
+    trailing_trivia: TrailingTrivia,
+    call_op: Option<String>,
+    name: String,
+    args: Option<Arguments>,
+    block: Option<Block>,
 }
 
 #[derive(Debug)]
@@ -805,7 +822,7 @@ impl Block {
 pub(crate) struct MethodChain {
     shape: Shape,
     receiver: Option<Box<Node>>,
-    calls: Vec<MethodCall>,
+    calls: Vec<CallUnit>,
     calls_shape: Shape,
 }
 
@@ -822,7 +839,21 @@ impl MethodChain {
     pub(crate) fn append_call(&mut self, call: MethodCall) {
         self.shape.append(&call.shape);
         self.calls_shape.append(&call.shape);
-        self.calls.push(call);
+
+        let name = match call.message {
+            MethodMessage::Normal { name } => name,
+        };
+        let call_unit = CallUnit {
+            shape: call.shape,
+            leading_trivia: call.leading_trivia,
+            trailing_trivia: call.trailing_trivia,
+            call_op: call.call_op,
+            name,
+            args: call.args,
+            block: call.block,
+        };
+
+        self.calls.push(call_unit);
     }
 }
 
