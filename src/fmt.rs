@@ -709,7 +709,6 @@ impl Arguments {
 pub(crate) struct MethodCall {
     pub shape: Shape,
     pub leading_trivia: LeadingTrivia,
-    pub trailing_trivia: TrailingTrivia,
     pub call_op: Option<String>,
     pub message: MethodMessage,
     pub args: Option<Arguments>,
@@ -728,7 +727,6 @@ impl MethodCall {
         Self {
             shape,
             leading_trivia,
-            trailing_trivia: TrailingTrivia::none(),
             call_op,
             message,
             args: None,
@@ -748,11 +746,6 @@ impl MethodCall {
         self.shape.append(&Shape::inline(" ".len()));
         self.shape.append(&block.shape);
         self.block = Some(block);
-    }
-
-    pub(crate) fn set_trailing_trivia(&mut self, trivia: TrailingTrivia) {
-        self.shape.append(&trivia.shape);
-        self.trailing_trivia = trivia;
     }
 }
 
@@ -859,9 +852,20 @@ impl MethodChain {
         }
     }
 
-    pub(crate) fn append_call(&mut self, call: MethodCall) {
+    pub(crate) fn append_call(&mut self, last_call_trailing: TrailingTrivia, call: MethodCall) {
+        self.shape.append(&last_call_trailing.shape);
         self.shape.append(&call.shape);
+        self.calls_shape.append(&last_call_trailing.shape);
         self.calls_shape.append(&call.shape);
+
+        if !last_call_trailing.is_none() {
+            let last_call = self
+                .calls
+                .last_mut()
+                .expect("call must exist when last trailing exist");
+            last_call.shape.append(&last_call_trailing.shape);
+            last_call.trailing_trivia = last_call_trailing;
+        }
 
         let call_unit = match call.message {
             MethodMessage::Normal { name } => {
@@ -869,7 +873,7 @@ impl MethodChain {
                 CallUnit {
                     shape: call.shape,
                     leading_trivia: call.leading_trivia,
-                    trailing_trivia: call.trailing_trivia,
+                    trailing_trivia: TrailingTrivia::none(),
                     call_op: call.call_op,
                     subject: Box::new(node),
                     args: call.args,
@@ -887,7 +891,7 @@ impl MethodChain {
                     CallUnit {
                         shape: receiver.shape.add(&call.shape),
                         leading_trivia: leading,
-                        trailing_trivia: call.trailing_trivia,
+                        trailing_trivia: TrailingTrivia::none(),
                         call_op: call.call_op,
                         subject: receiver,
                         args: call.args,

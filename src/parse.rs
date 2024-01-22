@@ -383,8 +383,10 @@ struct Postmodifier<'src> {
     statements: Option<prism::StatementsNode<'src>>,
 }
 
+#[derive(Debug)]
 enum MethodType {
     Normal,      // foo(a)
+    Not,         // not
     Unary,       // -a
     Binary,      // a - b
     Assign,      // a = b
@@ -772,9 +774,14 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_call_node().unwrap();
                 let loc = node.location();
                 let leading = self.take_leading_trivia(loc.start_offset());
+
                 let kind = match Self::detect_method_type(&node) {
                     MethodType::Normal => {
-                        let chain = self.visit_call_root(&node, next_loc_start, None);
+                        let chain = self.visit_call_root(&node, next_loc_start);
+                        fmt::Kind::MethodChain(chain)
+                    }
+                    MethodType::Not => {
+                        let chain = self.visit_not(node);
                         fmt::Kind::MethodChain(chain)
                     }
                     MethodType::Unary => {
@@ -800,14 +807,14 @@ impl FmtNodeBuilder<'_> {
             prism::Node::ForwardingSuperNode { .. } => {
                 let node = node.as_forwarding_super_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let chain = self.visit_call_root(&node, next_loc_start, None);
+                let chain = self.visit_call_root(&node, next_loc_start);
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::MethodChain(chain), trailing)
             }
             prism::Node::SuperNode { .. } => {
                 let node = node.as_super_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let chain = self.visit_call_root(&node, next_loc_start, None);
+                let chain = self.visit_call_root(&node, next_loc_start);
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::MethodChain(chain), trailing)
             }
@@ -1202,14 +1209,14 @@ impl FmtNodeBuilder<'_> {
             prism::Node::CallTargetNode { .. } => {
                 let node = node.as_call_target_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let chain = self.visit_call_root(&node, next_loc_start, None);
+                let chain = self.visit_call_root(&node, next_loc_start);
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::MethodChain(chain), trailing)
             }
             prism::Node::IndexTargetNode { .. } => {
                 let node = node.as_index_target_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let chain = self.visit_call_root(&node, next_loc_start, None);
+                let chain = self.visit_call_root(&node, next_loc_start);
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::MethodChain(chain), trailing)
             }
@@ -2082,29 +2089,26 @@ impl FmtNodeBuilder<'_> {
         &mut self,
         call: &C,
         next_loc_start: usize,
-        next_msg_start: Option<usize>,
     ) -> fmt::MethodChain {
-        let mut chain = match call.receiver() {
-            Some(receiver) => match receiver {
-                prism::Node::CallNode { .. } => {
-                    let node = receiver.as_call_node().unwrap();
-                    let msg_end = call.message_loc().as_ref().map(|l| l.start_offset());
-                    self.visit_call_root(&node, next_loc_start, msg_end)
+        let (mut chain, last_call_trailing) = match call.receiver() {
+            Some(receiver) => {
+                let next_loc_start = call
+                    .message_loc()
+                    .or_else(|| call.opening_loc())
+                    .or_else(|| call.arguments().map(|a| a.location()))
+                    .or_else(|| call.block().map(|a| a.location()))
+                    .map(|l| l.start_offset())
+                    .unwrap_or(next_loc_start);
+                let node = self.visit(receiver, next_loc_start);
+                match node.kind {
+                    fmt::Kind::MethodChain(chain) => (chain, node.trailing_trivia),
+                    _ => (
+                        fmt::MethodChain::new(Some(node)),
+                        fmt::TrailingTrivia::none(),
+                    ),
                 }
-                _ => {
-                    let next_loc_start = call
-                        .message_loc()
-                        .or_else(|| call.opening_loc())
-                        .or_else(|| call.arguments().map(|a| a.location()))
-                        .or_else(|| call.block().map(|a| a.location()))
-                        .map(|l| l.start_offset())
-                        .or(next_msg_start)
-                        .unwrap_or(next_loc_start);
-                    let recv = self.visit(receiver, next_loc_start);
-                    fmt::MethodChain::new(Some(recv))
-                }
-            },
-            None => fmt::MethodChain::new(None),
+            }
+            None => (fmt::MethodChain::new(None), fmt::TrailingTrivia::none()),
         };
 
         let call_leading = if let Some(msg_loc) = call.message_loc() {
@@ -2129,7 +2133,6 @@ impl FmtNodeBuilder<'_> {
         let closing_next_start = block
             .as_ref()
             .map(|b| b.location().start_offset())
-            .or(next_msg_start)
             .unwrap_or(next_loc_start);
         let (args, block) = match block {
             Some(node) => match node {
@@ -2179,13 +2182,44 @@ impl FmtNodeBuilder<'_> {
             method_call.set_block(block);
         }
 
-        if let Some(next_msg_start) = next_msg_start {
-            let call_trailing = self.take_trailing_comment(next_msg_start);
-            method_call.set_trailing_trivia(call_trailing);
-        }
-
-        chain.append_call(method_call);
+        chain.append_call(last_call_trailing, method_call);
         self.last_loc_end = call.location().end_offset();
+        chain
+    }
+
+    fn visit_not(&mut self, node: prism::CallNode) -> fmt::MethodChain {
+        // not(v) is parsed like below:
+        //   receiver: v
+        //   method name: "!"
+        //   args: empty but has parentheses
+
+        let receiver = node.receiver().expect("not must have receiver (argument)");
+
+        let opening_loc = node.opening_loc();
+        let closing_loc = node.closing_loc();
+        let opening = opening_loc.as_ref().map(Self::source_lossy_at);
+        let closing = closing_loc.as_ref().map(Self::source_lossy_at);
+        let mut args = fmt::Arguments::new(opening, closing);
+
+        let closing_start = closing_loc.map(|l| l.start_offset());
+        let receiver_next = closing_start.unwrap_or(receiver.location().end_offset());
+        let receiver = self.visit(receiver, receiver_next);
+        args.append_node(receiver);
+
+        let mut call = fmt::MethodCall::new(
+            fmt::LeadingTrivia::new(),
+            None,
+            fmt::MethodMessage::Normal {
+                name: "not".to_string(),
+            },
+        );
+        let virtual_end = self.take_end_trivia_as_virtual_end(closing_start);
+        args.set_virtual_end(virtual_end);
+        args.last_comma_allowed = false;
+        call.set_args(args);
+
+        let mut chain = fmt::MethodChain::new(None);
+        chain.append_call(fmt::TrailingTrivia::none(), call);
         chain
     }
 
@@ -2317,6 +2351,10 @@ impl FmtNodeBuilder<'_> {
     }
 
     fn detect_method_type(call: &prism::CallNode) -> MethodType {
+        let method_name = call.name().as_slice();
+        if method_name == b"!" && call.message_loc().map_or(false, |m| m.as_slice() == b"not") {
+            return MethodType::Not;
+        }
         if call.receiver().is_some()
             && call.call_operator_loc().is_none()
             && call.opening_loc().is_none()
@@ -2327,7 +2365,6 @@ impl FmtNodeBuilder<'_> {
                 MethodType::Unary
             };
         }
-        let method_name = call.name().as_slice();
         if method_name[method_name.len() - 1] == b'='
             && method_name != b"=="
             && method_name != b"==="
@@ -2361,7 +2398,7 @@ impl FmtNodeBuilder<'_> {
             .expect("call write must have argument");
 
         let mut chain = fmt::MethodChain::new(Some(receiver));
-        chain.append_call(setter_call);
+        chain.append_call(fmt::TrailingTrivia::none(), setter_call);
         let left = fmt::Node::without_trivia(fmt::Kind::MethodChain(chain));
         let arg_end = arg.location().end_offset();
         let right = self.visit(arg, arg_end);
@@ -2396,7 +2433,7 @@ impl FmtNodeBuilder<'_> {
         index_call.set_args(left_args);
 
         let mut chain = fmt::MethodChain::new(Some(receiver));
-        chain.append_call(index_call);
+        chain.append_call(fmt::TrailingTrivia::none(), index_call);
         let left = fmt::Node::without_trivia(fmt::Kind::MethodChain(chain));
         let arg2_end = arg2.location().end_offset();
         let right = self.visit(arg2, arg2_end);
@@ -2636,7 +2673,7 @@ impl FmtNodeBuilder<'_> {
         next_loc_start: usize,
     ) -> (fmt::LeadingTrivia, fmt::Assign, fmt::TrailingTrivia) {
         let leading = self.take_leading_trivia(call.location().start_offset());
-        let chain = self.visit_call_root(call, next_loc_start, None);
+        let chain = self.visit_call_root(call, next_loc_start);
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.visit(value, next_loc_start);
         let trailing = self.take_trailing_comment(next_loc_start);
