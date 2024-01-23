@@ -2521,11 +2521,12 @@ impl FmtNodeBuilder<'_> {
         right: prism::Node,
     ) -> fmt::InfixChain {
         let left = self.visit(left, operator_loc.start_offset());
-        let mut chain = match left.kind {
-            fmt::Kind::InfixChain(chain) => chain,
-            _ => fmt::InfixChain::new(left),
-        };
         let operator = Self::source_lossy_at(&operator_loc);
+        let precedence = fmt::InfixPrecedence::from_operator(&operator);
+        let mut chain = match left.kind {
+            fmt::Kind::InfixChain(chain) if chain.precedence() == &precedence => chain,
+            _ => fmt::InfixChain::new(left, precedence),
+        };
         let right_end = right.location().end_offset();
         let right = self.visit(right, right_end);
         chain.append_right(operator, right);

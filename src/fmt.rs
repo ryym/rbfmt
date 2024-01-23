@@ -914,16 +914,22 @@ impl MethodChain {
 pub(crate) struct InfixChain {
     shape: Shape,
     left: Box<Node>,
+    precedence: InfixPrecedence,
     rights: Vec<InfixRight>,
 }
 
 impl InfixChain {
-    pub(crate) fn new(left: Node) -> Self {
+    pub(crate) fn new(left: Node, precedence: InfixPrecedence) -> Self {
         Self {
             shape: left.shape,
             left: Box::new(left),
+            precedence,
             rights: vec![],
         }
+    }
+
+    pub(crate) fn precedence(&self) -> &InfixPrecedence {
+        &self.precedence
     }
 
     pub(crate) fn append_right(&mut self, op: String, right: Node) {
@@ -947,6 +953,45 @@ impl InfixRight {
             shape,
             operator,
             value: Box::new(value),
+        }
+    }
+}
+
+// https://ruby-doc.org/core-2.6.2/doc/syntax/precedence_rdoc.html#label-Precedence
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum InfixPrecedence {
+    WordAndOr, // and, or
+    // Assign,    // =, etc
+    Range,     // .., ...
+    Or,        // ||
+    And,       // &&
+    Eq,        // <=>, ==, ===, !=, =~, !~
+    Comp,      // >, >=, <, <=
+    Union,     // |, ^
+    Intersect, // &
+    Shift,     // <<, >>
+    Add,       // +, -
+    Mult,      // *, /, %
+    Power,     // **
+}
+
+impl InfixPrecedence {
+    pub(crate) fn from_operator(op: &str) -> Self {
+        match op {
+            "**" => Self::Power,
+            "*" | "/" | "%" => Self::Mult,
+            "+" | "-" => Self::Add,
+            "<<" | ">>" => Self::Shift,
+            "&" => Self::Intersect,
+            "|" | "^" => Self::Union,
+            ">" | ">=" | "<" | "<=" => Self::Comp,
+            "<=>" | "==" | "===" | "!=" | "=~" | "!~" => Self::Eq,
+            "&&" => Self::And,
+            "||" => Self::Or,
+            ".." | "..." => Self::Range,
+            // "=" => Self::Assign,
+            "and" | "or" => Self::WordAndOr,
+            _ => panic!("unexpected infix operator: {}", op),
         }
     }
 }
