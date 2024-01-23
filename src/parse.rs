@@ -2370,6 +2370,7 @@ impl FmtNodeBuilder<'_> {
             && method_name != b"==="
             && method_name != b"<="
             && method_name != b">="
+            && method_name != b"!="
         {
             return if method_name == b"[]=" {
                 MethodType::IndexAssign

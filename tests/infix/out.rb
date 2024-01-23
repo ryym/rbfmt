@@ -23,6 +23,20 @@ a >= b
 
 a << b ^ c == d * e > f
 
+# We can call operator methods with normal form:
+a.==(b)
+a.!=(
+  b, # b
+)
+a.===(b) # b
+a.=~(b)
+a.!~(b)
+a.<=>(b)
+a.<(b)
+a.<=(b)
+a.>(b)
+a.>=(b)
+
 1 + 2 - 3
 1 + (2 * 3 / (a % b)) / 4
 9 * foo.bar(3)[8] - baz
