@@ -218,9 +218,9 @@ impl Kind {
                     None => statements.virtual_end.is_none(),
                 }
             }
-            Self::Atom(_) => false,
-            Self::StringLike(_) => false,
-            Self::DynStringLike(_) => false,
+            Self::Atom(_) => true,
+            Self::StringLike(_) => true,
+            Self::DynStringLike(_) => true,
             Self::HeredocOpening(_) => false,
             Self::Parens(_) => true,
             Self::If(_) => false,
@@ -639,20 +639,15 @@ impl Postmodifier {
 #[derive(Debug)]
 pub(crate) struct Conditional {
     shape: Shape,
-    keyword_trailing: TrailingTrivia,
     predicate: Box<Node>,
     body: Statements,
 }
 
 impl Conditional {
-    pub(crate) fn new(keyword_trailing: TrailingTrivia, predicate: Node, body: Statements) -> Self {
-        let shape = keyword_trailing
-            .shape
-            .add(&predicate.shape)
-            .add(&body.shape);
+    pub(crate) fn new(predicate: Node, body: Statements) -> Self {
+        let shape = predicate.shape.add(&body.shape);
         Self {
             shape,
-            keyword_trailing,
             predicate: Box::new(predicate),
             body,
         }
@@ -1670,15 +1665,6 @@ enum EmptyLineHandling {
     Skip,
 }
 
-impl EmptyLineHandling {
-    fn trim_start() -> Self {
-        Self::Trim {
-            start: true,
-            end: false,
-        }
-    }
-}
-
 pub(crate) type HeredocMap = HashMap<Pos, Heredoc>;
 
 #[derive(Debug)]
@@ -1925,43 +1911,41 @@ impl Formatter {
             self.push_str("unless");
         }
 
-        self.format_node_after_keyword(
-            ctx,
-            &expr.if_first.keyword_trailing,
-            &expr.if_first.predicate,
-        );
+        self.format_conditional(&expr.if_first, ctx);
         if !expr.if_first.body.shape.is_empty() {
+            self.indent();
             self.break_line(ctx);
             self.format_statements(&expr.if_first.body, ctx, true);
+            self.dedent();
         }
 
         for elsif in &expr.elsifs {
             self.break_line(ctx);
-            self.dedent();
             self.put_indent();
             self.push_str("elsif");
-            self.format_node_after_keyword(ctx, &elsif.keyword_trailing, &elsif.predicate);
+            self.format_conditional(elsif, ctx);
             if !elsif.body.shape.is_empty() {
+                self.indent();
                 self.break_line(ctx);
                 self.format_statements(&elsif.body, ctx, true);
+                self.dedent();
             }
         }
 
         if let Some(if_last) = &expr.if_last {
             self.break_line(ctx);
-            self.dedent();
             self.put_indent();
             self.push_str("else");
             self.write_trailing_comment(&if_last.keyword_trailing);
-            self.indent();
             if !if_last.body.shape.is_empty() {
+                self.indent();
                 self.break_line(ctx);
                 self.format_statements(&if_last.body, ctx, true);
+                self.dedent();
             }
         }
 
         self.break_line(ctx);
-        self.dedent();
         self.put_indent();
         self.push_str("end");
     }
@@ -2277,34 +2261,29 @@ impl Formatter {
         self.format_statements(&modifier.conditional.body, ctx, false);
         self.push(' ');
         self.push_str(&modifier.keyword);
-        self.format_node_after_keyword(
-            ctx,
-            &modifier.conditional.keyword_trailing,
-            &modifier.conditional.predicate,
-        );
-        self.dedent();
+        self.format_conditional(&modifier.conditional, ctx);
     }
 
-    // Handle comments like "if # foo\n #bar\n predicate"
-    fn format_node_after_keyword(
-        &mut self,
-        ctx: &FormatContext,
-        keyword_trailing: &TrailingTrivia,
-        node: &Node,
-    ) {
-        if keyword_trailing.is_none() && node.leading_trivia.is_empty() {
+    fn format_conditional(&mut self, cond: &Conditional, ctx: &FormatContext) {
+        if cond.predicate.is_diagonal() {
             self.push(' ');
-            self.format(node, ctx);
-            self.write_trailing_comment(&node.trailing_trivia);
-            self.indent();
+            self.format(&cond.predicate, ctx);
+            self.write_trailing_comment(&cond.predicate.trailing_trivia);
         } else {
-            self.write_trailing_comment(keyword_trailing);
             self.indent();
             self.break_line(ctx);
-            self.write_leading_trivia(&node.leading_trivia, ctx, EmptyLineHandling::trim_start());
+            self.write_leading_trivia(
+                &cond.predicate.leading_trivia,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: true,
+                    end: true,
+                },
+            );
             self.put_indent();
-            self.format(node, ctx);
-            self.write_trailing_comment(&node.trailing_trivia);
+            self.format(&cond.predicate, ctx);
+            self.write_trailing_comment(&cond.predicate.trailing_trivia);
+            self.dedent();
         }
     }
 

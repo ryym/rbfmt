@@ -1,9 +1,11 @@
 1 rescue 2 # a
 
-foo.bar(2) rescue # a
+foo.bar(2) rescue
+  # a
   :a
 
-@foo rescue # a
+@foo rescue
+  # a
   # b
   nil
 

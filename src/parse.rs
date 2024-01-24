@@ -1811,9 +1811,6 @@ impl FmtNodeBuilder<'_> {
         let end_loc = node.end_loc.expect("if/unless expression must have end");
         let end_start = end_loc.start_offset();
 
-        let if_next_loc = node.predicate.location().start_offset();
-        let keyword_trailing = self.take_trailing_comment(if_next_loc);
-
         let conseq = node.consequent;
         let next_pred_loc_start = node
             .statements
@@ -1830,7 +1827,7 @@ impl FmtNodeBuilder<'_> {
                 // take trailing of else/elsif
                 let else_start = conseq.location().start_offset();
                 let body = self.visit_statements(node.statements, else_start);
-                let if_first = fmt::Conditional::new(keyword_trailing, predicate, body);
+                let if_first = fmt::Conditional::new(predicate, body);
                 let mut ifexpr = fmt::If::new(node.is_if, if_first);
                 self.visit_ifelse(conseq, &mut ifexpr);
                 ifexpr
@@ -1838,7 +1835,7 @@ impl FmtNodeBuilder<'_> {
             // if...end
             None => {
                 let body = self.visit_statements(node.statements, end_start);
-                let if_first = fmt::Conditional::new(keyword_trailing, predicate, body);
+                let if_first = fmt::Conditional::new(predicate, body);
                 fmt::If::new(node.is_if, if_first)
             }
         };
@@ -1860,9 +1857,6 @@ impl FmtNodeBuilder<'_> {
                 let predicate = node.predicate();
                 let consequent = node.consequent();
 
-                let keyword_next = predicate.location().start_offset();
-                let keyword_trailing = self.take_trailing_comment(keyword_next);
-
                 let predicate_next = node
                     .statements()
                     .map(|s| s.location().start_offset())
@@ -1876,7 +1870,7 @@ impl FmtNodeBuilder<'_> {
                     .unwrap_or(end_loc.start_offset());
                 let body = self.visit_statements(node.statements(), body_end_loc);
 
-                let conditional = fmt::Conditional::new(keyword_trailing, predicate, body);
+                let conditional = fmt::Conditional::new(predicate, body);
                 ifexpr.elsifs.push(conditional);
                 if let Some(consequent) = consequent {
                     self.visit_ifelse(consequent, ifexpr);
@@ -1999,7 +1993,7 @@ impl FmtNodeBuilder<'_> {
             .unwrap_or(closing_loc.start_offset());
         let predicate = self.visit(predicate, predicate_next);
         let body = self.visit_statements(body, closing_loc.start_offset());
-        let content = fmt::Conditional::new(fmt::TrailingTrivia::none(), predicate, body);
+        let content = fmt::Conditional::new(predicate, body);
         fmt::While { is_while, content }
     }
 
@@ -2055,14 +2049,11 @@ impl FmtNodeBuilder<'_> {
         let kwd_loc = postmod.keyword_loc;
         let statements = self.visit_statements(postmod.statements, kwd_loc.start_offset());
 
-        let pred_loc = postmod.predicate.location();
-        let keyword_trailing = self.take_trailing_comment(pred_loc.start_offset());
-
         let predicate = self.visit(postmod.predicate, next_loc_start);
 
         let postmod = fmt::Postmodifier::new(
             postmod.keyword,
-            fmt::Conditional::new(keyword_trailing, predicate, statements),
+            fmt::Conditional::new(predicate, statements),
         );
 
         let trailing = self.take_trailing_comment(next_loc_start);
@@ -2076,12 +2067,11 @@ impl FmtNodeBuilder<'_> {
 
         let rescue_expr = node.rescue_expression();
         let rescue_expr_loc = rescue_expr.location();
-        let keyword_trailing = self.take_trailing_comment(rescue_expr_loc.start_offset());
         let rescue_expr = self.visit(rescue_expr, rescue_expr_loc.end_offset());
 
         fmt::Postmodifier::new(
             "rescue".to_string(),
-            fmt::Conditional::new(keyword_trailing, rescue_expr, statements),
+            fmt::Conditional::new(rescue_expr, statements),
         )
     }
 

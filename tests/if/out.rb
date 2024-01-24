@@ -52,14 +52,16 @@ elsif 2
 end
 
 if 1
-elsif # elsif
+elsif
+  # elsif
   # 2b
   2 # 2a
   2.0
 end
 
 # if-1
-if # if-2
+if
+  # if-2
   # if-3
   true # if-4
   # if-5
@@ -67,7 +69,8 @@ if # if-2
   # if-7
 end # if-8
 
-if # if-1
+if
+  # if-1
   true
   nil
 end
@@ -80,7 +83,8 @@ end
 
 if true
   1
-elsif # 2
+elsif
+  # 2
   false
   2
 end
@@ -121,10 +125,12 @@ end
 
 1 if true # a
 
-foo.bar(2) if # a
+foo.bar(2) if
+  # a
   true
 
-@foo if # a
+@foo if
+  # a
   # b
   true
 
@@ -134,10 +140,12 @@ end if true # b
 
 1 unless true # a
 
-foo.bar(2) unless # a
+foo.bar(2) unless
+  # a
   true
 
-@foo unless # a
+@foo unless
+  # a
   # b
   true
 

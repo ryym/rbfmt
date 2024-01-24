@@ -47,7 +47,8 @@ while a.b!
 end
 
 a while b
-a while # b
+a while
+  # b
   b
 a while foo [
   1, # 1
@@ -87,7 +88,8 @@ until
 end # 5
 
 a until b
-a until # b
+a until
+  # b
   b
 a until foo [
   1, # 1

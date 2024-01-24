@@ -5,10 +5,9 @@ a = foo.bar(1, 2).baz # z
 
 a = b = c = d = e
 
-a =
-  "a#{
-    1 # b
-  }c"
+a = "a#{
+  1 # b
+}c"
 
 foo =
   # a
