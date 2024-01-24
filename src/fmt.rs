@@ -1787,12 +1787,11 @@ impl Formatter {
     fn format_embedded_statements(&mut self, embedded: &EmbeddedStatements, ctx: &FormatContext) {
         self.push_str(&embedded.opening);
 
-        if embedded
-            .statements
-            .shape
-            .fits_in_inline(self.remaining_width)
-        {
+        if embedded.shape.is_inline() {
+            let remaining = self.remaining_width;
+            self.remaining_width = usize::MAX;
             self.format_statements(&embedded.statements, ctx, false);
+            self.remaining_width = remaining;
         } else {
             self.break_line(ctx);
             self.indent();

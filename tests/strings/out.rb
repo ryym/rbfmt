@@ -53,3 +53,13 @@
 }def`
 
 "a#@b #@@c #$d #{@e}"
+
+"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbb #{cccccccccccc(ddddddddddd, eeeeeeeeeee, ffffffffff, gggg)}"
+
+"aaa#{
+  # foo
+  fooooooooooooooooooooooooooooooooooooooooooooooooooooo(
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+    bbbbbbbbbbbbbbbbbbbbbbbbb,
+  )
+}bb"
