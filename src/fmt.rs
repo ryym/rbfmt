@@ -765,6 +765,12 @@ impl MethodMessage {
 }
 
 #[derive(Debug)]
+struct IndexCall {
+    args: Option<Arguments>,
+    block: Option<Block>,
+}
+
+#[derive(Debug)]
 struct CallUnit {
     shape: Shape,
     leading_trivia: LeadingTrivia,
@@ -772,20 +778,17 @@ struct CallUnit {
     call_op: Option<String>,
     subject: Box<Node>,
     args: Option<Arguments>,
-    index: Option<Arguments>,
     block: Option<Block>,
+    index_calls: Vec<IndexCall>,
 }
 
 impl CallUnit {
     fn append_index_access(&mut self, idx_access: MethodCall) {
-        if let Some(args) = &idx_access.args {
-            self.shape.append(&args.shape);
-        }
-        if let Some(block) = &idx_access.block {
-            self.shape.append(&block.shape);
-        }
-        self.index = idx_access.args;
-        self.block = idx_access.block;
+        self.shape.append(&idx_access.shape);
+        self.index_calls.push(IndexCall {
+            args: idx_access.args,
+            block: idx_access.block,
+        });
     }
 }
 
@@ -877,8 +880,8 @@ impl MethodChain {
                     call_op: call.call_op,
                     subject: Box::new(node),
                     args: call.args,
-                    index: None,
                     block: call.block,
+                    index_calls: vec![],
                 }
             }
             MethodMessage::IndexAccess => {
@@ -895,8 +898,8 @@ impl MethodChain {
                         call_op: call.call_op,
                         subject: receiver,
                         args: call.args,
-                        index: None,
                         block: call.block,
+                        index_calls: vec![],
                     }
                 } else {
                     let mut prev = self.calls.remove(self.calls.len() - 1);
@@ -2359,11 +2362,16 @@ impl Formatter {
                 if let Some(args) = &call.args {
                     self.format_arguments(args, ctx);
                 }
-                if let Some(index) = &call.index {
-                    self.format_arguments(index, ctx);
-                }
                 if let Some(block) = &call.block {
                     self.format_block(block, ctx);
+                }
+                for idx_call in &call.index_calls {
+                    if let Some(args) = &idx_call.args {
+                        self.format_arguments(args, ctx);
+                    }
+                    if let Some(block) = &idx_call.block {
+                        self.format_block(block, ctx);
+                    }
                 }
             }
         } else {
@@ -2383,11 +2391,16 @@ impl Formatter {
                 if let Some(args) = &call.args {
                     self.format_arguments(args, ctx);
                 }
-                if let Some(index) = &call.index {
-                    self.format_arguments(index, ctx);
-                }
                 if let Some(block) = &call.block {
                     self.format_block(block, ctx);
+                }
+                for idx_call in &call.index_calls {
+                    if let Some(args) = &idx_call.args {
+                        self.format_arguments(args, ctx);
+                    }
+                    if let Some(block) = &idx_call.block {
+                        self.format_block(block, ctx);
+                    }
                 }
                 self.write_trailing_comment(&call.trailing_trivia);
             }
