@@ -22,9 +22,9 @@ while foo(1, 2)
 end
 
 while
-  # 1
-  # 2
-  true # 3
+    # 1
+    # 2
+    true # 3
   # 4
 end # 5
 
@@ -81,9 +81,9 @@ until foo(1, 2)
 end
 
 until
-  # 1
-  # 2
-  true # 3
+    # 1
+    # 2
+    true # 3
   # 4
 end # 5
 

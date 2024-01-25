@@ -89,6 +89,18 @@ elsif # 2
   2
 end
 
+if foo.
+    #bar
+    bar
+  baz
+end
+
+if foo(
+  1, # 2
+).bar
+  foo
+end
+
 # --- unless ---
 
 unless true

@@ -2172,27 +2172,7 @@ impl Formatter {
         } else {
             self.push_str("until");
         }
-        let pred = &expr.content.predicate;
-        if pred.shape.fits_in_one_line(self.remaining_width) || pred.is_diagonal() {
-            self.push(' ');
-            self.format(pred, ctx);
-            self.write_trailing_comment(&pred.trailing_trivia);
-        } else {
-            self.indent();
-            self.break_line(ctx);
-            self.write_leading_trivia(
-                &pred.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
-            );
-            self.put_indent();
-            self.format(pred, ctx);
-            self.write_trailing_comment(&pred.trailing_trivia);
-            self.dedent();
-        }
+        self.format_conditional(&expr.content, ctx);
         if !expr.content.body.shape().is_empty() {
             self.indent();
             self.break_line(ctx);
@@ -2261,10 +2241,7 @@ impl Formatter {
         self.format_statements(&modifier.conditional.body, ctx, false);
         self.push(' ');
         self.push_str(&modifier.keyword);
-        self.format_conditional(&modifier.conditional, ctx);
-    }
-
-    fn format_conditional(&mut self, cond: &Conditional, ctx: &FormatContext) {
+        let cond = &modifier.conditional;
         if cond.predicate.is_diagonal() {
             self.push(' ');
             self.format(&cond.predicate, ctx);
@@ -2283,6 +2260,33 @@ impl Formatter {
             self.put_indent();
             self.format(&cond.predicate, ctx);
             self.write_trailing_comment(&cond.predicate.trailing_trivia);
+            self.dedent();
+        }
+    }
+
+    fn format_conditional(&mut self, cond: &Conditional, ctx: &FormatContext) {
+        if cond.predicate.is_diagonal() {
+            self.push(' ');
+            self.indent();
+            self.format(&cond.predicate, ctx);
+            self.write_trailing_comment(&cond.predicate.trailing_trivia);
+            self.dedent();
+        } else {
+            self.indent();
+            self.indent();
+            self.break_line(ctx);
+            self.write_leading_trivia(
+                &cond.predicate.leading_trivia,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: true,
+                    end: true,
+                },
+            );
+            self.put_indent();
+            self.format(&cond.predicate, ctx);
+            self.write_trailing_comment(&cond.predicate.trailing_trivia);
+            self.dedent();
             self.dedent();
         }
     }

@@ -42,9 +42,9 @@ if a == 1..a == 3
 end
 
 if foo
-  # bar
-  .bar..a
-  # b
-  .b
+    # bar
+    .bar..a
+    # b
+    .b
   c
 end

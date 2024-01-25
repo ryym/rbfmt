@@ -53,40 +53,52 @@ end
 
 if 1
 elsif
-  # elsif
-  # 2b
-  2 # 2a
+    # elsif
+    # 2b
+    2 # 2a
   2.0
 end
 
 # if-1
 if
-  # if-2
-  # if-3
-  true # if-4
+    # if-2
+    # if-3
+    true # if-4
   # if-5
   nil # if-6
   # if-7
 end # if-8
 
 if
-  # if-1
-  true
+    # if-1
+    true
   nil
 end
 
 if
-  # if-1
-  true
+    # if-1
+    true
   nil
 end
 
 if true
   1
 elsif
-  # 2
-  false
+    # 2
+    false
   2
+end
+
+if foo
+    #bar
+    .bar
+  baz
+end
+
+if foo(
+    1, # 2
+  ).bar
+  foo
 end
 
 # --- unless ---
