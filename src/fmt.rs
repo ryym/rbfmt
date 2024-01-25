@@ -11,6 +11,7 @@ pub(crate) fn format(node: Node, heredoc_map: HeredocMap) -> String {
     let ctx = FormatContext { heredoc_map };
     let mut formatter = Formatter {
         remaining_width: config.line_width,
+        line_count: 0,
         config,
         buffer: String::new(),
         indent: 0,
@@ -1689,6 +1690,7 @@ struct FormatDraft {
 struct FormatStateSnapshot {
     buffer_len: usize,
     remaining_width: usize,
+    line_count: usize,
     indent: usize,
     heredoc_queue: VecDeque<Pos>,
 }
@@ -1703,6 +1705,7 @@ enum DraftResult {
 struct Formatter {
     config: FormatConfig,
     remaining_width: usize,
+    line_count: usize,
     buffer: String,
     indent: usize,
     heredoc_queue: VecDeque<Pos>,
@@ -1717,6 +1720,7 @@ impl Formatter {
             snapshot: FormatStateSnapshot {
                 buffer_len: self.buffer.len(),
                 remaining_width: self.remaining_width,
+                line_count: self.line_count,
                 indent: self.indent,
                 heredoc_queue: self.heredoc_queue.clone(),
             },
@@ -1730,6 +1734,7 @@ impl Formatter {
                 DraftResult::Rollback => {
                     self.buffer.truncate(draft.snapshot.buffer_len);
                     self.remaining_width = draft.snapshot.remaining_width;
+                    self.line_count = draft.snapshot.line_count;
                     self.indent = draft.snapshot.indent;
                     self.heredoc_queue = draft.snapshot.heredoc_queue;
                 }
@@ -3377,6 +3382,7 @@ impl Formatter {
     fn break_line(&mut self, ctx: &FormatContext) {
         self.push('\n');
         self.remaining_width = self.config.line_width;
+        self.line_count += 1;
         let mut queue = mem::take(&mut self.heredoc_queue);
         while let Some(pos) = queue.pop_front() {
             self.write_heredoc_body(&pos, ctx);
