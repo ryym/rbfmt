@@ -15,6 +15,7 @@ pub(crate) fn format(node: Node, heredoc_map: HeredocMap) -> String {
         buffer: String::new(),
         indent: 0,
         heredoc_queue: VecDeque::new(),
+        drafts: vec![],
     };
     formatter.format(&node, &ctx);
     if !formatter.buffer.is_empty() {
@@ -1679,15 +1680,64 @@ struct FormatContext {
 }
 
 #[derive(Debug)]
+struct FormatDraft {
+    index: usize,
+    snapshot: FormatStateSnapshot,
+}
+
+#[derive(Debug)]
+struct FormatStateSnapshot {
+    buffer_len: usize,
+    remaining_width: usize,
+    indent: usize,
+    heredoc_queue: VecDeque<Pos>,
+}
+
+#[derive(Debug)]
+enum DraftResult {
+    Commit,
+    Rollback,
+}
+
+#[derive(Debug)]
 struct Formatter {
     config: FormatConfig,
     remaining_width: usize,
     buffer: String,
     indent: usize,
     heredoc_queue: VecDeque<Pos>,
+    drafts: Vec<FormatDraft>,
 }
 
 impl Formatter {
+    fn draft(&mut self, mut f: impl FnMut(&mut Self) -> DraftResult) {
+        let index = self.drafts.len();
+        let draft = FormatDraft {
+            index,
+            snapshot: FormatStateSnapshot {
+                buffer_len: self.buffer.len(),
+                remaining_width: self.remaining_width,
+                indent: self.indent,
+                heredoc_queue: self.heredoc_queue.clone(),
+            },
+        };
+        self.drafts.push(draft);
+        let result = f(self);
+        let draft = self.drafts.pop();
+        match draft {
+            Some(draft) if draft.index == index => match result {
+                DraftResult::Commit => {}
+                DraftResult::Rollback => {
+                    self.buffer.truncate(draft.snapshot.buffer_len);
+                    self.remaining_width = draft.snapshot.remaining_width;
+                    self.indent = draft.snapshot.indent;
+                    self.heredoc_queue = draft.snapshot.heredoc_queue;
+                }
+            },
+            _ => panic!("invalid draft state: {:?} finished in {}", draft, index),
+        };
+    }
+
     fn format(&mut self, node: &Node, ctx: &FormatContext) {
         match &node.kind {
             Kind::Atom(value) => self.format_atom(value),
