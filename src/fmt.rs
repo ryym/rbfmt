@@ -1716,7 +1716,7 @@ struct Formatter {
 }
 
 impl Formatter {
-    fn draft(&mut self, mut f: impl FnMut(&mut Self) -> DraftResult) {
+    fn draft(&mut self, mut f: impl FnMut(&mut Self) -> DraftResult) -> DraftResult {
         let index = self.drafts.len();
         let draft = FormatDraft {
             index,
@@ -1744,6 +1744,7 @@ impl Formatter {
             },
             _ => panic!("invalid draft state: {:?} finished in {}", draft, index),
         };
+        result
     }
 
     fn format(&mut self, node: &Node, ctx: &FormatContext) {
@@ -2365,56 +2366,48 @@ impl Formatter {
         //     .bar
         //     .baz
 
-        let mut format_horizontal = chain.calls_shape.fits_in_inline(self.remaining_width);
-        if !format_horizontal {
-            let last_idx = chain.calls.len() - 1;
-            let mut has_comments = false;
-            let mut multiline_calls = 0;
-            for (i, call) in chain.calls.iter().enumerate() {
-                let remaining_width = if i == 0 && chain.receiver.is_none() {
-                    self.remaining_width
-                } else {
-                    self.config.line_width - (self.indent + self.config.indent_size)
-                };
-
-                if !call.leading_trivia.is_empty()
-                    || i < last_idx && !call.trailing_trivia.is_none()
-                {
-                    has_comments = true;
-                    break;
-                }
-                if !call.shape.fits_in_one_line(remaining_width) {
-                    multiline_calls += 1;
-                    if multiline_calls > 1 {
-                        break;
+        let can_be_horizontal = chain
+            .calls
+            .iter()
+            .all(|call| call.leading_trivia.is_empty() && call.trailing_trivia.is_none());
+        let committed = if can_be_horizontal {
+            let result = self.draft(|d| {
+                let mut multilines_call_count = 0;
+                for call in &chain.calls {
+                    let prev_line_count = d.line_count;
+                    if let Some(call_op) = &call.call_op {
+                        d.push_str(call_op);
+                    }
+                    d.format(&call.subject, ctx);
+                    if let Some(args) = &call.args {
+                        d.format_arguments(args, ctx);
+                    }
+                    if let Some(block) = &call.block {
+                        d.format_block(block, ctx);
+                    }
+                    for idx_call in &call.index_calls {
+                        if let Some(args) = &idx_call.args {
+                            d.format_arguments(args, ctx);
+                        }
+                        if let Some(block) = &idx_call.block {
+                            d.format_block(block, ctx);
+                        }
+                    }
+                    if prev_line_count < d.line_count {
+                        multilines_call_count += 1;
+                        if multilines_call_count > 1 {
+                            return DraftResult::Rollback;
+                        }
                     }
                 }
-            }
-            format_horizontal = !has_comments && multiline_calls == 1;
-        }
-
-        if format_horizontal {
-            for call in &chain.calls {
-                if let Some(call_op) = &call.call_op {
-                    self.push_str(call_op);
-                }
-                self.format(&call.subject, ctx);
-                if let Some(args) = &call.args {
-                    self.format_arguments(args, ctx);
-                }
-                if let Some(block) = &call.block {
-                    self.format_block(block, ctx);
-                }
-                for idx_call in &call.index_calls {
-                    if let Some(args) = &idx_call.args {
-                        self.format_arguments(args, ctx);
-                    }
-                    if let Some(block) = &idx_call.block {
-                        self.format_block(block, ctx);
-                    }
-                }
-            }
+                DraftResult::Commit
+            });
+            matches!(result, DraftResult::Commit)
         } else {
+            false
+        };
+
+        if !committed {
             let mut indented = false;
             for call in chain.calls.iter() {
                 if call.call_op.is_some() && !indented {

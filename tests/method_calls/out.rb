@@ -143,3 +143,32 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa if foo(
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa unless bbbbbbbbbbbbbbbbbbbb[
   :cccccccccc,
 ].nil?
+
+Aaaaaa.hoge.cccc(
+  dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
+).foo.bar
+
+Aaaaaa.hoge.cccc(
+  Aaaaaa
+    .hoge
+    .cccc(
+      dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
+    )
+    .cccc(
+      dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
+    )
+    .foo
+    .bar,
+  dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
+).foo.bar
+
+Aaaaaa
+  .cccc(dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", eeeeee: fff)
+  .cccc(dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", eeeeee: fff)
+  .bbbb do |abc|
+    d
+  end
+  .cccc(1, 2, 3)
+  .each do |hoge|
+    hoge
+  end

@@ -79,10 +79,9 @@ foo(1)
     4
   end
 
-foo
-  .flat_map(&:get_some_value_of_foo)
-  .filter(&:really_foo?)
-  .sum { |value| quantify_something_from(value) }
+foo.flat_map(&:get_some_value_of_foo).filter(&:really_foo?).sum { |value|
+  quantify_something_from(value)
+}
 
 foo(
   # 1
