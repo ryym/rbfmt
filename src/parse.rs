@@ -461,10 +461,6 @@ impl FmtNodeBuilder<'_> {
             prism::Node::BackReferenceReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::NumberedReferenceReadNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ConstantReadNode { .. } => self.parse_atom(node, next_loc_start),
-            prism::Node::ConstantPathNode { .. } => {
-                let (leading, path, trailing) = self.visit_constant_path(node, next_loc_start);
-                fmt::Node::new(leading, fmt::Kind::Atom(path), trailing)
-            }
             prism::Node::BlockLocalVariableNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ForwardingArgumentsNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::RedoNode { .. } => self.parse_atom(node, next_loc_start),
@@ -472,6 +468,14 @@ impl FmtNodeBuilder<'_> {
             prism::Node::SourceFileNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::SourceLineNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::SourceEncodingNode { .. } => self.parse_atom(node, next_loc_start),
+
+            prism::Node::ConstantPathNode { .. } => {
+                let node = node.as_constant_path_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let const_path = self.visit_constant_path(node.parent(), node.child());
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::ConstantPath(const_path), trailing)
+            }
 
             prism::Node::StringNode { .. } => {
                 let node = node.as_string_node().unwrap();
@@ -1203,8 +1207,11 @@ impl FmtNodeBuilder<'_> {
             prism::Node::GlobalVariableTargetNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ConstantTargetNode { .. } => self.parse_atom(node, next_loc_start),
             prism::Node::ConstantPathTargetNode { .. } => {
-                let (leading, path, trailing) = self.visit_constant_path(node, next_loc_start);
-                fmt::Node::new(leading, fmt::Kind::Atom(path), trailing)
+                let node = node.as_constant_path_target_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let const_path = self.visit_constant_path(node.parent(), node.child());
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::ConstantPath(const_path), trailing)
             }
             prism::Node::CallTargetNode { .. } => {
                 let node = node.as_call_target_node().unwrap();
@@ -1585,38 +1592,28 @@ impl FmtNodeBuilder<'_> {
 
     fn visit_constant_path(
         &mut self,
-        node: prism::Node,
-        next_loc_start: usize,
-    ) -> (fmt::LeadingTrivia, String, fmt::TrailingTrivia) {
-        let loc = node.location();
-
-        // Use `end_offset` to treat any trivia inside the path as leading trivia for simplicity.
-        // e.g. "Foo::\n#comment\nBar" -> "#comment\nFoo::Bar"
-        let leading_trivia = self.take_leading_trivia(loc.end_offset());
-
-        fn rec(node: Option<prism::Node>, parts: &mut Vec<u8>) {
-            if let Some(node) = node {
-                match node {
-                    prism::Node::ConstantReadNode { .. } => {
-                        let node = node.as_constant_read_node().unwrap();
-                        parts.extend(node.location().as_slice());
-                    }
-                    prism::Node::ConstantPathNode { .. } => {
-                        let node = node.as_constant_path_node().unwrap();
-                        rec(node.parent(), parts);
-                        parts.extend_from_slice(node.delimiter_loc().as_slice());
-                        parts.extend_from_slice(node.child().location().as_slice());
-                    }
-                    _ => panic!("unexpected constant path part: {:?}", node),
+        parent: Option<prism::Node>,
+        child: prism::Node,
+    ) -> fmt::ConstantPath {
+        let mut const_path = match parent {
+            Some(parent) => {
+                let parent_end = parent.location().start_offset();
+                let parent = self.visit(parent, parent_end);
+                match parent.kind {
+                    fmt::Kind::ConstantPath(const_path) => const_path,
+                    _ => fmt::ConstantPath::new(Some(parent)),
                 }
             }
+            None => fmt::ConstantPath::new(None),
+        };
+        if !matches!(child, prism::Node::ConstantReadNode { .. }) {
+            panic!("unexpected constant path child: {:?}", child);
         }
-        let mut parts = vec![];
-        rec(Some(node), &mut parts);
-
-        let path = String::from_utf8_lossy(&parts).to_string();
-        let trailing_trivia = self.take_trailing_comment(next_loc_start);
-        (leading_trivia, path, trailing_trivia)
+        let child_loc = child.location();
+        let path_leading = self.take_leading_trivia(child_loc.start_offset());
+        let path = Self::source_lossy_at(&child_loc);
+        const_path.append_part(path_leading, path);
+        const_path
     }
 
     fn visit_string_like(
@@ -2648,12 +2645,12 @@ impl FmtNodeBuilder<'_> {
         value: prism::Node,
         next_loc_start: usize,
     ) -> (fmt::LeadingTrivia, fmt::Assign, fmt::TrailingTrivia) {
-        let (leading, path, _) =
-            self.visit_constant_path(const_path.as_node(), operator_loc.start_offset());
+        let leading = self.take_leading_trivia(const_path.location().start_offset());
+        let const_path = self.visit_constant_path(const_path.parent(), const_path.child());
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.visit(value, next_loc_start);
         let trailing = self.take_trailing_comment(next_loc_start);
-        let target = fmt::Node::without_trivia(fmt::Kind::Atom(path));
+        let target = fmt::Node::without_trivia(fmt::Kind::ConstantPath(const_path));
         (leading, fmt::Assign::new(target, operator, value), trailing)
     }
 

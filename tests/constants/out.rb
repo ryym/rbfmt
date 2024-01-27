@@ -7,10 +7,14 @@ a = Foo
 Foo::Bar::Baz
 Foo::Bar::Baz
 
-# a
+Foo::
+  # a
+  Bar::Baz::
+  # b
+  Qux # c
 
-# b
-Foo::Bar::Baz # c
+self.class::Foo
+a.b(1, 2)[3]::C::D
 
 self
 self.foo # foo

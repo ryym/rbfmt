@@ -145,6 +145,7 @@ pub(crate) enum Kind {
     StringLike(StringLike),
     DynStringLike(DynStringLike),
     HeredocOpening(HeredocOpening),
+    ConstantPath(ConstantPath),
     Statements(Statements),
     Parens(Parens),
     If(If),
@@ -180,6 +181,7 @@ impl Kind {
             Self::StringLike(s) => s.shape,
             Self::DynStringLike(s) => s.shape,
             Self::HeredocOpening(opening) => *opening.shape(),
+            Self::ConstantPath(c) => c.shape,
             Self::Statements(statements) => statements.shape,
             Self::Parens(parens) => parens.shape,
             Self::If(_) => If::shape(),
@@ -224,6 +226,7 @@ impl Kind {
             Self::StringLike(_) => true,
             Self::DynStringLike(_) => true,
             Self::HeredocOpening(_) => false,
+            Self::ConstantPath(_) => false,
             Self::Parens(_) => true,
             Self::If(_) => false,
             Self::Ternary(_) => true,
@@ -396,6 +399,30 @@ pub(crate) enum HeredocPart {
     Str(StringLike),
     Statements(EmbeddedStatements),
     Variable(EmbeddedVariable),
+}
+
+#[derive(Debug)]
+pub(crate) struct ConstantPath {
+    shape: Shape,
+    root: Option<Box<Node>>,
+    parts: Vec<(LeadingTrivia, String)>,
+}
+
+impl ConstantPath {
+    pub(crate) fn new(root: Option<Node>) -> Self {
+        let shape = root.as_ref().map_or(Shape::inline(0), |r| r.shape);
+        Self {
+            shape,
+            root: root.map(Box::new),
+            parts: vec![],
+        }
+    }
+
+    pub(crate) fn append_part(&mut self, leading: LeadingTrivia, path: String) {
+        self.shape.append(&leading.shape);
+        self.shape.append(&Shape::inline("::".len() + path.len()));
+        self.parts.push((leading, path));
+    }
 }
 
 #[derive(Debug)]
@@ -1753,6 +1780,7 @@ impl Formatter {
             Kind::StringLike(str) => self.format_string_like(str),
             Kind::DynStringLike(dstr) => self.format_dyn_string_like(dstr, ctx),
             Kind::HeredocOpening(opening) => self.format_heredoc_opening(opening),
+            Kind::ConstantPath(const_path) => self.format_constant_path(const_path, ctx),
             Kind::Statements(statements) => self.format_statements(statements, ctx, false),
             Kind::Parens(parens) => self.format_parens(parens, ctx),
             Kind::If(ifexpr) => self.format_if(ifexpr, ctx),
@@ -1858,6 +1886,36 @@ impl Formatter {
         self.push_str(opening.indent_mode.prefix_symbols());
         self.push_str(&opening.id);
         self.heredoc_queue.push_back(opening.pos);
+    }
+
+    fn format_constant_path(&mut self, const_path: &ConstantPath, ctx: &FormatContext) {
+        if let Some(root) = &const_path.root {
+            self.format(root, ctx);
+        }
+        self.push_str("::");
+        let last_idx = const_path.parts.len() - 1;
+        for (i, (leading, path)) in const_path.parts.iter().enumerate() {
+            if leading.is_empty() {
+                self.push_str(path);
+            } else {
+                self.indent();
+                self.break_line(ctx);
+                self.write_leading_trivia(
+                    leading,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: true,
+                        end: true,
+                    },
+                );
+                self.put_indent();
+                self.push_str(path);
+                self.dedent();
+            }
+            if i < last_idx {
+                self.push_str("::");
+            }
+        }
     }
 
     fn format_statements(

@@ -11,8 +11,12 @@ Foo::  Bar::
 Foo::
   # a
 
-  Bar:: # b
-  Baz # c
+  Bar::
+  Baz:: # b
+  Qux # c
+
+self.class::Foo
+a.b(1, 2)[3]::C::D
 
 self
 self.foo # foo
