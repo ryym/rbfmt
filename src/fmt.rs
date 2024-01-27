@@ -1020,14 +1020,6 @@ impl Lambda {
 }
 
 #[derive(Debug)]
-pub(crate) struct Assign {
-    shape: Shape,
-    target: Box<Node>,
-    operator: String,
-    value: Box<Node>,
-}
-
-#[derive(Debug)]
 pub(crate) struct CallLike {
     shape: Shape,
     name: String,
@@ -1047,6 +1039,14 @@ impl CallLike {
         self.shape.append(&args.shape);
         self.arguments = Some(args);
     }
+}
+
+#[derive(Debug)]
+pub(crate) struct Assign {
+    shape: Shape,
+    target: Box<Node>,
+    operator: String,
+    value: Box<Node>,
 }
 
 impl Assign {
