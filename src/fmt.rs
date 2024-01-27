@@ -1054,7 +1054,7 @@ impl Assign {
         let shape = target
             .shape
             .add(&value.shape)
-            .add(&Shape::inline(operator.len()));
+            .add(&Shape::inline(operator.len() + "  ".len()));
         Self {
             shape,
             target: Box::new(target),
@@ -1477,6 +1477,9 @@ impl BlockParameters {
     }
 
     pub(crate) fn append_param(&mut self, node: Node) {
+        if !self.params.is_empty() {
+            self.shape.insert(&Shape::inline(", ".len()));
+        }
         self.shape.insert(&node.shape);
         self.params.push(node);
     }
