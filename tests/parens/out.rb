@@ -34,3 +34,8 @@
     2
   end
 )
+
+!(
+  aaaaaaaaaaaaaaaaaaaaaaaaaa? &&
+    %w[bbbbbbbbb cccccccccccccc].include?(dddddddddddddddddddddddddddddd)
+)
