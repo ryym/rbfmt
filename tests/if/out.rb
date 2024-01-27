@@ -23,6 +23,10 @@ elsif true
 else
 end
 
+if !foo.bar # baz
+  nil
+end
+
 # 0
 if a # 1
   # 2

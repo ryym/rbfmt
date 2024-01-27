@@ -237,7 +237,7 @@ impl Kind {
             Self::CallLike(_) => true,
             Self::Assign(_) => true,
             Self::MultiAssignTarget(_) => true,
-            Self::Prefix(_) => false,
+            Self::Prefix(_) => true,
             Self::Array(_) => true,
             Self::Hash(_) => true,
             Self::KeywordHash(_) => true,
