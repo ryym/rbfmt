@@ -731,12 +731,12 @@ impl Arguments {
 
 #[derive(Debug)]
 pub(crate) struct MethodCall {
-    pub shape: Shape,
-    pub leading_trivia: LeadingTrivia,
-    pub call_op: Option<String>,
-    pub message: MethodMessage,
-    pub args: Option<Arguments>,
-    pub block: Option<Block>,
+    shape: Shape,
+    leading_trivia: LeadingTrivia,
+    call_op: Option<String>,
+    message: MethodMessage,
+    args: Option<Arguments>,
+    block: Option<Block>,
 }
 
 impl MethodCall {
