@@ -942,6 +942,7 @@ pub(crate) struct InfixChain {
     shape: Shape,
     left: Box<Node>,
     precedence: InfixPrecedence,
+    rights_shape: Shape,
     rights: Vec<InfixRight>,
 }
 
@@ -951,6 +952,7 @@ impl InfixChain {
             shape: left.shape,
             left: Box::new(left),
             precedence,
+            rights_shape: Shape::inline(0),
             rights: vec![],
         }
     }
@@ -962,6 +964,7 @@ impl InfixChain {
     pub(crate) fn append_right(&mut self, op: String, right: Node) {
         let right = InfixRight::new(op, right);
         self.shape.append(&right.shape);
+        self.rights_shape.append(&right.shape);
         self.rights.push(right);
     }
 }
@@ -2653,8 +2656,8 @@ impl Formatter {
     }
 
     fn format_infix_chain(&mut self, chain: &InfixChain, ctx: &FormatContext) {
-        if chain.shape.fits_in_one_line(self.remaining_width) {
-            self.format(&chain.left, ctx);
+        self.format(&chain.left, ctx);
+        if chain.rights_shape.fits_in_one_line(self.remaining_width) {
             for right in &chain.rights {
                 self.push(' ');
                 self.push_str(&right.operator);
@@ -2662,7 +2665,6 @@ impl Formatter {
                 self.format(&right.value, ctx);
             }
         } else {
-            self.format(&chain.left, ctx);
             for right in &chain.rights {
                 self.push(' ');
                 self.push_str(&right.operator);
