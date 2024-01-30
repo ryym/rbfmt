@@ -1713,6 +1713,7 @@ struct FormatContext {
 #[derive(Debug)]
 struct FormatDraft {
     index: usize,
+    some_line_exceeded: bool,
     snapshot: FormatStateSnapshot,
 }
 
@@ -1747,6 +1748,7 @@ impl Formatter {
         let index = self.drafts.len();
         let draft = FormatDraft {
             index,
+            some_line_exceeded: false,
             snapshot: FormatStateSnapshot {
                 buffer_len: self.buffer.len(),
                 remaining_width: self.remaining_width,
@@ -1760,7 +1762,12 @@ impl Formatter {
         let draft = self.drafts.pop();
         match draft {
             Some(draft) if draft.index == index => match result {
-                DraftResult::Commit => {}
+                DraftResult::Commit => {
+                    if let Some(prev) = self.drafts.last_mut() {
+                        prev.some_line_exceeded =
+                            prev.some_line_exceeded || draft.some_line_exceeded;
+                    }
+                }
                 DraftResult::Rollback => {
                     self.buffer.truncate(draft.snapshot.buffer_len);
                     self.remaining_width = draft.snapshot.remaining_width;
@@ -1772,6 +1779,12 @@ impl Formatter {
             _ => panic!("invalid draft state: {:?} finished in {}", draft, index),
         };
         result
+    }
+
+    fn current_draft(&self) -> &FormatDraft {
+        self.drafts
+            .last()
+            .expect("current_draft must be used in draft mode")
     }
 
     fn format(&mut self, node: &Node, ctx: &FormatContext) {
@@ -2450,6 +2463,9 @@ impl Formatter {
                         if let Some(block) = &idx_call.block {
                             d.format_block(block, ctx);
                         }
+                    }
+                    if d.current_draft().some_line_exceeded {
+                        return DraftResult::Rollback;
                     }
                     if prev_line_count < d.line_count {
                         multilines_call_count += 1;
@@ -3416,11 +3432,21 @@ impl Formatter {
     }
 
     fn push(&mut self, c: char) {
+        if self.remaining_width == 0 {
+            if let Some(draft) = self.drafts.last_mut() {
+                draft.some_line_exceeded = true
+            }
+        }
         self.buffer.push(c);
         self.remaining_width = self.remaining_width.saturating_sub(1);
     }
 
     fn push_str(&mut self, str: &str) {
+        if self.remaining_width < str.len() {
+            if let Some(draft) = self.drafts.last_mut() {
+                draft.some_line_exceeded = true
+            }
+        }
         self.buffer.push_str(str);
         self.remaining_width = self.remaining_width.saturating_sub(str.len());
     }

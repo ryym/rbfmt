@@ -172,3 +172,14 @@ Aaaaaa
   .each do |hoge|
     hoge
   end
+
+aaaaaaaaaaaaaaaaaaaaaaa
+  .bbbbbbbbbbbbbbbbbbbbbbbbbbb
+  .cccccccccccccccccccccc
+  .dddddddddddddddddd
+  .eeeeeeeeeeeeeee
+
+aaaaaaaaaaaaaaaaaaaaaaa
+  .bbbbbbbbbbbbbbbbbbbbbbbbbbb
+  .cccccccccccccccccccccc
+  .dddddddddddddddddddddddddd(eeeeeeeeeeeeeee)

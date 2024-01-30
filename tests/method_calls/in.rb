@@ -156,3 +156,7 @@ Aaaaaa.cccc(dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", eeeeee: ff
 end.cccc(1, 2, 3).each do |hoge|
   hoge
 end
+
+aaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbb.cccccccccccccccccccccc.dddddddddddddddddd.eeeeeeeeeeeeeee
+
+aaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbb.cccccccccccccccccccccc.dddddddddddddddddddddddddd(eeeeeeeeeeeeeee)
