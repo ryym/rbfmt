@@ -163,7 +163,6 @@ pub(crate) enum Kind {
     Prefix(Prefix),
     Array(Array),
     Hash(Hash),
-    KeywordHash(KeywordHash),
     Assoc(Assoc),
     Begin(Begin),
     Def(Def),
@@ -199,7 +198,6 @@ impl Kind {
             Self::Prefix(prefix) => prefix.shape,
             Self::Array(array) => array.shape,
             Self::Hash(hash) => hash.shape,
-            Self::KeywordHash(khash) => khash.shape,
             Self::Assoc(assoc) => assoc.shape,
             Self::Begin(_) => Begin::shape(),
             Self::Def(def) => def.shape,
@@ -243,7 +241,6 @@ impl Kind {
             Self::Prefix(_) => true,
             Self::Array(_) => true,
             Self::Hash(_) => true,
-            Self::KeywordHash(_) => true,
             Self::Assoc(_) => true,
             Self::Begin(_) => false,
             Self::Def(_) => false,
@@ -1248,30 +1245,6 @@ impl Hash {
 }
 
 #[derive(Debug)]
-pub(crate) struct KeywordHash {
-    shape: Shape,
-    elements: Vec<Node>,
-}
-
-impl KeywordHash {
-    pub(crate) fn new() -> Self {
-        let shape = Shape::inline(0);
-        Self {
-            shape,
-            elements: vec![],
-        }
-    }
-
-    pub(crate) fn append_element(&mut self, element: Node) {
-        if !self.elements.is_empty() {
-            self.shape.append(&Shape::inline(", ".len()));
-        }
-        self.shape.append(&element.shape);
-        self.elements.push(element);
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct Assoc {
     shape: Shape,
     key: Box<Node>,
@@ -1814,7 +1787,6 @@ impl Formatter {
             Kind::Prefix(prefix) => self.format_prefix(prefix, ctx),
             Kind::Array(array) => self.format_array(array, ctx),
             Kind::Hash(hash) => self.format_hash(hash, ctx),
-            Kind::KeywordHash(khash) => self.format_keyword_hash(khash, ctx),
             Kind::Assoc(assoc) => self.format_assoc(assoc, ctx),
             Kind::Begin(begin) => self.format_begin(begin, ctx),
             Kind::Def(def) => self.format_def(def, ctx),
@@ -2854,38 +2826,6 @@ impl Formatter {
             self.break_line(ctx);
             self.put_indent();
             self.push_str(&hash.closing);
-        }
-    }
-
-    fn format_keyword_hash(&mut self, khash: &KeywordHash, ctx: &FormatContext) {
-        if khash.shape.fits_in_inline(self.remaining_width) {
-            for (i, n) in khash.elements.iter().enumerate() {
-                if i > 0 {
-                    self.push_str(", ");
-                }
-                self.format(n, ctx);
-            }
-        } else {
-            let last_idx = khash.elements.len() - 1;
-            for (i, element) in khash.elements.iter().enumerate() {
-                if i > 0 {
-                    self.break_line(ctx);
-                    self.write_leading_trivia(
-                        &element.leading_trivia,
-                        ctx,
-                        EmptyLineHandling::Trim {
-                            start: false,
-                            end: false,
-                        },
-                    );
-                    self.put_indent();
-                }
-                self.format(element, ctx);
-                if i < last_idx {
-                    self.push(',');
-                }
-                self.write_trailing_comment(&element.trailing_trivia);
-            }
         }
     }
 

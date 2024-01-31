@@ -1338,26 +1338,6 @@ impl FmtNodeBuilder<'_> {
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::Hash(hash), trailing)
             }
-            prism::Node::KeywordHashNode { .. } => {
-                let node = node.as_keyword_hash_node().unwrap();
-                let leading = self.take_leading_trivia(node.location().start_offset());
-                let mut khash = fmt::KeywordHash::new();
-                Self::each_node_with_next_start(
-                    node.elements().iter(),
-                    // Do not consume trailing comment of the last element.
-                    // Since the keyword hash places at the end of an array or arguments,
-                    // the last trailing comment should be handled by its container array or arguments.
-                    // If the keyword hash itself handles the last trailing comment,
-                    // its container accidentally put the comma after the trailing comment.
-                    0,
-                    |node, next_start| {
-                        let element = self.visit(node, next_start);
-                        khash.append_element(element);
-                    },
-                );
-                let trailing = self.take_trailing_comment(next_loc_start);
-                fmt::Node::new(leading, fmt::Kind::KeywordHash(khash), trailing)
-            }
             prism::Node::AssocNode { .. } => {
                 let node = node.as_assoc_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
