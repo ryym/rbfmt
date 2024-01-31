@@ -3358,7 +3358,7 @@ impl Formatter {
                 }
                 LineTrivia::Comment(comment) => {
                     self.put_indent();
-                    self.push_str(&comment.value);
+                    self.buffer.push_str(&comment.value);
                     self.break_line(ctx);
                 }
             }
@@ -3368,7 +3368,7 @@ impl Formatter {
     fn write_trailing_comment(&mut self, trivia: &TrailingTrivia) {
         if let Some(comment) = &trivia.comment {
             self.push(' ');
-            self.push_str(&comment.value);
+            self.buffer.push_str(&comment.value);
         }
     }
 
