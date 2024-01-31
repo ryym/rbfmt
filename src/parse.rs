@@ -1295,9 +1295,17 @@ impl FmtNodeBuilder<'_> {
                 Self::each_node_with_next_start(
                     node.elements().iter(),
                     closing_start.unwrap_or(next_loc_start),
-                    |node, next_start| {
-                        let element = self.visit(node, next_start);
-                        array.append_element(element);
+                    |node, next_start| match node {
+                        prism::Node::KeywordHashNode { .. } => {
+                            let node = node.as_keyword_hash_node().unwrap();
+                            self.each_keyword_hash_element(node, next_start, |element| {
+                                array.append_element(element);
+                            });
+                        }
+                        _ => {
+                            let element = self.visit(node, next_start);
+                            array.append_element(element);
+                        }
                     },
                 );
                 if let Some(closing_start) = closing_start {
@@ -2271,8 +2279,18 @@ impl FmtNodeBuilder<'_> {
                         } else {
                             next_start
                         };
-                        let fmt_node = self.visit(node, next_start);
-                        args.append_node(fmt_node);
+                        match node {
+                            prism::Node::KeywordHashNode { .. } => {
+                                let node = node.as_keyword_hash_node().unwrap();
+                                self.each_keyword_hash_element(node, next_start, |fmt_node| {
+                                    args.append_node(fmt_node);
+                                });
+                            }
+                            _ => {
+                                let fmt_node = self.visit(node, next_start);
+                                args.append_node(fmt_node);
+                            }
+                        }
                     },
                 );
                 let virtual_end = self.take_end_trivia_as_virtual_end(closing_start);
@@ -2280,6 +2298,22 @@ impl FmtNodeBuilder<'_> {
                 Some(args)
             }
         }
+    }
+
+    fn each_keyword_hash_element(
+        &mut self,
+        node: prism::KeywordHashNode,
+        next_loc_start: usize,
+        mut f: impl FnMut(fmt::Node),
+    ) {
+        Self::each_node_with_next_start(
+            node.elements().iter(),
+            next_loc_start,
+            |node, next_start| {
+                let element = self.visit(node, next_start);
+                f(element);
+            },
+        );
     }
 
     fn visit_block_arg(

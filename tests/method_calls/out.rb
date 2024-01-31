@@ -145,21 +145,25 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa unless bb
 ].nil?
 
 Aaaaaa.hoge.cccc(
-  dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
+  dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
 ).foo.bar
 
 Aaaaaa.hoge.cccc(
   Aaaaaa
     .hoge
     .cccc(
-      dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
+      dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
     )
     .cccc(
-      dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
+      dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
     )
     .foo
     .bar,
-  dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
+  dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
 ).foo.bar
 
 Aaaaaa
