@@ -3373,7 +3373,7 @@ impl Formatter {
     }
 
     fn push(&mut self, c: char) {
-        if self.remaining_width == 0 {
+        if self.remaining_width == 0 && c != '\n' {
             if let Some(draft) = self.drafts.last_mut() {
                 draft.some_line_exceeded = true
             }
