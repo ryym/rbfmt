@@ -1229,7 +1229,9 @@ impl Hash {
     }
 
     pub(crate) fn append_element(&mut self, element: Node) {
-        if !self.elements.is_empty() {
+        if self.elements.is_empty() {
+            self.shape.insert(&Shape::inline("  ".len()));
+        } else {
             self.shape.insert(&Shape::inline(", ".len()));
         }
         self.shape.insert(&element.shape);
