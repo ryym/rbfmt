@@ -756,10 +756,7 @@ impl MethodCall {
     }
 
     pub(crate) fn set_args(&mut self, args: Arguments) {
-        // For now surround the arguments by parentheses always.
-        self.shape.append(&Shape::inline("(".len()));
         self.shape.append(&args.shape);
-        self.shape.append(&Shape::inline(")".len()));
         self.args = Some(args);
     }
 
