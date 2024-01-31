@@ -46,14 +46,14 @@ impl Shape {
 
     pub(crate) fn fits_in_inline(&self, width: usize) -> bool {
         match self {
-            Self::Inline { len } => *len < width,
+            Self::Inline { len } => *len <= width,
             _ => false,
         }
     }
 
     pub(crate) fn fits_in_one_line(&self, width: usize) -> bool {
         match self {
-            Self::Inline { len } | Self::LineEnd { len } => *len < width,
+            Self::Inline { len } | Self::LineEnd { len } => *len <= width,
             Self::Multilines => false,
         }
     }
