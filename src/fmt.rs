@@ -777,7 +777,7 @@ impl MethodMessage {
     fn len(&self) -> usize {
         match self {
             Self::Normal { name } => name.len(),
-            Self::IndexAccess => "[]".len(),
+            Self::IndexAccess => 0,
         }
     }
 }
