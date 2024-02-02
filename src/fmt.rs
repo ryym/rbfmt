@@ -784,7 +784,7 @@ impl MethodMessage {
 
 #[derive(Debug)]
 struct IndexCall {
-    args: Option<Arguments>,
+    args: Arguments,
     block: Option<Block>,
 }
 
@@ -804,7 +804,7 @@ impl CallUnit {
     fn append_index_access(&mut self, idx_access: MethodCall) {
         self.shape.append(&idx_access.shape);
         self.index_calls.push(IndexCall {
-            args: idx_access.args,
+            args: idx_access.args.expect("index access must have Arguments"),
             block: idx_access.block,
         });
     }
@@ -2425,9 +2425,7 @@ impl Formatter {
                         d.format_block(block, ctx);
                     }
                     for idx_call in &call.index_calls {
-                        if let Some(args) = &idx_call.args {
-                            d.format_arguments(args, ctx);
-                        }
+                        d.format_arguments(&idx_call.args, ctx);
                         if let Some(block) = &idx_call.block {
                             d.format_block(block, ctx);
                         }
@@ -2472,9 +2470,7 @@ impl Formatter {
                     self.format_block(block, ctx);
                 }
                 for idx_call in &call.index_calls {
-                    if let Some(args) = &idx_call.args {
-                        self.format_arguments(args, ctx);
-                    }
+                    self.format_arguments(&idx_call.args, ctx);
                     if let Some(block) = &idx_call.block {
                         self.format_block(block, ctx);
                     }
