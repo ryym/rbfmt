@@ -55,5 +55,9 @@ foo.bar(
 
 [1].map { |n| n.abs }[0] = 1
 
+[
+  1, # 1
+][2].foo(3)[4] { 5 }
+
 foo.bar = 1
 foo(1, 2)[3].bar(4).baz = 5, 6

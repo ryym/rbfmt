@@ -794,7 +794,7 @@ struct CallUnit {
     leading_trivia: LeadingTrivia,
     trailing_trivia: TrailingTrivia,
     call_op: Option<String>,
-    subject: Box<Node>,
+    subject: Option<String>,
     args: Option<Arguments>,
     block: Option<Block>,
     index_calls: Vec<IndexCall>,
@@ -889,32 +889,24 @@ impl MethodChain {
         }
 
         let call_unit = match call.message {
-            MethodMessage::Normal { name } => {
-                let node = Node::without_trivia(Kind::Atom(name));
-                CallUnit {
-                    shape: call.shape,
-                    leading_trivia: call.leading_trivia,
-                    trailing_trivia: TrailingTrivia::none(),
-                    call_op: call.call_op,
-                    subject: Box::new(node),
-                    args: call.args,
-                    block: call.block,
-                    index_calls: vec![],
-                }
-            }
+            MethodMessage::Normal { name } => CallUnit {
+                shape: call.shape,
+                leading_trivia: call.leading_trivia,
+                trailing_trivia: TrailingTrivia::none(),
+                call_op: call.call_op,
+                subject: Some(name),
+                args: call.args,
+                block: call.block,
+                index_calls: vec![],
+            },
             MethodMessage::IndexAccess => {
                 if self.calls.is_empty() {
-                    let mut receiver = self
-                        .receiver
-                        .take()
-                        .expect("receiver or previous call must exist before index access");
-                    let leading = mem::replace(&mut receiver.leading_trivia, LeadingTrivia::new());
                     CallUnit {
-                        shape: receiver.shape.add(&call.shape),
-                        leading_trivia: leading,
+                        shape: call.shape,
+                        leading_trivia: LeadingTrivia::new(),
                         trailing_trivia: TrailingTrivia::none(),
                         call_op: call.call_op,
-                        subject: receiver,
+                        subject: None,
                         args: call.args,
                         block: call.block,
                         index_calls: vec![],
@@ -2423,7 +2415,9 @@ impl Formatter {
                     if let Some(call_op) = &call.call_op {
                         d.push_str(call_op);
                     }
-                    d.format(&call.subject, ctx);
+                    if let Some(subject) = &call.subject {
+                        d.push_str(subject);
+                    }
                     if let Some(args) = &call.args {
                         d.format_arguments(args, ctx);
                     }
@@ -2468,7 +2462,9 @@ impl Formatter {
                     self.put_indent();
                     self.push_str(call_op);
                 }
-                self.format(&call.subject, ctx);
+                if let Some(subject) = &call.subject {
+                    self.push_str(subject);
+                }
                 if let Some(args) = &call.args {
                     self.format_arguments(args, ctx);
                 }
