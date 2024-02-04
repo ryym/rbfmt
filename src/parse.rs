@@ -2065,26 +2065,23 @@ impl FmtNodeBuilder<'_> {
         call: &C,
         next_loc_start: usize,
     ) -> fmt::MethodChain {
-        let (mut chain, last_call_trailing) = match call.receiver() {
-            Some(receiver) => {
-                let next_loc_start = call
-                    .message_loc()
-                    .or_else(|| call.opening_loc())
-                    .or_else(|| call.arguments().map(|a| a.location()))
-                    .or_else(|| call.block().map(|a| a.location()))
-                    .map(|l| l.start_offset())
-                    .unwrap_or(next_loc_start);
-                let node = self.visit(receiver, next_loc_start);
-                match node.kind {
-                    fmt::Kind::MethodChain(chain) => (chain, node.trailing_trivia),
-                    _ => (
-                        fmt::MethodChain::new(Some(node)),
-                        fmt::TrailingTrivia::none(),
-                    ),
-                }
+        let current_chain = call.receiver().map(|receiver| {
+            let next_loc_start = call
+                .message_loc()
+                .or_else(|| call.opening_loc())
+                .or_else(|| call.arguments().map(|a| a.location()))
+                .or_else(|| call.block().map(|a| a.location()))
+                .map(|l| l.start_offset())
+                .unwrap_or(next_loc_start);
+            let node = self.visit(receiver, next_loc_start);
+            match node.kind {
+                fmt::Kind::MethodChain(chain) => (chain, node.trailing_trivia),
+                _ => (
+                    fmt::MethodChain::with_receiver(node),
+                    fmt::TrailingTrivia::none(),
+                ),
             }
-            None => (fmt::MethodChain::new(None), fmt::TrailingTrivia::none()),
-        };
+        });
 
         let call_leading = if let Some(msg_loc) = call.message_loc() {
             self.take_leading_trivia(msg_loc.start_offset())
@@ -2144,18 +2141,30 @@ impl FmtNodeBuilder<'_> {
         };
 
         let name = String::from_utf8_lossy(call.name()).to_string();
-        if name == "[]" {
-            chain.append_index_call(fmt::IndexCall::new(
-                args.expect("index call must have arguments"),
+        let chain = match current_chain {
+            Some((mut chain, last_call_trailing)) => {
+                if name == "[]" {
+                    chain.append_index_call(fmt::IndexCall::new(
+                        args.expect("index call must have arguments"),
+                        block,
+                    ));
+                } else {
+                    let call_operator = call.call_operator_loc().map(|l| Self::source_lossy_at(&l));
+                    chain.append_message_call(
+                        last_call_trailing,
+                        fmt::MessageCall::new(call_leading, call_operator, name, args, block),
+                    );
+                }
+                chain
+            }
+            None => fmt::MethodChain::without_receiver(fmt::MessageCall::new(
+                call_leading,
+                None,
+                name,
+                args,
                 block,
-            ));
-        } else {
-            let call_operator = call.call_operator_loc().map(|l| Self::source_lossy_at(&l));
-            chain.append_message_call(
-                last_call_trailing,
-                fmt::MessageCall::new(call_leading, call_operator, name, args, block),
-            );
-        }
+            )),
+        };
 
         self.last_loc_end = call.location().end_offset();
         chain
@@ -2183,18 +2192,13 @@ impl FmtNodeBuilder<'_> {
         args.set_virtual_end(virtual_end);
         args.last_comma_allowed = false;
 
-        let mut chain = fmt::MethodChain::new(None);
-        chain.append_message_call(
-            fmt::TrailingTrivia::none(),
-            fmt::MessageCall::new(
-                fmt::LeadingTrivia::new(),
-                None,
-                "not".to_string(),
-                Some(args),
-                None,
-            ),
-        );
-        chain
+        fmt::MethodChain::without_receiver(fmt::MessageCall::new(
+            fmt::LeadingTrivia::new(),
+            None,
+            "not".to_string(),
+            Some(args),
+            None,
+        ))
     }
 
     fn visit_arguments(
@@ -2396,7 +2400,7 @@ impl FmtNodeBuilder<'_> {
             .and_then(|args| args.arguments().iter().next())
             .expect("call write must have argument");
 
-        let mut chain = fmt::MethodChain::new(Some(receiver));
+        let mut chain = fmt::MethodChain::with_receiver(receiver);
         chain.append_message_call(
             fmt::TrailingTrivia::none(),
             fmt::MessageCall::new(call_leading, call_operator, name, None, None),
@@ -2431,7 +2435,7 @@ impl FmtNodeBuilder<'_> {
         let left_args_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
         left_args.set_virtual_end(left_args_end);
 
-        let mut chain = fmt::MethodChain::new(Some(receiver));
+        let mut chain = fmt::MethodChain::with_receiver(receiver);
         chain.append_index_call(fmt::IndexCall::new(left_args, None));
 
         let left = fmt::Node::without_trivia(fmt::Kind::MethodChain(chain));

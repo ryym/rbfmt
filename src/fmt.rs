@@ -791,7 +791,7 @@ struct CallUnit {
     leading_trivia: LeadingTrivia,
     trailing_trivia: TrailingTrivia,
     operator: Option<String>,
-    subject: Option<String>,
+    name: String,
     arguments: Option<Arguments>,
     block: Option<Block>,
     index_calls: Vec<IndexCall>,
@@ -804,7 +804,7 @@ impl CallUnit {
             leading_trivia: call.leading_trivia,
             trailing_trivia: TrailingTrivia::none(),
             operator: call.operator,
-            subject: Some(call.name),
+            name: call.name,
             arguments: call.arguments,
             block: call.block,
             index_calls: vec![],
@@ -865,16 +865,25 @@ impl Block {
 #[derive(Debug)]
 pub(crate) struct MethodChain {
     shape: Shape,
-    receiver: Option<Receiver>,
+    head: MethodChainHead,
     calls: Vec<CallUnit>,
     calls_shape: Shape,
 }
 
 impl MethodChain {
-    pub(crate) fn new(receiver: Option<Node>) -> Self {
+    pub(crate) fn with_receiver(receiver: Node) -> Self {
         Self {
-            shape: receiver.as_ref().map_or(Shape::inline(0), |r| r.shape),
-            receiver: receiver.map(Receiver::new),
+            shape: receiver.shape,
+            head: MethodChainHead::Receiver(Receiver::new(receiver)),
+            calls: vec![],
+            calls_shape: Shape::inline(0),
+        }
+    }
+
+    pub(crate) fn without_receiver(call: MessageCall) -> Self {
+        Self {
+            shape: call.shape,
+            head: MethodChainHead::FirstCall(CallUnit::from_message(call)),
             calls: vec![],
             calls_shape: Shape::inline(0),
         }
@@ -894,6 +903,10 @@ impl MethodChain {
             let last_call = self
                 .calls
                 .last_mut()
+                .or(match &mut self.head {
+                    MethodChainHead::FirstCall(call) => Some(call),
+                    _ => None,
+                })
                 .expect("call must exist when last trailing exist");
             last_call.shape.append(&last_call_trailing.shape);
             last_call.trailing_trivia = last_call_trailing;
@@ -909,8 +922,30 @@ impl MethodChain {
 
         if let Some(prev) = self.calls.last_mut() {
             prev.append_index_call(idx_call);
-        } else if let Some(ref mut recv) = &mut self.receiver {
-            recv.append_index_call(idx_call);
+        } else {
+            self.head.append_index_call(idx_call);
+        }
+    }
+}
+
+#[derive(Debug)]
+enum MethodChainHead {
+    Receiver(Receiver),
+    FirstCall(CallUnit),
+}
+
+impl MethodChainHead {
+    fn has_trailing_trivia(&self) -> bool {
+        match self {
+            Self::Receiver(receiver) => !receiver.node.trailing_trivia.is_none(),
+            Self::FirstCall(call) => !call.trailing_trivia.is_none(),
+        }
+    }
+
+    fn append_index_call(&mut self, idx_call: IndexCall) {
+        match self {
+            Self::Receiver(receiver) => receiver.append_index_call(idx_call),
+            Self::FirstCall(call) => call.append_index_call(idx_call),
         }
     }
 }
@@ -2402,14 +2437,32 @@ impl Formatter {
     }
 
     fn format_method_chain(&mut self, chain: &MethodChain, ctx: &FormatContext) {
-        if let Some(recv) = &chain.receiver {
-            self.format(&recv.node, ctx);
-            self.write_trailing_comment(&recv.node.trailing_trivia);
-            for idx_call in &recv.index_calls {
-                self.format_arguments(&idx_call.arguments, ctx);
-                if let Some(block) = &idx_call.block {
+        match &chain.head {
+            MethodChainHead::Receiver(receiver) => {
+                self.format(&receiver.node, ctx);
+                self.write_trailing_comment(&receiver.node.trailing_trivia);
+                for idx_call in &receiver.index_calls {
+                    self.format_arguments(&idx_call.arguments, ctx);
+                    if let Some(block) = &idx_call.block {
+                        self.format_block(block, ctx);
+                    }
+                }
+            }
+            MethodChainHead::FirstCall(call) => {
+                self.push_str(&call.name);
+                if let Some(args) = &call.arguments {
+                    self.format_arguments(args, ctx);
+                }
+                if let Some(block) = &call.block {
                     self.format_block(block, ctx);
                 }
+                for idx_call in &call.index_calls {
+                    self.format_arguments(&idx_call.arguments, ctx);
+                    if let Some(block) = &idx_call.block {
+                        self.format_block(block, ctx);
+                    }
+                }
+                self.write_trailing_comment(&call.trailing_trivia);
             }
         }
 
@@ -2423,10 +2476,11 @@ impl Formatter {
         //     .bar
         //     .baz
 
-        let can_be_horizontal = chain
-            .calls
-            .iter()
-            .all(|call| call.leading_trivia.is_empty() && call.trailing_trivia.is_none());
+        let can_be_horizontal = !chain.head.has_trailing_trivia()
+            && chain
+                .calls
+                .iter()
+                .all(|call| call.leading_trivia.is_empty() && call.trailing_trivia.is_none());
         let committed = if can_be_horizontal {
             let result = self.draft(|d| {
                 let mut multilines_call_count = 0;
@@ -2435,9 +2489,7 @@ impl Formatter {
                     if let Some(call_op) = &call.operator {
                         d.push_str(call_op);
                     }
-                    if let Some(subject) = &call.subject {
-                        d.push_str(subject);
-                    }
+                    d.push_str(&call.name);
                     if let Some(args) = &call.arguments {
                         d.format_arguments(args, ctx);
                     }
@@ -2468,21 +2520,15 @@ impl Formatter {
         };
 
         if !committed {
-            let mut indented = false;
+            self.indent();
             for call in chain.calls.iter() {
-                if call.operator.is_some() && !indented {
-                    self.indent();
-                    indented = true;
-                }
                 if let Some(call_op) = &call.operator {
                     self.break_line(ctx);
                     self.write_leading_trivia(&call.leading_trivia, ctx, EmptyLineHandling::Skip);
                     self.put_indent();
                     self.push_str(call_op);
                 }
-                if let Some(subject) = &call.subject {
-                    self.push_str(subject);
-                }
+                self.push_str(&call.name);
                 if let Some(args) = &call.arguments {
                     self.format_arguments(args, ctx);
                 }
@@ -2497,9 +2543,7 @@ impl Formatter {
                 }
                 self.write_trailing_comment(&call.trailing_trivia);
             }
-            if indented {
-                self.dedent();
-            }
+            self.dedent();
         }
     }
 
