@@ -2093,14 +2093,6 @@ impl FmtNodeBuilder<'_> {
             // foo.\n#hoge\n(2)
         };
 
-        let call_op = call.call_operator_loc().map(|l| Self::source_lossy_at(&l));
-        let name = String::from_utf8_lossy(call.name()).to_string();
-        let mut method_call = if name == "[]" {
-            fmt::MethodCall::new(call_leading, call_op, fmt::MethodMessage::IndexAccess)
-        } else {
-            fmt::MethodCall::new(call_leading, call_op, fmt::MethodMessage::Normal { name })
-        };
-
         let arguments = call.arguments();
         let block = call.block();
         let opening_loc = call.opening_loc();
@@ -2150,14 +2142,21 @@ impl FmtNodeBuilder<'_> {
                 (args, None)
             }
         };
-        if let Some(args) = args {
-            method_call.set_args(args);
-        }
-        if let Some(block) = block {
-            method_call.set_block(block);
+
+        let name = String::from_utf8_lossy(call.name()).to_string();
+        if name == "[]" {
+            chain.append_index_call(fmt::IndexCall::new(
+                args.expect("index call must have arguments"),
+                block,
+            ));
+        } else {
+            let call_operator = call.call_operator_loc().map(|l| Self::source_lossy_at(&l));
+            chain.append_message_call(
+                last_call_trailing,
+                fmt::MessageCall::new(call_leading, call_operator, name, args, block),
+            );
         }
 
-        chain.append_call(last_call_trailing, method_call);
         self.last_loc_end = call.location().end_offset();
         chain
     }
@@ -2180,21 +2179,21 @@ impl FmtNodeBuilder<'_> {
         let receiver_next = closing_start.unwrap_or(receiver.location().end_offset());
         let receiver = self.visit(receiver, receiver_next);
         args.append_node(receiver);
-
-        let mut call = fmt::MethodCall::new(
-            fmt::LeadingTrivia::new(),
-            None,
-            fmt::MethodMessage::Normal {
-                name: "not".to_string(),
-            },
-        );
         let virtual_end = self.take_end_trivia_as_virtual_end(closing_start);
         args.set_virtual_end(virtual_end);
         args.last_comma_allowed = false;
-        call.set_args(args);
 
         let mut chain = fmt::MethodChain::new(None);
-        chain.append_call(fmt::TrailingTrivia::none(), call);
+        chain.append_message_call(
+            fmt::TrailingTrivia::none(),
+            fmt::MessageCall::new(
+                fmt::LeadingTrivia::new(),
+                None,
+                "not".to_string(),
+                Some(args),
+                None,
+            ),
+        );
         chain
     }
 
@@ -2386,13 +2385,11 @@ impl FmtNodeBuilder<'_> {
         let msg_loc = call.message_loc().expect("call write must have message");
         let receiver = call.receiver().expect("call write must have receiver");
         let receiver = self.visit(receiver, msg_loc.start_offset());
-        let call_op = call.call_operator_loc().as_ref().map(Self::source_lossy_at);
 
         let call_leading = self.take_leading_trivia(msg_loc.start_offset());
+        let call_operator = call.call_operator_loc().as_ref().map(Self::source_lossy_at);
         let mut name = String::from_utf8_lossy(call.name().as_slice()).to_string();
         name.truncate(name.len() - 1); // Remove '='
-        let setter_call =
-            fmt::MethodCall::new(call_leading, call_op, fmt::MethodMessage::Normal { name });
 
         let arg = call
             .arguments()
@@ -2400,7 +2397,11 @@ impl FmtNodeBuilder<'_> {
             .expect("call write must have argument");
 
         let mut chain = fmt::MethodChain::new(Some(receiver));
-        chain.append_call(fmt::TrailingTrivia::none(), setter_call);
+        chain.append_message_call(
+            fmt::TrailingTrivia::none(),
+            fmt::MessageCall::new(call_leading, call_operator, name, None, None),
+        );
+
         let left = fmt::Node::without_trivia(fmt::Kind::MethodChain(chain));
         let arg_end = arg.location().end_offset();
         let right = self.visit(arg, arg_end);
@@ -2424,18 +2425,15 @@ impl FmtNodeBuilder<'_> {
             _ => panic!("index write must have exactly two arguments"),
         };
 
-        let index_call_leading = fmt::LeadingTrivia::new();
-        let mut index_call =
-            fmt::MethodCall::new(index_call_leading, None, fmt::MethodMessage::IndexAccess);
         let mut left_args = fmt::Arguments::new(Some("[".to_string()), Some("]".to_string()));
         let closing_start = closing_loc.start_offset();
         left_args.append_node(self.visit(arg1, closing_start));
         let left_args_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
         left_args.set_virtual_end(left_args_end);
-        index_call.set_args(left_args);
 
         let mut chain = fmt::MethodChain::new(Some(receiver));
-        chain.append_call(fmt::TrailingTrivia::none(), index_call);
+        chain.append_index_call(fmt::IndexCall::new(left_args, None));
+
         let left = fmt::Node::without_trivia(fmt::Kind::MethodChain(chain));
         let arg2_end = arg2.location().end_offset();
         let right = self.visit(arg2, arg2_end);

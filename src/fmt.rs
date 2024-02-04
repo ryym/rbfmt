@@ -727,65 +727,62 @@ impl Arguments {
 }
 
 #[derive(Debug)]
-pub(crate) struct MethodCall {
+pub(crate) struct MessageCall {
     shape: Shape,
     leading_trivia: LeadingTrivia,
-    call_op: Option<String>,
-    message: MethodMessage,
-    args: Option<Arguments>,
+    operator: Option<String>,
+    name: String,
+    arguments: Option<Arguments>,
     block: Option<Block>,
 }
 
-impl MethodCall {
+impl MessageCall {
     pub(crate) fn new(
         leading_trivia: LeadingTrivia,
-        call_op: Option<String>,
-        message: MethodMessage,
+        operator: Option<String>,
+        name: String,
+        arguments: Option<Arguments>,
+        block: Option<Block>,
     ) -> Self {
-        let call_op_len = call_op.as_ref().map_or(0, |s| s.len());
-        let msg_shape = Shape::inline(message.len() + call_op_len);
-        let shape = leading_trivia.shape.add(&msg_shape);
+        let operator_len = operator.as_ref().map_or(0, |s| s.len());
+        let msg_shape = Shape::inline(name.len() + operator_len);
+        let mut shape = leading_trivia.shape.add(&msg_shape);
+        if let Some(args) = &arguments {
+            shape.append(&args.shape);
+        }
+        if let Some(block) = &block {
+            shape.append(&block.shape);
+        }
         Self {
             shape,
             leading_trivia,
-            call_op,
-            message,
-            args: None,
-            block: None,
-        }
-    }
-
-    pub(crate) fn set_args(&mut self, args: Arguments) {
-        self.shape.append(&args.shape);
-        self.args = Some(args);
-    }
-
-    pub(crate) fn set_block(&mut self, block: Block) {
-        self.shape.append(&Shape::inline(" ".len()));
-        self.shape.append(&block.shape);
-        self.block = Some(block);
-    }
-}
-
-#[derive(Debug)]
-pub(crate) enum MethodMessage {
-    Normal { name: String },
-    IndexAccess,
-}
-
-impl MethodMessage {
-    fn len(&self) -> usize {
-        match self {
-            Self::Normal { name } => name.len(),
-            Self::IndexAccess => 0,
+            operator,
+            name,
+            arguments,
+            block,
         }
     }
 }
 
 #[derive(Debug)]
-struct IndexCall {
-    args: Arguments,
+pub(crate) struct IndexCall {
+    shape: Shape,
+    arguments: Arguments,
     block: Option<Block>,
+}
+
+impl IndexCall {
+    pub(crate) fn new(arguments: Arguments, block: Option<Block>) -> Self {
+        let mut shape = arguments.shape;
+        if let Some(block) = &block {
+            shape.append(&block.shape);
+        }
+        Self {
+            shape,
+            arguments,
+            block,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -793,20 +790,30 @@ struct CallUnit {
     shape: Shape,
     leading_trivia: LeadingTrivia,
     trailing_trivia: TrailingTrivia,
-    call_op: Option<String>,
+    operator: Option<String>,
     subject: Option<String>,
-    args: Option<Arguments>,
+    arguments: Option<Arguments>,
     block: Option<Block>,
     index_calls: Vec<IndexCall>,
 }
 
 impl CallUnit {
-    fn append_index_access(&mut self, idx_access: MethodCall) {
-        self.shape.append(&idx_access.shape);
-        self.index_calls.push(IndexCall {
-            args: idx_access.args.expect("index access must have Arguments"),
-            block: idx_access.block,
-        });
+    fn from_message(call: MessageCall) -> Self {
+        Self {
+            shape: call.shape,
+            leading_trivia: call.leading_trivia,
+            trailing_trivia: TrailingTrivia::none(),
+            operator: call.operator,
+            subject: Some(call.name),
+            arguments: call.arguments,
+            block: call.block,
+            index_calls: vec![],
+        }
+    }
+
+    fn append_index_call(&mut self, idx_call: IndexCall) {
+        self.shape.append(&idx_call.shape);
+        self.index_calls.push(idx_call);
     }
 }
 
@@ -873,11 +880,15 @@ impl MethodChain {
         }
     }
 
-    pub(crate) fn append_call(&mut self, last_call_trailing: TrailingTrivia, call: MethodCall) {
+    pub(crate) fn append_message_call(
+        &mut self,
+        last_call_trailing: TrailingTrivia,
+        msg_call: MessageCall,
+    ) {
         self.shape.append(&last_call_trailing.shape);
-        self.shape.append(&call.shape);
+        self.shape.append(&msg_call.shape);
         self.calls_shape.append(&last_call_trailing.shape);
-        self.calls_shape.append(&call.shape);
+        self.calls_shape.append(&msg_call.shape);
 
         if !last_call_trailing.is_none() {
             let last_call = self
@@ -888,38 +899,28 @@ impl MethodChain {
             last_call.trailing_trivia = last_call_trailing;
         }
 
-        let call_unit = match call.message {
-            MethodMessage::Normal { name } => CallUnit {
-                shape: call.shape,
-                leading_trivia: call.leading_trivia,
-                trailing_trivia: TrailingTrivia::none(),
-                call_op: call.call_op,
-                subject: Some(name),
-                args: call.args,
-                block: call.block,
-                index_calls: vec![],
-            },
-            MethodMessage::IndexAccess => {
-                if self.calls.is_empty() {
-                    CallUnit {
-                        shape: call.shape,
-                        leading_trivia: LeadingTrivia::new(),
-                        trailing_trivia: TrailingTrivia::none(),
-                        call_op: call.call_op,
-                        subject: None,
-                        args: call.args,
-                        block: call.block,
-                        index_calls: vec![],
-                    }
-                } else {
-                    let mut prev = self.calls.remove(self.calls.len() - 1);
-                    prev.append_index_access(call);
-                    prev
-                }
-            }
-        };
+        let call = CallUnit::from_message(msg_call);
+        self.calls.push(call);
+    }
 
-        self.calls.push(call_unit);
+    pub(crate) fn append_index_call(&mut self, idx_call: IndexCall) {
+        self.shape.append(&idx_call.shape);
+        self.calls_shape.append(&idx_call.shape);
+
+        if let Some(prev) = self.calls.last_mut() {
+            prev.append_index_call(idx_call);
+        } else {
+            self.calls.push(CallUnit {
+                shape: idx_call.shape,
+                leading_trivia: LeadingTrivia::new(),
+                trailing_trivia: TrailingTrivia::none(),
+                operator: None,
+                subject: None,
+                arguments: Some(idx_call.arguments),
+                block: idx_call.block,
+                index_calls: vec![],
+            });
+        }
     }
 }
 
@@ -2412,20 +2413,20 @@ impl Formatter {
                 let mut multilines_call_count = 0;
                 for call in &chain.calls {
                     let prev_line_count = d.line_count;
-                    if let Some(call_op) = &call.call_op {
+                    if let Some(call_op) = &call.operator {
                         d.push_str(call_op);
                     }
                     if let Some(subject) = &call.subject {
                         d.push_str(subject);
                     }
-                    if let Some(args) = &call.args {
+                    if let Some(args) = &call.arguments {
                         d.format_arguments(args, ctx);
                     }
                     if let Some(block) = &call.block {
                         d.format_block(block, ctx);
                     }
                     for idx_call in &call.index_calls {
-                        d.format_arguments(&idx_call.args, ctx);
+                        d.format_arguments(&idx_call.arguments, ctx);
                         if let Some(block) = &idx_call.block {
                             d.format_block(block, ctx);
                         }
@@ -2450,11 +2451,11 @@ impl Formatter {
         if !committed {
             let mut indented = false;
             for call in chain.calls.iter() {
-                if call.call_op.is_some() && !indented {
+                if call.operator.is_some() && !indented {
                     self.indent();
                     indented = true;
                 }
-                if let Some(call_op) = &call.call_op {
+                if let Some(call_op) = &call.operator {
                     self.break_line(ctx);
                     self.write_leading_trivia(&call.leading_trivia, ctx, EmptyLineHandling::Skip);
                     self.put_indent();
@@ -2463,14 +2464,14 @@ impl Formatter {
                 if let Some(subject) = &call.subject {
                     self.push_str(subject);
                 }
-                if let Some(args) = &call.args {
+                if let Some(args) = &call.arguments {
                     self.format_arguments(args, ctx);
                 }
                 if let Some(block) = &call.block {
                     self.format_block(block, ctx);
                 }
                 for idx_call in &call.index_calls {
-                    self.format_arguments(&idx_call.args, ctx);
+                    self.format_arguments(&idx_call.arguments, ctx);
                     if let Some(block) = &idx_call.block {
                         self.format_block(block, ctx);
                     }
