@@ -195,3 +195,7 @@ else # 3.5
 ensure # 4.5
   5
 end
+
+Foo.transaction do
+  p 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+end
