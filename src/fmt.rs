@@ -1907,12 +1907,11 @@ impl Formatter {
             self.format_statements(&embedded.statements, ctx, false);
             self.remaining_width = remaining;
         } else {
-            self.break_line(ctx);
             self.indent();
+            self.break_line(ctx);
             self.format_statements(&embedded.statements, ctx, true);
             self.break_line(ctx);
             self.dedent();
-            self.put_indent();
         }
 
         self.push_str(&embedded.closing);
@@ -1949,7 +1948,6 @@ impl Formatter {
                         end: true,
                     },
                 );
-                self.put_indent();
                 self.push_str(path);
                 self.dedent();
             }
@@ -1983,7 +1981,6 @@ impl Formatter {
                     end: false,
                 },
             );
-            self.put_indent();
             self.format(n, ctx);
             self.write_trailing_comment(&n.trailing_trivia);
         }
@@ -2008,7 +2005,6 @@ impl Formatter {
                 self.format_statements(&parens.body, ctx, true);
                 self.dedent();
                 self.break_line(ctx);
-                self.put_indent();
             }
             self.push(')');
         }
@@ -2051,7 +2047,6 @@ impl Formatter {
                         }
                     }
                     LineTrivia::Comment(comment) => {
-                        self.put_indent();
                         self.push_str(&comment.value);
                         if i < last_idx {
                             self.break_line(ctx);
@@ -2079,7 +2074,6 @@ impl Formatter {
 
         for elsif in &expr.elsifs {
             self.break_line(ctx);
-            self.put_indent();
             self.push_str("elsif");
             self.format_conditional(elsif, ctx);
             if !elsif.body.shape.is_empty() {
@@ -2092,7 +2086,6 @@ impl Formatter {
 
         if let Some(if_last) = &expr.if_last {
             self.break_line(ctx);
-            self.put_indent();
             self.push_str("else");
             self.write_trailing_comment(&if_last.keyword_trailing);
             if !if_last.body.shape.is_empty() {
@@ -2104,7 +2097,6 @@ impl Formatter {
         }
 
         self.break_line(ctx);
-        self.put_indent();
         self.push_str("end");
     }
 
@@ -2127,7 +2119,6 @@ impl Formatter {
                             end: true,
                         },
                     );
-                    self.put_indent();
                     self.format(pred, ctx);
                     self.write_trailing_comment(&pred.trailing_trivia);
                     self.dedent();
@@ -2156,12 +2147,10 @@ impl Formatter {
             if i > 0 {
                 self.break_line(ctx);
             }
-            self.put_indent();
             self.format_case_when(branch, ctx);
         }
         if let Some(otherwise) = &case.otherwise {
             self.break_line(ctx);
-            self.put_indent();
             self.push_str("else");
             self.write_trailing_comment(&otherwise.keyword_trailing);
             if !otherwise.body.shape.is_empty() {
@@ -2172,7 +2161,6 @@ impl Formatter {
             }
         }
         self.break_line(ctx);
-        self.put_indent();
         self.push_str("end");
     }
 
@@ -2217,7 +2205,6 @@ impl Formatter {
                             end: true,
                         },
                     );
-                    self.put_indent();
                     self.format(&when.conditions[0], ctx);
                     self.dedent();
                 }
@@ -2238,7 +2225,6 @@ impl Formatter {
                                 end: false,
                             },
                         );
-                        self.put_indent();
                         self.format(cond, ctx);
                         if i < last_idx {
                             self.push(',');
@@ -2281,7 +2267,6 @@ impl Formatter {
                     end: true,
                 },
             );
-            self.put_indent();
             self.format(&tern.then, ctx);
             self.write_trailing_comment(&tern.then.trailing_trivia);
             self.dedent();
@@ -2297,7 +2282,6 @@ impl Formatter {
             self.write_trailing_comment(&tern.otherwise.trailing_trivia);
         } else {
             self.break_line(ctx);
-            self.put_indent();
             self.push(':');
             if tern.otherwise.shape.fits_in_one_line(self.remaining_width)
                 || tern.otherwise.is_diagonal()
@@ -2316,7 +2300,6 @@ impl Formatter {
                         end: true,
                     },
                 );
-                self.put_indent();
                 self.format(&tern.otherwise, ctx);
                 self.write_trailing_comment(&tern.otherwise.trailing_trivia);
                 self.dedent();
@@ -2338,7 +2321,6 @@ impl Formatter {
             self.dedent();
         }
         self.break_line(ctx);
-        self.put_indent();
         self.push_str("end");
     }
 
@@ -2358,7 +2340,6 @@ impl Formatter {
                     end: true,
                 },
             );
-            self.put_indent();
             self.format(&expr.index, ctx);
             self.dedent();
         }
@@ -2379,7 +2360,6 @@ impl Formatter {
                     end: true,
                 },
             );
-            self.put_indent();
             self.format(collection, ctx);
             self.write_trailing_comment(&collection.trailing_trivia);
             self.dedent();
@@ -2391,7 +2371,6 @@ impl Formatter {
             self.dedent();
         }
         self.break_line(ctx);
-        self.put_indent();
         self.push_str("end");
     }
 
@@ -2415,7 +2394,6 @@ impl Formatter {
                     end: true,
                 },
             );
-            self.put_indent();
             self.format(&cond.predicate, ctx);
             self.write_trailing_comment(&cond.predicate.trailing_trivia);
             self.dedent();
@@ -2441,7 +2419,6 @@ impl Formatter {
                     end: true,
                 },
             );
-            self.put_indent();
             self.format(&cond.predicate, ctx);
             self.write_trailing_comment(&cond.predicate.trailing_trivia);
             self.dedent();
@@ -2540,7 +2517,6 @@ impl Formatter {
                 if let Some(call_op) = &call.operator {
                     self.break_line(ctx);
                     self.write_leading_trivia(&call.leading_trivia, ctx, EmptyLineHandling::Skip);
-                    self.put_indent();
                     self.push_str(call_op);
                 }
                 self.push_str(&call.name);
@@ -2600,7 +2576,6 @@ impl Formatter {
                             end: false,
                         },
                     );
-                    self.put_indent();
                     self.format(arg, ctx);
                     if i < last_idx || args.last_comma_allowed {
                         self.push(',');
@@ -2611,7 +2586,6 @@ impl Formatter {
             self.write_trivia_at_virtual_end(ctx, &args.virtual_end, true, args.nodes.is_empty());
             self.dedent();
             self.break_line(ctx);
-            self.put_indent();
             if let Some(closing) = &args.closing {
                 self.push_str(closing);
             }
@@ -2635,7 +2609,6 @@ impl Formatter {
                             end: false,
                         },
                     );
-                    self.put_indent();
                     self.format(arg, ctx);
                     if i < last_idx {
                         self.push(',');
@@ -2675,7 +2648,6 @@ impl Formatter {
                 } else {
                     self.indent();
                     self.break_line(ctx);
-                    self.put_indent();
                     self.format_block_parameters(params, ctx);
                     self.dedent();
                 }
@@ -2684,7 +2656,6 @@ impl Formatter {
                 self.format_block_body(&block.body, ctx, true);
             }
             self.break_line(ctx);
-            self.put_indent();
             self.push_str(&block.closing);
         }
     }
@@ -2720,7 +2691,6 @@ impl Formatter {
                         end: false,
                     },
                 );
-                self.put_indent();
                 self.format(&right.value, ctx);
                 self.dedent();
             }
@@ -2749,7 +2719,6 @@ impl Formatter {
                     end: true,
                 },
             );
-            self.put_indent();
             self.format(value, ctx);
             self.dedent();
         }
@@ -2786,7 +2755,6 @@ impl Formatter {
                         end: false,
                     },
                 );
-                self.put_indent();
                 self.format(target, ctx);
                 if i < last_idx || multi.with_implicit_rest {
                     self.push(',');
@@ -2796,7 +2764,6 @@ impl Formatter {
             self.write_trivia_at_virtual_end(ctx, &multi.virtual_end, true, false);
             self.dedent();
             self.break_line(ctx);
-            self.put_indent();
             self.push(')');
         }
     }
@@ -2836,7 +2803,6 @@ impl Formatter {
                         end: false,
                     },
                 );
-                self.put_indent();
                 self.format(element, ctx);
                 self.push_str(array.separator());
                 self.write_trailing_comment(&element.trailing_trivia);
@@ -2849,7 +2815,6 @@ impl Formatter {
             );
             self.dedent();
             self.break_line(ctx);
-            self.put_indent();
             self.push_str(array.closing.as_deref().unwrap_or("]"));
         }
     }
@@ -2881,7 +2846,6 @@ impl Formatter {
                         end: false,
                     },
                 );
-                self.put_indent();
                 self.format(element, ctx);
                 self.push(',');
                 self.write_trailing_comment(&element.trailing_trivia);
@@ -2894,7 +2858,6 @@ impl Formatter {
             );
             self.dedent();
             self.break_line(ctx);
-            self.put_indent();
             self.push_str(&hash.closing);
         }
     }
@@ -2925,7 +2888,6 @@ impl Formatter {
                     end: true,
                 },
             );
-            self.put_indent();
             self.format(&assoc.value, ctx);
             self.dedent();
         }
@@ -2936,7 +2898,6 @@ impl Formatter {
         self.write_trailing_comment(&begin.keyword_trailing);
         self.format_block_body(&begin.body, ctx, true);
         self.break_line(ctx);
-        self.put_indent();
         self.push_str("end");
     }
 
@@ -2949,7 +2910,6 @@ impl Formatter {
             } else {
                 self.indent();
                 self.break_line(ctx);
-                self.put_indent();
                 // no leading trivia here.
                 self.format(receiver, ctx);
             }
@@ -2961,7 +2921,6 @@ impl Formatter {
                 self.write_trailing_comment(&receiver.trailing_trivia);
                 self.indent();
                 self.break_line(ctx);
-                self.put_indent();
                 self.push_str(&def.name);
                 self.format_method_parameters(&def.parameters, ctx);
                 self.dedent();
@@ -3003,7 +2962,6 @@ impl Formatter {
                 self.write_trailing_comment(head_trailing);
                 self.format_block_body(body, ctx, true);
                 self.break_line(ctx);
-                self.put_indent();
                 self.push_str("end");
             }
         }
@@ -3023,12 +2981,10 @@ impl Formatter {
         }
         for rescue in &body.rescues {
             self.break_line(ctx);
-            self.put_indent();
             self.format_rescue(rescue, ctx);
         }
         if let Some(rescue_else) = &body.rescue_else {
             self.break_line(ctx);
-            self.put_indent();
             self.push_str("else");
             self.write_trailing_comment(&rescue_else.keyword_trailing);
             if !rescue_else.body.shape().is_empty() {
@@ -3040,7 +2996,6 @@ impl Formatter {
         }
         if let Some(ensure) = &body.ensure {
             self.break_line(ctx);
-            self.put_indent();
             self.push_str("ensure");
             self.write_trailing_comment(&ensure.keyword_trailing);
             if !ensure.body.shape().is_empty() {
@@ -3087,7 +3042,6 @@ impl Formatter {
                                 end: false,
                             },
                         );
-                        self.put_indent();
                         self.format(exception, ctx);
                         if i < last_idx {
                             self.push(',');
@@ -3115,7 +3069,6 @@ impl Formatter {
                         end: false,
                     },
                 );
-                self.put_indent();
                 self.format(reference, ctx);
                 self.write_trailing_comment(&reference.trailing_trivia);
                 self.dedent();
@@ -3159,7 +3112,6 @@ impl Formatter {
                                 end: false,
                             },
                         );
-                        self.put_indent();
                         self.format(n, ctx);
                         if i < last_idx {
                             self.push(',');
@@ -3175,7 +3127,6 @@ impl Formatter {
                 );
                 self.dedent();
                 self.break_line(ctx);
-                self.put_indent();
                 self.push(')');
             }
         }
@@ -3224,7 +3175,6 @@ impl Formatter {
                             end: false,
                         },
                     );
-                    self.put_indent();
                     self.format(n, ctx);
                     if i < last_idx {
                         self.push(',');
@@ -3234,7 +3184,6 @@ impl Formatter {
             }
             if !params.locals.is_empty() {
                 self.break_line(ctx);
-                self.put_indent();
                 self.push(';');
                 let last_idx = params.locals.len() - 1;
                 for (i, n) in params.locals.iter().enumerate() {
@@ -3247,7 +3196,6 @@ impl Formatter {
                             end: false,
                         },
                     );
-                    self.put_indent();
                     self.format(n, ctx);
                     if i < last_idx {
                         self.push(',');
@@ -3263,7 +3211,6 @@ impl Formatter {
             );
             self.dedent();
             self.break_line(ctx);
-            self.put_indent();
             self.push_str(&params.closing);
             self.write_trailing_comment(&params.closing_trailing);
         }
@@ -3290,7 +3237,6 @@ impl Formatter {
                         end: true,
                     },
                 );
-                self.put_indent();
                 self.format(superclass, ctx);
                 self.write_trailing_comment(&superclass.trailing_trivia);
                 self.dedent();
@@ -3300,7 +3246,6 @@ impl Formatter {
         }
         self.format_block_body(&class.body, ctx, true);
         self.break_line(ctx);
-        self.put_indent();
         self.push_str("end");
     }
 
@@ -3327,7 +3272,6 @@ impl Formatter {
                     end: false,
                 },
             );
-            self.put_indent();
             self.format(&class.expression, ctx);
             self.write_trailing_comment(&class.expression.trailing_trivia);
             self.dedent();
@@ -3335,7 +3279,6 @@ impl Formatter {
         }
         self.format_block_body(&class.body, ctx, true);
         self.break_line(ctx);
-        self.put_indent();
         self.push_str("end");
     }
 
@@ -3365,7 +3308,6 @@ impl Formatter {
                         end: true,
                     },
                 );
-                self.put_indent();
                 self.format(right, ctx);
                 self.dedent();
             }
@@ -3392,7 +3334,6 @@ impl Formatter {
                 self.dedent();
             }
             self.break_line(ctx);
-            self.put_indent();
             self.push('}');
         }
     }
@@ -3428,8 +3369,7 @@ impl Formatter {
                     }
                 }
                 LineTrivia::Comment(comment) => {
-                    self.put_indent();
-                    self.buffer.push_str(&comment.value);
+                    self.push_str(&comment.value);
                     self.break_line(ctx);
                 }
             }
@@ -3444,13 +3384,29 @@ impl Formatter {
     }
 
     fn push(&mut self, c: char) {
+        if self.remaining_width == self.config.line_width {
+            self.put_indent();
+        }
         self.buffer.push(c);
         self.remaining_width = self.remaining_width.saturating_sub(1);
     }
 
     fn push_str(&mut self, str: &str) {
+        if self.remaining_width == self.config.line_width {
+            self.put_indent();
+        }
+        self.push_str_without_indent(str);
+    }
+
+    fn push_str_without_indent(&mut self, str: &str) {
         self.buffer.push_str(str);
         self.remaining_width = self.remaining_width.saturating_sub(str.len());
+    }
+
+    fn put_indent(&mut self) {
+        let spaces = " ".repeat(self.indent);
+        self.buffer.push_str(&spaces);
+        self.remaining_width = self.remaining_width.saturating_sub(spaces.len());
     }
 
     fn indent(&mut self) {
@@ -3462,7 +3418,7 @@ impl Formatter {
     }
 
     fn break_line(&mut self, ctx: &FormatContext) {
-        self.push('\n');
+        self.buffer.push('\n');
         self.remaining_width = self.config.line_width;
         self.line_count += 1;
         let mut queue = mem::take(&mut self.heredoc_queue);
@@ -3480,7 +3436,7 @@ impl Formatter {
                         HeredocPart::Str(str) => {
                             // Ignore non-UTF8 source code for now.
                             let value = String::from_utf8_lossy(&str.value);
-                            self.push_str(&value);
+                            self.push_str_without_indent(&value);
                         }
                         HeredocPart::Statements(embedded) => {
                             self.format_embedded_statements(embedded, ctx);
@@ -3501,7 +3457,7 @@ impl Formatter {
                         HeredocPart::Str(str) => {
                             // Ignore non-UTF8 source code for now.
                             let value = String::from_utf8_lossy(&str.value);
-                            self.push_str(&value);
+                            self.push_str_without_indent(&value);
                         }
                         HeredocPart::Statements(embedded) => {
                             self.format_embedded_statements(embedded, ctx);
@@ -3515,11 +3471,6 @@ impl Formatter {
                 self.push_str(&heredoc.id);
             }
         }
-        self.push('\n');
-    }
-
-    fn put_indent(&mut self) {
-        let spaces = " ".repeat(self.indent);
-        self.push_str(&spaces);
+        self.buffer.push('\n');
     }
 }

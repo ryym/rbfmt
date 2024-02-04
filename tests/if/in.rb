@@ -105,6 +105,12 @@ if foo(
   foo
 end
 
+if true
+  foo.select { |bar|
+    baz
+  } if 2
+end
+
 # --- unless ---
 
 unless true
