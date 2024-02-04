@@ -121,3 +121,9 @@ foo(<<~H1, <<~H2)
 H1
   222
 H2
+
+if true
+  <<~H1
+    not-formatted-well
+H1
+end
