@@ -865,7 +865,7 @@ impl Block {
 #[derive(Debug)]
 pub(crate) struct MethodChain {
     shape: Shape,
-    receiver: Option<Box<Node>>,
+    receiver: Option<Receiver>,
     calls: Vec<CallUnit>,
     calls_shape: Shape,
 }
@@ -874,7 +874,7 @@ impl MethodChain {
     pub(crate) fn new(receiver: Option<Node>) -> Self {
         Self {
             shape: receiver.as_ref().map_or(Shape::inline(0), |r| r.shape),
-            receiver: receiver.map(Box::new),
+            receiver: receiver.map(Receiver::new),
             calls: vec![],
             calls_shape: Shape::inline(0),
         }
@@ -909,18 +909,31 @@ impl MethodChain {
 
         if let Some(prev) = self.calls.last_mut() {
             prev.append_index_call(idx_call);
-        } else {
-            self.calls.push(CallUnit {
-                shape: idx_call.shape,
-                leading_trivia: LeadingTrivia::new(),
-                trailing_trivia: TrailingTrivia::none(),
-                operator: None,
-                subject: None,
-                arguments: Some(idx_call.arguments),
-                block: idx_call.block,
-                index_calls: vec![],
-            });
+        } else if let Some(ref mut recv) = &mut self.receiver {
+            recv.append_index_call(idx_call);
         }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Receiver {
+    shape: Shape,
+    node: Box<Node>,
+    index_calls: Vec<IndexCall>,
+}
+
+impl Receiver {
+    fn new(node: Node) -> Self {
+        Self {
+            shape: node.shape,
+            node: Box::new(node),
+            index_calls: vec![],
+        }
+    }
+
+    fn append_index_call(&mut self, idx_call: IndexCall) {
+        self.shape.append(&idx_call.shape);
+        self.index_calls.push(idx_call);
     }
 }
 
@@ -2390,8 +2403,14 @@ impl Formatter {
 
     fn format_method_chain(&mut self, chain: &MethodChain, ctx: &FormatContext) {
         if let Some(recv) = &chain.receiver {
-            self.format(recv, ctx);
-            self.write_trailing_comment(&recv.trailing_trivia);
+            self.format(&recv.node, ctx);
+            self.write_trailing_comment(&recv.node.trailing_trivia);
+            for idx_call in &recv.index_calls {
+                self.format_arguments(&idx_call.arguments, ctx);
+                if let Some(block) = &idx_call.block {
+                    self.format_block(block, ctx);
+                }
+            }
         }
 
         // horizontal format
