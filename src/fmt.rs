@@ -472,6 +472,10 @@ impl Statements {
     pub(crate) fn shape(&self) -> Shape {
         self.shape
     }
+
+    fn is_empty(&self) -> bool {
+        self.nodes.is_empty() && self.virtual_end.is_none()
+    }
 }
 
 #[derive(Debug)]
@@ -724,6 +728,10 @@ impl Arguments {
         }
         self.virtual_end = end;
     }
+
+    fn is_empty(&self) -> bool {
+        self.nodes.is_empty() && self.virtual_end.is_none()
+    }
 }
 
 #[derive(Debug)]
@@ -880,6 +888,10 @@ impl Block {
         self.shape.insert(&Shape::inline("  ".len()));
         self.shape.insert(&body.shape);
         self.body = body;
+    }
+
+    fn is_empty(&self) -> bool {
+        !matches!(self.shape, Shape::Multilines) && self.body.is_empty()
     }
 
     fn min_first_line_len(&self) -> usize {
@@ -1440,6 +1452,10 @@ impl BlockBody {
     pub(crate) fn set_ensure(&mut self, ensure: Else) {
         self.shape = Shape::Multilines;
         self.ensure = Some(ensure);
+    }
+
+    fn is_empty(&self) -> bool {
+        self.statements.is_empty() && self.rescues.is_empty() && self.ensure.is_none()
     }
 }
 
@@ -2455,63 +2471,75 @@ impl Formatter {
                 self.write_trailing_comment(&call.trailing_trivia);
             }
         }
+        if chain.calls.is_empty() {
+            return;
+        }
 
-        // horizontal format
-        //   foo.bar.baz
-        //   foo.bar.baz do
-        //     ...
-        //   end
-        // vertical format
-        //   foo
-        //     .bar
-        //     .baz
-
-        let can_be_horizontal = !chain.head.has_trailing_trivia()
-            && chain
-                .calls
-                .iter()
-                .all(|call| call.leading_trivia.is_empty() && call.trailing_trivia.is_none());
-        let committed = if can_be_horizontal {
-            let result = self.draft(|d| {
-                let mut multilines_call_count = 0;
-                for call in &chain.calls {
-                    if let Some(min_first_line_len) = call.min_first_line_len() {
-                        if min_first_line_len > d.remaining_width {
+        // Format horizontal if all these are met:
+        //   - no intermediate comments
+        //   - one or zero blocks
+        //   - only one multilines arguments or block
+        //   - no more arguments after multilines call
+        // Problems:
+        //   - The format can change to vertical by a subtle modification
+        //   - Sometimes the vertical format is more beautiful
+        let draft_result = self.draft(|d| {
+            if chain.head.has_trailing_trivia() {
+                return DraftResult::Rollback;
+            }
+            let mut call_expanded = false;
+            let mut non_empty_block_exists = false;
+            let last_idx = chain.calls.len() - 1;
+            for (i, call) in chain.calls.iter().enumerate() {
+                if i < last_idx && !call.trailing_trivia.is_none() {
+                    return DraftResult::Rollback;
+                }
+                match call.min_first_line_len() {
+                    Some(len) if len <= d.remaining_width => {}
+                    _ => return DraftResult::Rollback,
+                };
+                let prev_line_count = d.line_count;
+                if let Some(call_op) = &call.operator {
+                    d.push_str(call_op);
+                }
+                d.push_str(&call.name);
+                if let Some(args) = &call.arguments {
+                    if !args.is_empty() && call_expanded {
+                        return DraftResult::Rollback;
+                    }
+                    d.format_arguments(args, ctx);
+                }
+                if let Some(block) = &call.block {
+                    if !block.is_empty() {
+                        if call_expanded {
+                            return DraftResult::Rollback;
+                        }
+                        if !non_empty_block_exists {
+                            non_empty_block_exists = true
+                        } else {
                             return DraftResult::Rollback;
                         }
                     }
-                    let prev_line_count = d.line_count;
-                    if let Some(call_op) = &call.operator {
-                        d.push_str(call_op);
+                    d.format_block(block, ctx);
+                }
+                for idx_call in &call.index_calls {
+                    // XXX: Handle single arg index as non-breakable
+                    if !idx_call.arguments.is_empty() && call_expanded {
+                        return DraftResult::Rollback;
                     }
-                    d.push_str(&call.name);
-                    if let Some(args) = &call.arguments {
-                        d.format_arguments(args, ctx);
-                    }
-                    if let Some(block) = &call.block {
+                    d.format_arguments(&idx_call.arguments, ctx);
+                    if let Some(block) = &idx_call.block {
                         d.format_block(block, ctx);
                     }
-                    for idx_call in &call.index_calls {
-                        d.format_arguments(&idx_call.arguments, ctx);
-                        if let Some(block) = &idx_call.block {
-                            d.format_block(block, ctx);
-                        }
-                    }
-                    if prev_line_count < d.line_count {
-                        multilines_call_count += 1;
-                        if multilines_call_count > 1 {
-                            return DraftResult::Rollback;
-                        }
-                    }
                 }
-                DraftResult::Commit
-            });
-            matches!(result, DraftResult::Commit)
-        } else {
-            false
-        };
+                if prev_line_count < d.line_count {
+                    call_expanded = true
+                }
+            }
+            DraftResult::Commit
+        });
 
-        if !committed {
+        if !matches!(draft_result, DraftResult::Commit) {
             self.indent();
             for call in chain.calls.iter() {
                 if let Some(call_op) = &call.operator {

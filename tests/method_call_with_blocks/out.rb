@@ -203,3 +203,21 @@ end
 Foo.transaction do
   p 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
 end
+
+if true
+  aaaaaaaaaaaa.bbbbbbbbbbbbbbbbbb(:xx, :yy, :zz).cccccccc(1, 2, 3).ddddddddd('e').each do |item|
+    item.foo.bar&.baz || :qux
+  end
+  aaaaaaaaaaaa.bbbbbbbbbbbbbbbbbb(:xx, :yy, :zz).cccccccc(1, 2, 3).ddddddddd('eeeeeee').each do |
+    item
+  |
+    item.foo.bar&.baz || :qux
+  end
+  aaaaaaaaaaaa
+    .bbbbbbbbbbbbbbbbbb(:xx, :yy, :zz)
+    .cccccccc(1, 2, 3)
+    .ddddddddd('eeeeeeeeeeeeeeeeeeeeeeeeeee')
+    .each do |item|
+      item.foo.bar&.baz || :qux
+    end
+end

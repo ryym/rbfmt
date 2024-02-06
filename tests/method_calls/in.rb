@@ -76,6 +76,10 @@ foo.bar
   # d
   .d {}.e {}
 
+foo # a
+  .bar
+  .baz
+
 # a
 foo # b
   # c
@@ -160,3 +164,21 @@ end
 aaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbb.cccccccccccccccccccccc.dddddddddddddddddd.eeeeeeeeeeeeeee
 
 aaaaaaaaaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbbbbbbbbbbbbbb.cccccccccccccccccccccc.dddddddddddddddddddddddddd(eeeeeeeeeeeeeee)
+
+if true
+  # Ideally these chains should be formatted as same.
+  Aaaa.own(bbbbbb_id).where(Aaaa.arel_table[:bbbb_date].lt(bbbb_date)).order(bbbb_date_cccc: :desc).take
+  Aaaa.own(bbbbbb_id).where(Aaaa.arel_table[:bbbb_date].lt(bbbb_date)).order(bbbb_date_cccc_cccc: :desc).take
+
+  foooo.very_very_long_name_method_abcde_efghi.very_very_long_name_method_abcde_efghi(1).do_something(aa, bb, cc, dd, ee)
+  foooo.very_very_long_name_method_abcde_efghi.aaaaaaaaaaaaaa_bbbbbbbb(1).do_something(aa, bb, cc, dd, ee)
+
+  attributes.select { |attr, _| attr.to_sym.in? Aaaa::BBBBBBBBBBBBBBBBBBB }
+    .merge(bbbb_date: bbbb_date.ccccccccc)
+    .merge(ddd_date: bbbb_date - 1.day)
+    .merge(eeeeeeeeeeeeeeeee: prev_eeeeeeeeeeeeeeeee)
+
+  aaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbb
+    .find_by(ccccccc_id: dddddddddddddd.ccccccc_id)
+    .try(:eeeeeeeeeeeeeeeeeeeee)
+end
