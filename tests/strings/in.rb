@@ -55,6 +55,23 @@
   @e
 }"
 
+foo(1, "abc", "#{d}e", 2)
+
+foo(
+  1,
+  "a
+  b
+  c",
+  2,
+)
+
+foo(
+  1,
+  "#{d}
+  e",
+  2,
+)
+
 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbb #{cccccccccccc(ddddddddddd, eeeeeeeeeee, ffffffffff, gggg)}"
 
 "aaa#{
