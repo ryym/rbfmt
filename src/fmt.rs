@@ -255,10 +255,10 @@ impl Kind {
 
 #[derive(Debug)]
 pub(crate) struct StringLike {
-    pub shape: Shape,
-    pub opening: Option<String>,
-    pub value: Vec<u8>,
-    pub closing: Option<String>,
+    shape: Shape,
+    opening: Option<String>,
+    value: Vec<u8>,
+    closing: Option<String>,
 }
 
 impl StringLike {
@@ -277,10 +277,10 @@ impl StringLike {
 
 #[derive(Debug)]
 pub(crate) struct DynStringLike {
-    pub shape: Shape,
-    pub opening: Option<String>,
-    pub parts: Vec<DynStrPart>,
-    pub closing: Option<String>,
+    shape: Shape,
+    opening: Option<String>,
+    parts: Vec<DynStrPart>,
+    closing: Option<String>,
 }
 
 impl DynStringLike {
