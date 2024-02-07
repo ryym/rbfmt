@@ -65,6 +65,15 @@ impl Shape {
         }
     }
 
+    fn argument_style(&self) -> ArgumentStyle {
+        match self {
+            Self::Inline { len } => ArgumentStyle::Horizontal {
+                min_first_line_len: *len,
+            },
+            _ => ArgumentStyle::Vertical,
+        }
+    }
+
     pub(crate) fn append(&mut self, other: &Self) {
         let shape = self.add(other);
         let _ = mem::replace(self, shape);
@@ -101,6 +110,30 @@ impl Shape {
 }
 
 #[derive(Debug)]
+enum ArgumentStyle {
+    Vertical,
+    Horizontal { min_first_line_len: usize },
+}
+
+impl ArgumentStyle {
+    fn add(&self, other: Self) -> Self {
+        match (self, other) {
+            (
+                Self::Horizontal {
+                    min_first_line_len: len1,
+                },
+                Self::Horizontal {
+                    min_first_line_len: len2,
+                },
+            ) => Self::Horizontal {
+                min_first_line_len: len1 + len2,
+            },
+            _ => Self::Vertical,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Node {
     pub leading_trivia: LeadingTrivia,
     pub trailing_trivia: TrailingTrivia,
@@ -131,10 +164,18 @@ impl Node {
     }
 
     pub(crate) fn is_diagonal(&self) -> bool {
-        if !self.leading_trivia.shape.is_empty() {
-            false
-        } else {
+        if self.leading_trivia.shape.is_empty() {
             self.kind.is_diagonal()
+        } else {
+            false
+        }
+    }
+
+    fn argument_style(&self) -> ArgumentStyle {
+        if self.leading_trivia.is_empty() {
+            self.kind.argument_style()
+        } else {
+            ArgumentStyle::Vertical
         }
     }
 }
@@ -249,6 +290,63 @@ impl Kind {
             Self::RangeLike(_) => true,
             Self::PrePostExec(_) => true,
             Self::Alias(_) => true,
+        }
+    }
+
+    fn argument_style(&self) -> ArgumentStyle {
+        match self {
+            Self::Atom(atom) => ArgumentStyle::Horizontal {
+                min_first_line_len: atom.len(),
+            },
+            Self::StringLike(str) => str.shape.argument_style(),
+            Self::HeredocOpening(opening) => opening.shape.argument_style(),
+            Self::Parens(_) => ArgumentStyle::Horizontal {
+                min_first_line_len: "(".len(),
+            },
+            Self::Lambda(lambda) => {
+                let min_len = if lambda.parameters.is_some() {
+                    "->(".len()
+                } else {
+                    "-> {".len()
+                };
+                ArgumentStyle::Horizontal {
+                    min_first_line_len: min_len,
+                }
+            }
+            Self::Prefix(prefix) => {
+                let expr_style = prefix.expression.as_ref().map_or(
+                    ArgumentStyle::Horizontal {
+                        min_first_line_len: 0,
+                    },
+                    |e| e.argument_style(),
+                );
+                ArgumentStyle::Horizontal {
+                    min_first_line_len: prefix.operator.len(),
+                }
+                .add(expr_style)
+            }
+            Self::Array(array) => match &array.opening {
+                Some(opening) => ArgumentStyle::Horizontal {
+                    min_first_line_len: opening.len(),
+                },
+                None => array
+                    .elements
+                    .first()
+                    .expect("non-brackets array must have elements")
+                    .argument_style(),
+            },
+            Self::Hash(hash) => ArgumentStyle::Horizontal {
+                min_first_line_len: hash.opening.len(),
+            },
+            Self::Assoc(assoc) => match assoc.value.argument_style() {
+                ArgumentStyle::Vertical => ArgumentStyle::Vertical,
+                ArgumentStyle::Horizontal {
+                    min_first_line_len: value_len,
+                } => assoc.key.argument_style().add(ArgumentStyle::Horizontal {
+                    min_first_line_len: ": ".len() + value_len,
+                }),
+            },
+            _ => ArgumentStyle::Vertical,
         }
     }
 }
@@ -2484,7 +2582,7 @@ impl Formatter {
             return;
         }
 
-        // Format horizontal if all these are met:
+        // Format horizontally if all these are met:
         //   - no intermediate comments
         //   - one or zero blocks
         //   - only one multilines arguments or block
@@ -2583,22 +2681,52 @@ impl Formatter {
     }
 
     fn format_arguments(&mut self, args: &Arguments, ctx: &FormatContext) {
-        if args.shape.fits_in_inline(self.remaining_width) {
-            if let Some(opening) = &args.opening {
-                self.push_str(opening);
-            } else {
-                self.push(' ');
+        // Format horizontally if all these are met:
+        //   - no intermediate comments
+        //   - all nodes' ArgumentStyle is horizontal
+        //   - only the last argument can span in multilines
+        let draft_result = self.draft(|d| {
+            if args.virtual_end.is_some() {
+                return DraftResult::Rollback;
             }
+            d.push_str(args.opening.as_ref().map_or(" ", |s| s));
             for (i, arg) in args.nodes.iter().enumerate() {
                 if i > 0 {
-                    self.push_str(", ");
+                    d.push_str(", ");
                 }
-                self.format(arg, ctx);
+                if matches!(arg.shape, Shape::LineEnd { .. }) {
+                    return DraftResult::Rollback;
+                }
+                match arg.argument_style() {
+                    ArgumentStyle::Vertical => match arg.shape {
+                        Shape::Inline { len } if len <= d.remaining_width => {
+                            d.format(arg, ctx);
+                        }
+                        _ => return DraftResult::Rollback,
+                    },
+                    ArgumentStyle::Horizontal { min_first_line_len } => {
+                        if d.remaining_width < min_first_line_len {
+                            return DraftResult::Rollback;
+                        }
+                        let prev_line_count = d.line_count;
+                        d.format(arg, ctx);
+                        if prev_line_count < d.line_count && i < args.nodes.len() - 1 {
+                            return DraftResult::Rollback;
+                        }
+                    }
+                }
             }
             if let Some(closing) = &args.closing {
-                self.push_str(closing);
+                d.push_str(closing);
             }
-        } else if let Some(opening) = &args.opening {
+            DraftResult::Commit
+        });
+
+        if matches!(draft_result, DraftResult::Commit) {
+            return;
+        }
+
+        if let Some(opening) = &args.opening {
             self.push_str(opening);
             self.indent();
             if !args.nodes.is_empty() {
@@ -2633,26 +2761,35 @@ impl Formatter {
                 self.push(',');
             }
             self.write_trailing_comment(&args.nodes[0].trailing_trivia);
-            if args.nodes.len() > 1 {
-                self.indent();
-                let last_idx = args.nodes.len() - 1;
-                for (i, arg) in args.nodes.iter().enumerate().skip(1) {
-                    self.break_line(ctx);
-                    self.write_leading_trivia(
-                        &arg.leading_trivia,
-                        ctx,
-                        EmptyLineHandling::Trim {
-                            start: i == 0,
-                            end: false,
-                        },
-                    );
-                    self.format(arg, ctx);
-                    if i < last_idx {
-                        self.push(',');
-                    }
-                    self.write_trailing_comment(&arg.trailing_trivia);
+            match args.nodes.len() {
+                1 => {}
+                2 if args.nodes[0].trailing_trivia.is_none()
+                    && args.nodes[1].shape.fits_in_one_line(self.remaining_width) =>
+                {
+                    self.push(' ');
+                    self.format(&args.nodes[1], ctx);
                 }
-                self.dedent();
+                _ => {
+                    self.indent();
+                    let last_idx = args.nodes.len() - 1;
+                    for (i, arg) in args.nodes.iter().enumerate().skip(1) {
+                        self.break_line(ctx);
+                        self.write_leading_trivia(
+                            &arg.leading_trivia,
+                            ctx,
+                            EmptyLineHandling::Trim {
+                                start: i == 0,
+                                end: false,
+                            },
+                        );
+                        self.format(arg, ctx);
+                        if i < last_idx {
+                            self.push(',');
+                        }
+                        self.write_trailing_comment(&arg.trailing_trivia);
+                    }
+                    self.dedent();
+                }
             }
         }
     }

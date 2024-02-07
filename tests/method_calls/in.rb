@@ -137,6 +137,71 @@ end
   # 3
 ) # 4
 
+foo(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccc)
+
+foo(bar, {
+  a: 1,
+  b: 2,
+})
+foo(bar, {
+  a: 1,
+  b: 2,
+}, :baz)
+
+foo(bar, -> {})
+foo(bar, ->(a, b) {
+  a + b
+})
+foo(bar, ->(
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
+  bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+) {
+  aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+})
+
+foo(bar, :baz, aaa.
+    # bbb
+    bbb.ccc
+   )
+
+foo(aaaaaaaaaa, [
+  aaa.bbb.ccc, # ddd
+  123,
+])
+foo(bar ? baz : [
+  aaa.bbb.ccc, # ddd
+  123,
+])
+
+render json: { messages: [aaaaaaaaa], extra: { bbbbbbbbbbbbb: cccccccccccccccccc } }, status: :dddddddddddddddd
+
+render json: {
+  messages: [aaaaaaaaa], extra: { bbbbbbbbbbbbb: cccccccccccccccccc },
+}, status: :dddddddddddddddd
+
+enum foo_bar_baz: {
+  aaaa: 0,
+  bbbb: 1,
+  cccc: 2,
+}, _prefix: true
+enum(foo_bar_baz: {
+  aaaa: 0,
+  bbbb: 1,
+  cccc: 2,
+}, _prefix: true)
+
+validate :foo_bar_baz, if: -> {
+  foo.bar? && aaa.bbb&.ccc != nil
+}
+validate :foo_bar_baz, on: :create, if: -> {
+  foo.bar? && aaa.bbb&.ccc != nil
+}
+validate :foo_bar_baz, if: -> {
+  foo.bar? && aaa.bbb&.ccc != nil
+}, on: :create
+
+validates :foo_bar_baz, exclusion: { in: %w(aaaaa bbbbb ccccc ddddd), message: "%{value} is reserved." }
+
 aaaaaaaa || Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.new(cccc, dddddddd)
 
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa if foo(
