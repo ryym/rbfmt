@@ -1293,8 +1293,12 @@ pub(crate) struct Hash {
 }
 
 impl Hash {
-    pub(crate) fn new(opening: String, closing: String) -> Self {
-        let shape = Shape::inline(opening.len() + closing.len());
+    pub(crate) fn new(opening: String, closing: String, should_be_inline: bool) -> Self {
+        let shape = if should_be_inline {
+            Shape::inline(opening.len() + closing.len())
+        } else {
+            Shape::Multilines
+        };
         Self {
             shape,
             opening,

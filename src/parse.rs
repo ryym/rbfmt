@@ -1323,7 +1323,15 @@ impl FmtNodeBuilder<'_> {
                 let closing_loc = node.closing_loc();
                 let opening = Self::source_lossy_at(&opening_loc);
                 let closing = Self::source_lossy_at(&closing_loc);
-                let mut hash = fmt::Hash::new(opening, closing);
+                let should_be_inline = if let Some(first_element) = node.elements().iter().next() {
+                    !self.does_line_break_exist_in(
+                        opening_loc.start_offset(),
+                        first_element.location().start_offset(),
+                    )
+                } else {
+                    true
+                };
+                let mut hash = fmt::Hash::new(opening, closing, should_be_inline);
                 let closing_start = closing_loc.start_offset();
                 Self::each_node_with_next_start(
                     node.elements().iter(),
