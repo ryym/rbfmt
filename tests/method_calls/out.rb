@@ -228,6 +228,14 @@ validates :foo_bar_baz, exclusion: {
   message: "%{value} is reserved.",
 }
 
+if true
+  if true
+    aaaaaa.bbbbbbbbbbbbbbb.find_by(ccccccc_id: dddddddddddddd.ccccccc_id).try(
+      :eeeeeeeeeeeeeeeeeeeee,
+    )
+  end
+end
+
 aaaaaaaa || Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.new(cccc, dddddddd)
 
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa if foo(

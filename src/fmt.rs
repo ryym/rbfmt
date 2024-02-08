@@ -2717,6 +2717,9 @@ impl Formatter {
                 }
             }
             if let Some(closing) = &args.closing {
+                if d.remaining_width < closing.len() {
+                    return DraftResult::Rollback;
+                }
                 d.push_str(closing);
             }
             DraftResult::Commit
