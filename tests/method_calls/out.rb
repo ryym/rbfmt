@@ -323,3 +323,27 @@ if true
     :eeeeeeeeeeeeeeeeeeeee,
   )
 end
+
+expect { subject }.to change {
+  Aaaaaaaaa.where(bbbbbbbbbbbbbbbbb: bbbbbbbbbbbbbbbbb).count
+}.from(0).to(1)
+
+expect { subject }.to change { Aaaaaaaaa.where(bbbbbbbbbbbbbbbbb: bbbbbbbbbbbbbbbbb).count }
+  .from(0)
+  .to(1)
+
+expect_subject_change
+  .foo {
+    Aaaaaaaaa.where(bbbbbbbbbbbbbbbbb: bbbbbbbbbbbbbbbbb).count
+  }
+  .from(0)
+  .to(1)
+
+expect_subject_change
+  .foo { Aaaaaaaaa.where(bbbbbbbbbbbbbbbbb: bbbbbbbbbbbbbbbbb).count }
+  .from(0)
+  .to(1)
+
+private def foo_bar_baz(a, b:, c: nil)
+  a + b * (c || 1)
+end
