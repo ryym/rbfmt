@@ -182,7 +182,7 @@ impl Node {
 
 #[derive(Debug)]
 pub(crate) enum Kind {
-    Atom(String),
+    Atom(Atom),
     StringLike(StringLike),
     DynStringLike(DynStringLike),
     HeredocOpening(HeredocOpening),
@@ -217,7 +217,7 @@ pub(crate) enum Kind {
 impl Kind {
     pub(crate) fn shape(&self) -> Shape {
         match self {
-            Self::Atom(s) => Shape::inline(s.len()),
+            Self::Atom(atom) => Shape::inline(atom.0.len()),
             Self::StringLike(s) => s.shape,
             Self::DynStringLike(s) => s.shape,
             Self::HeredocOpening(opening) => *opening.shape(),
@@ -296,7 +296,7 @@ impl Kind {
     fn argument_style(&self) -> ArgumentStyle {
         match self {
             Self::Atom(atom) => ArgumentStyle::Horizontal {
-                min_first_line_len: atom.len(),
+                min_first_line_len: atom.0.len(),
             },
             Self::StringLike(str) => str.shape.argument_style(),
             Self::HeredocOpening(opening) => opening.shape.argument_style(),
@@ -350,6 +350,9 @@ impl Kind {
         }
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct Atom(pub String);
 
 #[derive(Debug)]
 pub(crate) struct StringLike {
@@ -1941,7 +1944,7 @@ impl Formatter {
 
     fn format(&mut self, node: &Node, ctx: &FormatContext) {
         match &node.kind {
-            Kind::Atom(value) => self.format_atom(value),
+            Kind::Atom(atom) => self.format_atom(atom),
             Kind::StringLike(str) => self.format_string_like(str),
             Kind::DynStringLike(dstr) => self.format_dyn_string_like(dstr, ctx),
             Kind::HeredocOpening(opening) => self.format_heredoc_opening(opening),
@@ -1974,8 +1977,8 @@ impl Formatter {
         }
     }
 
-    fn format_atom(&mut self, value: &str) {
-        self.push_str(value);
+    fn format_atom(&mut self, atom: &Atom) {
+        self.push_str(&atom.0);
     }
 
     fn format_string_like(&mut self, str: &StringLike) {
@@ -2042,7 +2045,7 @@ impl Formatter {
 
     fn format_embedded_variable(&mut self, var: &EmbeddedVariable) {
         self.push_str(&var.operator);
-        self.format_atom(&var.variable);
+        self.push_str(&var.variable);
     }
 
     fn format_heredoc_opening(&mut self, opening: &HeredocOpening) {
