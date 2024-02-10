@@ -6,6 +6,7 @@ mod dyn_string_like;
 mod fors;
 mod heredoc;
 mod ifs;
+mod infix_chain;
 mod method_chain;
 mod parens;
 mod postmodifier;
@@ -17,8 +18,8 @@ mod whiles;
 
 pub(crate) use self::{
     atom::*, block::*, case::*, constant_path::*, dyn_string_like::*, fors::*, heredoc::*, ifs::*,
-    method_chain::*, parens::*, postmodifier::*, statements::*, string_like::*, ternary::*,
-    virtual_end::*, whiles::*,
+    infix_chain::*, method_chain::*, parens::*, postmodifier::*, statements::*, string_like::*,
+    ternary::*, virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -286,95 +287,6 @@ impl Arguments {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.nodes.is_empty() && self.virtual_end.is_none()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct InfixChain {
-    pub shape: Shape,
-    pub left: Box<Node>,
-    pub precedence: InfixPrecedence,
-    pub rights_shape: Shape,
-    pub rights: Vec<InfixRight>,
-}
-
-impl InfixChain {
-    pub(crate) fn new(left: Node, precedence: InfixPrecedence) -> Self {
-        Self {
-            shape: left.shape,
-            left: Box::new(left),
-            precedence,
-            rights_shape: Shape::inline(0),
-            rights: vec![],
-        }
-    }
-
-    pub(crate) fn precedence(&self) -> &InfixPrecedence {
-        &self.precedence
-    }
-
-    pub(crate) fn append_right(&mut self, op: String, right: Node) {
-        let right = InfixRight::new(op, right);
-        self.shape.append(&right.shape);
-        self.rights_shape.append(&right.shape);
-        self.rights.push(right);
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct InfixRight {
-    pub shape: Shape,
-    pub operator: String,
-    pub value: Box<Node>,
-}
-
-impl InfixRight {
-    fn new(operator: String, value: Node) -> Self {
-        let shape = Shape::inline(operator.len() + "  ".len()).add(&value.shape);
-        Self {
-            shape,
-            operator,
-            value: Box::new(value),
-        }
-    }
-}
-
-// https://ruby-doc.org/core-2.6.2/doc/syntax/precedence_rdoc.html#label-Precedence
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) enum InfixPrecedence {
-    WordAndOr, // and, or
-    // Assign,    // =, etc
-    Range,     // .., ...
-    Or,        // ||
-    And,       // &&
-    Eq,        // <=>, ==, ===, !=, =~, !~
-    Comp,      // >, >=, <, <=
-    Union,     // |, ^
-    Intersect, // &
-    Shift,     // <<, >>
-    Add,       // +, -
-    Mult,      // *, /, %
-    Power,     // **
-}
-
-impl InfixPrecedence {
-    pub(crate) fn from_operator(op: &str) -> Self {
-        match op {
-            "**" => Self::Power,
-            "*" | "/" | "%" => Self::Mult,
-            "+" | "-" => Self::Add,
-            "<<" | ">>" => Self::Shift,
-            "&" => Self::Intersect,
-            "|" | "^" => Self::Union,
-            ">" | ">=" | "<" | "<=" => Self::Comp,
-            "<=>" | "==" | "===" | "!=" | "=~" | "!~" => Self::Eq,
-            "&&" => Self::And,
-            "||" => Self::Or,
-            ".." | "..." => Self::Range,
-            // "=" => Self::Assign,
-            "and" | "or" => Self::WordAndOr,
-            _ => panic!("unexpected infix operator: {}", op),
-        }
     }
 }
 
