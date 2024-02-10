@@ -2,13 +2,14 @@ mod atom;
 mod constant_path;
 mod dyn_string_like;
 mod heredoc;
+mod parens;
 mod statements;
 mod string_like;
 mod virtual_end;
 
 pub(crate) use self::{
-    atom::*, constant_path::*, dyn_string_like::*, heredoc::*, statements::*, string_like::*,
-    virtual_end::*,
+    atom::*, constant_path::*, dyn_string_like::*, heredoc::*, parens::*, statements::*,
+    string_like::*, virtual_end::*,
 };
 
 use super::{
@@ -232,20 +233,6 @@ impl Kind {
             },
             _ => ArgumentStyle::Vertical,
         }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Parens {
-    pub shape: Shape,
-    pub body: Statements,
-}
-
-impl Parens {
-    pub(crate) fn new(body: Statements) -> Self {
-        let mut shape = Shape::inline("()".len());
-        shape.insert(&body.shape);
-        Self { shape, body }
     }
 }
 
