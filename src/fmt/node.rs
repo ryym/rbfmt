@@ -1,4 +1,5 @@
 mod alias;
+mod arguments;
 mod array;
 mod assign;
 mod assoc;
@@ -32,11 +33,11 @@ mod virtual_end;
 mod whiles;
 
 pub(crate) use self::{
-    alias::*, array::*, assign::*, assoc::*, atom::*, begin::*, block::*, call_like::*, case::*,
-    class_like::*, constant_path::*, def::*, dyn_string_like::*, fors::*, hash::*, heredoc::*,
-    ifs::*, infix_chain::*, lambda::*, method_chain::*, multi_assign_target::*, parens::*,
-    postmodifier::*, pre_post_exec::*, prefix::*, range_like::*, singleton_class::*, statements::*,
-    string_like::*, ternary::*, virtual_end::*, whiles::*,
+    alias::*, arguments::*, array::*, assign::*, assoc::*, atom::*, begin::*, block::*,
+    call_like::*, case::*, class_like::*, constant_path::*, def::*, dyn_string_like::*, fors::*,
+    hash::*, heredoc::*, ifs::*, infix_chain::*, lambda::*, method_chain::*,
+    multi_assign_target::*, parens::*, postmodifier::*, pre_post_exec::*, prefix::*, range_like::*,
+    singleton_class::*, statements::*, string_like::*, ternary::*, virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -260,50 +261,6 @@ impl Kind {
             },
             _ => ArgumentStyle::Vertical,
         }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Arguments {
-    pub opening: Option<String>,
-    pub closing: Option<String>,
-    pub shape: Shape,
-    pub nodes: Vec<Node>,
-    pub last_comma_allowed: bool,
-    pub virtual_end: Option<VirtualEnd>,
-}
-
-impl Arguments {
-    pub(crate) fn new(opening: Option<String>, closing: Option<String>) -> Self {
-        let opening_len = opening.as_ref().map_or(0, |o| o.len());
-        let closing_len = closing.as_ref().map_or(0, |o| o.len());
-        Self {
-            opening,
-            closing,
-            shape: Shape::inline(opening_len + closing_len),
-            nodes: vec![],
-            last_comma_allowed: true,
-            virtual_end: None,
-        }
-    }
-
-    pub(crate) fn append_node(&mut self, node: Node) {
-        self.shape.insert(&node.shape);
-        if !self.nodes.is_empty() {
-            self.shape.insert(&Shape::inline(", ".len()));
-        }
-        self.nodes.push(node);
-    }
-
-    pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
-        if let Some(end) = &end {
-            self.shape.insert(&end.shape);
-        }
-        self.virtual_end = end;
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        self.nodes.is_empty() && self.virtual_end.is_none()
     }
 }
 
