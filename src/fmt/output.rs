@@ -105,7 +105,7 @@ impl Output {
             Kind::Atom(atom) => atom.format(self),
             Kind::StringLike(str) => str.format(self),
             Kind::DynStringLike(dstr) => dstr.format(self, ctx),
-            Kind::HeredocOpening(opening) => self.format_heredoc_opening(opening),
+            Kind::HeredocOpening(opening) => opening.format(self),
             Kind::ConstantPath(const_path) => self.format_constant_path(const_path, ctx),
             Kind::Statements(statements) => self.format_statements(statements, ctx, false),
             Kind::Parens(parens) => self.format_parens(parens, ctx),
@@ -161,12 +161,6 @@ impl Output {
     pub(super) fn format_embedded_variable(&mut self, var: &EmbeddedVariable) {
         self.push_str(&var.operator);
         self.push_str(&var.variable);
-    }
-
-    pub(super) fn format_heredoc_opening(&mut self, opening: &HeredocOpening) {
-        self.push_str(opening.indent_mode.prefix_symbols());
-        self.push_str(&opening.id);
-        self.heredoc_queue.push_back(opening.pos);
     }
 
     pub(super) fn format_constant_path(&mut self, const_path: &ConstantPath, ctx: &FormatContext) {

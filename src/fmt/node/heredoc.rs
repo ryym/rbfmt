@@ -1,4 +1,4 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{output::Output, shape::Shape};
 
 use super::{EmbeddedStatements, EmbeddedVariable, StringLike};
 
@@ -26,6 +26,12 @@ impl HeredocOpening {
 
     pub(crate) fn shape(&self) -> &Shape {
         &self.shape
+    }
+
+    pub(crate) fn format(&self, o: &mut Output) {
+        o.push_str(self.indent_mode.prefix_symbols());
+        o.push_str(&self.id);
+        o.heredoc_queue.push_back(self.pos);
     }
 }
 
