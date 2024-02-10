@@ -108,7 +108,7 @@ impl Output {
             Kind::HeredocOpening(opening) => opening.format(self),
             Kind::ConstantPath(const_path) => const_path.format(self, ctx),
             Kind::Statements(statements) => statements.format(self, ctx, false),
-            Kind::Parens(parens) => self.format_parens(parens, ctx),
+            Kind::Parens(parens) => parens.format(self, ctx),
             Kind::If(ifexpr) => self.format_if(ifexpr, ctx),
             Kind::Ternary(ternary) => self.format_ternary(ternary, ctx),
             Kind::Case(case) => self.format_case(case, ctx),
@@ -161,24 +161,6 @@ impl Output {
     pub(super) fn format_embedded_variable(&mut self, var: &EmbeddedVariable) {
         self.push_str(&var.operator);
         self.push_str(&var.variable);
-    }
-
-    pub(super) fn format_parens(&mut self, parens: &Parens, ctx: &FormatContext) {
-        if parens.body.shape().is_empty() {
-            self.push_str("()");
-        } else {
-            self.push('(');
-            if parens.body.shape.fits_in_inline(self.remaining_width) {
-                parens.body.format(self, ctx, false);
-            } else {
-                self.indent();
-                self.break_line(ctx);
-                parens.body.format(self, ctx, true);
-                self.dedent();
-                self.break_line(ctx);
-            }
-            self.push(')');
-        }
     }
 
     pub(super) fn write_trivia_at_virtual_end(
