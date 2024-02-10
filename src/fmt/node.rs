@@ -6,6 +6,7 @@ mod begin;
 mod block;
 mod call_like;
 mod case;
+mod class_like;
 mod constant_path;
 mod def;
 mod dyn_string_like;
@@ -20,6 +21,7 @@ mod multi_assign_target;
 mod parens;
 mod postmodifier;
 mod prefix;
+mod singleton_class;
 mod statements;
 mod string_like;
 mod ternary;
@@ -28,9 +30,10 @@ mod whiles;
 
 pub(crate) use self::{
     array::*, assign::*, assoc::*, atom::*, begin::*, block::*, call_like::*, case::*,
-    constant_path::*, def::*, dyn_string_like::*, fors::*, hash::*, heredoc::*, ifs::*,
-    infix_chain::*, lambda::*, method_chain::*, multi_assign_target::*, parens::*, postmodifier::*,
-    prefix::*, statements::*, string_like::*, ternary::*, virtual_end::*, whiles::*,
+    class_like::*, constant_path::*, def::*, dyn_string_like::*, fors::*, hash::*, heredoc::*,
+    ifs::*, infix_chain::*, lambda::*, method_chain::*, multi_assign_target::*, parens::*,
+    postmodifier::*, prefix::*, singleton_class::*, statements::*, string_like::*, ternary::*,
+    virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -298,33 +301,6 @@ impl Arguments {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.nodes.is_empty() && self.virtual_end.is_none()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct ClassLike {
-    pub keyword: String,
-    pub name: String,
-    pub superclass: Option<Box<Node>>,
-    pub head_trailing: TrailingTrivia,
-    pub body: BlockBody,
-}
-
-impl ClassLike {
-    fn shape() -> Shape {
-        Shape::Multilines
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct SingletonClass {
-    pub expression: Box<Node>,
-    pub body: BlockBody,
-}
-
-impl SingletonClass {
-    fn shape() -> Shape {
-        Shape::Multilines
     }
 }
 
