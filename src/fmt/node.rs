@@ -1,15 +1,18 @@
 mod atom;
+mod case;
 mod constant_path;
 mod dyn_string_like;
 mod heredoc;
+mod ifs;
 mod parens;
 mod statements;
 mod string_like;
+mod ternary;
 mod virtual_end;
 
 pub(crate) use self::{
-    atom::*, constant_path::*, dyn_string_like::*, heredoc::*, parens::*, statements::*,
-    string_like::*, virtual_end::*,
+    atom::*, case::*, constant_path::*, dyn_string_like::*, heredoc::*, ifs::*, parens::*,
+    statements::*, string_like::*, ternary::*, virtual_end::*,
 };
 
 use super::{
@@ -237,112 +240,6 @@ impl Kind {
 }
 
 #[derive(Debug)]
-pub(crate) struct If {
-    pub is_if: bool,
-    pub if_first: Conditional,
-    pub elsifs: Vec<Conditional>,
-    pub if_last: Option<Else>,
-}
-
-impl If {
-    pub(crate) fn new(is_if: bool, if_first: Conditional) -> Self {
-        Self {
-            is_if,
-            if_first,
-            elsifs: vec![],
-            if_last: None,
-        }
-    }
-
-    pub(crate) fn shape() -> Shape {
-        Shape::Multilines
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Ternary {
-    pub shape: Shape,
-    pub predicate: Box<Node>,
-    pub predicate_trailing: TrailingTrivia,
-    pub then: Box<Node>,
-    pub otherwise: Box<Node>,
-}
-
-impl Ternary {
-    pub(crate) fn new(
-        predicate: Node,
-        predicate_trailing: TrailingTrivia,
-        then: Node,
-        otherwise: Node,
-    ) -> Self {
-        let shape = predicate
-            .shape
-            .add(&Shape::inline(" ? ".len()))
-            .add(predicate_trailing.shape())
-            .add(&then.shape)
-            .add(&Shape::inline(" : ".len()))
-            .add(&otherwise.shape);
-        Self {
-            shape,
-            predicate: Box::new(predicate),
-            predicate_trailing,
-            then: Box::new(then),
-            otherwise: Box::new(otherwise),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Case {
-    pub predicate: Option<Box<Node>>,
-    pub case_trailing: TrailingTrivia,
-    pub first_branch_leading: LeadingTrivia,
-    pub branches: Vec<CaseWhen>,
-    pub otherwise: Option<Else>,
-}
-
-impl Case {
-    pub(crate) fn shape() -> Shape {
-        Shape::Multilines
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct CaseWhen {
-    pub shape: Shape,
-    pub conditions: Vec<Node>,
-    pub conditions_shape: Shape,
-    pub body: Statements,
-}
-
-impl CaseWhen {
-    pub(crate) fn new(was_flat: bool) -> Self {
-        let shape = if was_flat {
-            Shape::inline(0)
-        } else {
-            Shape::Multilines
-        };
-        Self {
-            shape,
-            conditions: vec![],
-            conditions_shape: Shape::inline(0),
-            body: Statements::new(),
-        }
-    }
-
-    pub(crate) fn append_condition(&mut self, cond: Node) {
-        self.shape.append(&cond.shape);
-        self.conditions_shape.append(&cond.shape);
-        self.conditions.push(cond);
-    }
-
-    pub(crate) fn set_body(&mut self, body: Statements) {
-        self.shape.append(&body.shape);
-        self.body = body;
-    }
-}
-
-#[derive(Debug)]
 pub(crate) struct While {
     pub is_while: bool,
     pub content: Conditional,
@@ -384,30 +281,6 @@ impl Postmodifier {
             conditional,
         }
     }
-}
-
-#[derive(Debug)]
-pub(crate) struct Conditional {
-    pub shape: Shape,
-    pub predicate: Box<Node>,
-    pub body: Statements,
-}
-
-impl Conditional {
-    pub(crate) fn new(predicate: Node, body: Statements) -> Self {
-        let shape = predicate.shape.add(&body.shape);
-        Self {
-            shape,
-            predicate: Box::new(predicate),
-            body,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Else {
-    pub keyword_trailing: TrailingTrivia,
-    pub body: Statements,
 }
 
 #[derive(Debug)]
