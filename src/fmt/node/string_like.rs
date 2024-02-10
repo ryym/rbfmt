@@ -1,4 +1,4 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{output::Output, shape::Shape};
 
 #[derive(Debug)]
 pub(crate) struct StringLike {
@@ -23,6 +23,18 @@ impl StringLike {
             opening,
             value,
             closing,
+        }
+    }
+
+    pub(crate) fn format(&self, o: &mut Output) {
+        // Ignore non-UTF8 source code for now.
+        let value = String::from_utf8_lossy(&self.value);
+        if let Some(opening) = &self.opening {
+            o.push_str(opening);
+        }
+        o.push_str(&value);
+        if let Some(closing) = &self.closing {
+            o.push_str(closing);
         }
     }
 }

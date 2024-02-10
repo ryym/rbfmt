@@ -39,12 +39,12 @@ pub(crate) enum DraftResult {
 
 #[derive(Debug)]
 pub(crate) struct Output {
-    config: FormatConfig,
-    remaining_width: usize,
-    line_count: usize,
-    buffer: String,
-    indent: usize,
-    heredoc_queue: VecDeque<Pos>,
+    pub config: FormatConfig,
+    pub remaining_width: usize,
+    pub line_count: usize,
+    pub buffer: String,
+    pub indent: usize,
+    pub heredoc_queue: VecDeque<Pos>,
     drafts: Vec<Draft>,
 }
 
@@ -103,8 +103,8 @@ impl Output {
     fn format(&mut self, node: &Node, ctx: &FormatContext) {
         match &node.kind {
             Kind::Atom(atom) => atom.format(self),
-            Kind::StringLike(str) => self.format_string_like(str),
-            Kind::DynStringLike(dstr) => self.format_dyn_string_like(dstr, ctx),
+            Kind::StringLike(str) => str.format(self),
+            Kind::DynStringLike(dstr) => dstr.format(self, ctx),
             Kind::HeredocOpening(opening) => self.format_heredoc_opening(opening),
             Kind::ConstantPath(const_path) => self.format_constant_path(const_path, ctx),
             Kind::Statements(statements) => self.format_statements(statements, ctx, false),
@@ -135,50 +135,11 @@ impl Output {
         }
     }
 
-    fn format_string_like(&mut self, str: &StringLike) {
-        // Ignore non-UTF8 source code for now.
-        let value = String::from_utf8_lossy(&str.value);
-        if let Some(opening) = &str.opening {
-            self.push_str(opening);
-        }
-        self.push_str(&value);
-        if let Some(closing) = &str.closing {
-            self.push_str(closing);
-        }
-    }
-
-    fn format_dyn_string_like(&mut self, dstr: &DynStringLike, ctx: &FormatContext) {
-        if let Some(opening) = &dstr.opening {
-            self.push_str(opening);
-        }
-        let mut divided = false;
-        for part in &dstr.parts {
-            if divided {
-                self.push(' ');
-            }
-            match part {
-                DynStrPart::Str(str) => {
-                    divided = str.opening.is_some();
-                    self.format_string_like(str);
-                }
-                DynStrPart::DynStr(dstr) => {
-                    divided = true;
-                    self.format_dyn_string_like(dstr, ctx);
-                }
-                DynStrPart::Statements(embedded) => {
-                    self.format_embedded_statements(embedded, ctx);
-                }
-                DynStrPart::Variable(var) => {
-                    self.format_embedded_variable(var);
-                }
-            }
-        }
-        if let Some(closing) = &dstr.closing {
-            self.push_str(closing);
-        }
-    }
-
-    fn format_embedded_statements(&mut self, embedded: &EmbeddedStatements, ctx: &FormatContext) {
+    pub(super) fn format_embedded_statements(
+        &mut self,
+        embedded: &EmbeddedStatements,
+        ctx: &FormatContext,
+    ) {
         self.push_str(&embedded.opening);
 
         if embedded.shape.is_inline() {
@@ -197,7 +158,7 @@ impl Output {
         self.push_str(&embedded.closing);
     }
 
-    fn format_embedded_variable(&mut self, var: &EmbeddedVariable) {
+    pub(super) fn format_embedded_variable(&mut self, var: &EmbeddedVariable) {
         self.push_str(&var.operator);
         self.push_str(&var.variable);
     }
@@ -237,7 +198,7 @@ impl Output {
         }
     }
 
-    fn format_statements(
+    pub(super) fn format_statements(
         &mut self,
         statements: &Statements,
         ctx: &FormatContext,
@@ -1717,7 +1678,7 @@ impl Output {
         }
     }
 
-    fn push(&mut self, c: char) {
+    pub(super) fn push(&mut self, c: char) {
         if self.remaining_width == self.config.line_width {
             self.put_indent();
         }
@@ -1732,26 +1693,26 @@ impl Output {
         self.push_str_without_indent(str);
     }
 
-    fn push_str_without_indent(&mut self, str: &str) {
+    pub(super) fn push_str_without_indent(&mut self, str: &str) {
         self.buffer.push_str(str);
         self.remaining_width = self.remaining_width.saturating_sub(str.len());
     }
 
-    fn put_indent(&mut self) {
+    pub(super) fn put_indent(&mut self) {
         let spaces = " ".repeat(self.indent);
         self.buffer.push_str(&spaces);
         self.remaining_width = self.remaining_width.saturating_sub(spaces.len());
     }
 
-    fn indent(&mut self) {
+    pub(super) fn indent(&mut self) {
         self.indent += self.config.indent_size;
     }
 
-    fn dedent(&mut self) {
+    pub(super) fn dedent(&mut self) {
         self.indent = self.indent.saturating_sub(self.config.indent_size);
     }
 
-    fn break_line(&mut self, ctx: &FormatContext) {
+    pub(super) fn break_line(&mut self, ctx: &FormatContext) {
         self.buffer.push('\n');
         self.remaining_width = self.config.line_width;
         self.line_count += 1;

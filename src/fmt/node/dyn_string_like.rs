@@ -1,4 +1,7 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+};
 
 use super::{Statements, StringLike};
 
@@ -25,6 +28,37 @@ impl DynStringLike {
     pub(crate) fn append_part(&mut self, part: DynStrPart) {
         self.shape.insert(part.shape());
         self.parts.push(part);
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        if let Some(opening) = &self.opening {
+            o.push_str(opening);
+        }
+        let mut divided = false;
+        for part in &self.parts {
+            if divided {
+                o.push(' ');
+            }
+            match part {
+                DynStrPart::Str(str) => {
+                    divided = str.opening.is_some();
+                    str.format(o);
+                }
+                DynStrPart::DynStr(dstr) => {
+                    divided = true;
+                    dstr.format(o, ctx);
+                }
+                DynStrPart::Statements(embedded) => {
+                    embedded.format(o, ctx);
+                }
+                DynStrPart::Variable(var) => {
+                    var.format(o);
+                }
+            }
+        }
+        if let Some(closing) = &self.closing {
+            o.push_str(closing);
+        }
     }
 }
 
@@ -65,6 +99,25 @@ impl EmbeddedStatements {
             closing,
         }
     }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        o.push_str(&self.opening);
+
+        if self.shape.is_inline() {
+            let remaining = o.remaining_width;
+            o.remaining_width = usize::MAX;
+            o.format_statements(&self.statements, ctx, false);
+            o.remaining_width = remaining;
+        } else {
+            o.indent();
+            o.break_line(ctx);
+            o.format_statements(&self.statements, ctx, true);
+            o.break_line(ctx);
+            o.dedent();
+        }
+
+        o.push_str(&self.closing);
+    }
 }
 
 #[derive(Debug)]
@@ -82,5 +135,10 @@ impl EmbeddedVariable {
             operator,
             variable,
         }
+    }
+
+    pub(crate) fn format(&self, o: &mut Output) {
+        o.push_str(&self.operator);
+        o.push_str(&self.variable);
     }
 }
