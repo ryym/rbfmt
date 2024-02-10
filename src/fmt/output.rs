@@ -110,7 +110,7 @@ impl Output {
             Kind::Statements(statements) => statements.format(self, ctx, false),
             Kind::Parens(parens) => parens.format(self, ctx),
             Kind::If(ifexpr) => ifexpr.format(self, ctx),
-            Kind::Ternary(ternary) => self.format_ternary(ternary, ctx),
+            Kind::Ternary(ternary) => ternary.format(self, ctx),
             Kind::Case(case) => self.format_case(case, ctx),
             Kind::While(whle) => self.format_while(whle, ctx),
             Kind::For(expr) => self.format_for(expr, ctx),
@@ -348,70 +348,6 @@ impl Output {
                 self.indent();
                 self.break_line(ctx);
                 when.body.format(self, ctx, true);
-                self.dedent();
-            }
-        }
-    }
-
-    pub(super) fn format_ternary(&mut self, tern: &Ternary, ctx: &FormatContext) {
-        // Format `predicate`.
-        self.format(&tern.predicate, ctx);
-        self.push_str(" ?");
-
-        // Format `then`.
-        if tern.predicate_trailing.is_none()
-            && tern.then.shape.fits_in_one_line(self.remaining_width)
-        {
-            self.push(' ');
-            self.format(&tern.then, ctx);
-            self.write_trailing_comment(&tern.then.trailing_trivia);
-        } else {
-            self.write_trailing_comment(&tern.predicate_trailing);
-            self.indent();
-            self.break_line(ctx);
-            self.write_leading_trivia(
-                &tern.then.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
-            );
-            self.format(&tern.then, ctx);
-            self.write_trailing_comment(&tern.then.trailing_trivia);
-            self.dedent();
-        }
-
-        // Format `otherwise`.
-        if tern.predicate_trailing.is_none()
-            && tern.then.shape.is_inline()
-            && tern.otherwise.shape.fits_in_one_line(self.remaining_width)
-        {
-            self.push_str(" : ");
-            self.format(&tern.otherwise, ctx);
-            self.write_trailing_comment(&tern.otherwise.trailing_trivia);
-        } else {
-            self.break_line(ctx);
-            self.push(':');
-            if tern.otherwise.shape.fits_in_one_line(self.remaining_width)
-                || tern.otherwise.is_diagonal()
-            {
-                self.push(' ');
-                self.format(&tern.otherwise, ctx);
-                self.write_trailing_comment(&tern.otherwise.trailing_trivia);
-            } else {
-                self.indent();
-                self.break_line(ctx);
-                self.write_leading_trivia(
-                    &tern.otherwise.leading_trivia,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: true,
-                        end: true,
-                    },
-                );
-                self.format(&tern.otherwise, ctx);
-                self.write_trailing_comment(&tern.otherwise.trailing_trivia);
                 self.dedent();
             }
         }
