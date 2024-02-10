@@ -1,3 +1,4 @@
+mod alias;
 mod array;
 mod assign;
 mod assoc;
@@ -20,6 +21,7 @@ mod method_chain;
 mod multi_assign_target;
 mod parens;
 mod postmodifier;
+mod pre_post_exec;
 mod prefix;
 mod range_like;
 mod singleton_class;
@@ -30,11 +32,11 @@ mod virtual_end;
 mod whiles;
 
 pub(crate) use self::{
-    array::*, assign::*, assoc::*, atom::*, begin::*, block::*, call_like::*, case::*,
+    alias::*, array::*, assign::*, assoc::*, atom::*, begin::*, block::*, call_like::*, case::*,
     class_like::*, constant_path::*, def::*, dyn_string_like::*, fors::*, hash::*, heredoc::*,
     ifs::*, infix_chain::*, lambda::*, method_chain::*, multi_assign_target::*, parens::*,
-    postmodifier::*, prefix::*, range_like::*, singleton_class::*, statements::*, string_like::*,
-    ternary::*, virtual_end::*, whiles::*,
+    postmodifier::*, pre_post_exec::*, prefix::*, range_like::*, singleton_class::*, statements::*,
+    string_like::*, ternary::*, virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -302,46 +304,6 @@ impl Arguments {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.nodes.is_empty() && self.virtual_end.is_none()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct PrePostExec {
-    pub shape: Shape,
-    pub keyword: String,
-    pub statements: Statements,
-}
-
-impl PrePostExec {
-    pub(crate) fn new(keyword: String, statements: Statements, was_flat: bool) -> Self {
-        let shape = if was_flat {
-            Shape::inline(keyword.len()).add(&statements.shape())
-        } else {
-            Shape::Multilines
-        };
-        Self {
-            shape,
-            keyword,
-            statements,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Alias {
-    pub shape: Shape,
-    pub new_name: Box<Node>,
-    pub old_name: Box<Node>,
-}
-
-impl Alias {
-    pub(crate) fn new(new_name: Node, old_name: Node) -> Self {
-        let shape = new_name.shape.add(&old_name.shape);
-        Self {
-            shape,
-            new_name: Box::new(new_name),
-            old_name: Box::new(old_name),
-        }
     }
 }
 
