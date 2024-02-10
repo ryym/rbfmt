@@ -61,7 +61,7 @@ impl Output {
         }
     }
 
-    fn draft(&mut self, mut f: impl FnMut(&mut Self) -> DraftResult) -> DraftResult {
+    pub(super) fn draft(&mut self, mut f: impl FnMut(&mut Self) -> DraftResult) -> DraftResult {
         let index = self.drafts.len();
         let draft = Draft {
             index,
@@ -100,7 +100,7 @@ impl Output {
         self.buffer
     }
 
-    fn format(&mut self, node: &Node, ctx: &FormatContext) {
+    pub(super) fn format(&mut self, node: &Node, ctx: &FormatContext) {
         match &node.kind {
             Kind::Atom(atom) => atom.format(self),
             Kind::StringLike(str) => str.format(self),
@@ -163,13 +163,13 @@ impl Output {
         self.push_str(&var.variable);
     }
 
-    fn format_heredoc_opening(&mut self, opening: &HeredocOpening) {
+    pub(super) fn format_heredoc_opening(&mut self, opening: &HeredocOpening) {
         self.push_str(opening.indent_mode.prefix_symbols());
         self.push_str(&opening.id);
         self.heredoc_queue.push_back(opening.pos);
     }
 
-    fn format_constant_path(&mut self, const_path: &ConstantPath, ctx: &FormatContext) {
+    pub(super) fn format_constant_path(&mut self, const_path: &ConstantPath, ctx: &FormatContext) {
         if let Some(root) = &const_path.root {
             self.format(root, ctx);
         }
@@ -233,7 +233,7 @@ impl Output {
         );
     }
 
-    fn format_parens(&mut self, parens: &Parens, ctx: &FormatContext) {
+    pub(super) fn format_parens(&mut self, parens: &Parens, ctx: &FormatContext) {
         if parens.body.shape().is_empty() {
             self.push_str("()");
         } else {
@@ -251,7 +251,7 @@ impl Output {
         }
     }
 
-    fn write_trivia_at_virtual_end(
+    pub(super) fn write_trivia_at_virtual_end(
         &mut self,
         ctx: &FormatContext,
         end: &Option<VirtualEnd>,
@@ -298,7 +298,7 @@ impl Output {
         }
     }
 
-    fn format_if(&mut self, expr: &If, ctx: &FormatContext) {
+    pub(super) fn format_if(&mut self, expr: &If, ctx: &FormatContext) {
         if expr.is_if {
             self.push_str("if");
         } else {
@@ -341,7 +341,7 @@ impl Output {
         self.push_str("end");
     }
 
-    fn format_case(&mut self, case: &Case, ctx: &FormatContext) {
+    pub(super) fn format_case(&mut self, case: &Case, ctx: &FormatContext) {
         self.push_str("case");
         match &case.predicate {
             Some(pred) => {
@@ -405,7 +405,7 @@ impl Output {
         self.push_str("end");
     }
 
-    fn format_case_when(&mut self, when: &CaseWhen, ctx: &FormatContext) {
+    pub(super) fn format_case_when(&mut self, when: &CaseWhen, ctx: &FormatContext) {
         self.push_str("when");
         if when.shape.fits_in_one_line(self.remaining_width) {
             self.push(' ');
@@ -484,7 +484,7 @@ impl Output {
         }
     }
 
-    fn format_ternary(&mut self, tern: &Ternary, ctx: &FormatContext) {
+    pub(super) fn format_ternary(&mut self, tern: &Ternary, ctx: &FormatContext) {
         // Format `predicate`.
         self.format(&tern.predicate, ctx);
         self.push_str(" ?");
@@ -548,7 +548,7 @@ impl Output {
         }
     }
 
-    fn format_while(&mut self, expr: &While, ctx: &FormatContext) {
+    pub(super) fn format_while(&mut self, expr: &While, ctx: &FormatContext) {
         if expr.is_while {
             self.push_str("while");
         } else {
@@ -565,7 +565,7 @@ impl Output {
         self.push_str("end");
     }
 
-    fn format_for(&mut self, expr: &For, ctx: &FormatContext) {
+    pub(super) fn format_for(&mut self, expr: &For, ctx: &FormatContext) {
         self.push_str("for");
         if expr.index.shape.fits_in_inline(self.remaining_width) || expr.index.is_diagonal() {
             self.push(' ');
@@ -615,7 +615,7 @@ impl Output {
         self.push_str("end");
     }
 
-    fn format_postmodifier(&mut self, modifier: &Postmodifier, ctx: &FormatContext) {
+    pub(super) fn format_postmodifier(&mut self, modifier: &Postmodifier, ctx: &FormatContext) {
         self.format_statements(&modifier.conditional.body, ctx, false);
         self.push(' ');
         self.push_str(&modifier.keyword);
@@ -641,7 +641,7 @@ impl Output {
         }
     }
 
-    fn format_conditional(&mut self, cond: &Conditional, ctx: &FormatContext) {
+    pub(super) fn format_conditional(&mut self, cond: &Conditional, ctx: &FormatContext) {
         if cond.predicate.is_diagonal() {
             self.push(' ');
             self.indent();
@@ -667,7 +667,7 @@ impl Output {
         }
     }
 
-    fn format_method_chain(&mut self, chain: &MethodChain, ctx: &FormatContext) {
+    pub(super) fn format_method_chain(&mut self, chain: &MethodChain, ctx: &FormatContext) {
         match &chain.head {
             MethodChainHead::Receiver(receiver) => {
                 self.format(&receiver.node, ctx);
@@ -791,14 +791,14 @@ impl Output {
         }
     }
 
-    fn format_call_like(&mut self, call: &CallLike, ctx: &FormatContext) {
+    pub(super) fn format_call_like(&mut self, call: &CallLike, ctx: &FormatContext) {
         self.push_str(&call.name);
         if let Some(args) = &call.arguments {
             self.format_arguments(args, ctx);
         }
     }
 
-    fn format_arguments(&mut self, args: &Arguments, ctx: &FormatContext) {
+    pub(super) fn format_arguments(&mut self, args: &Arguments, ctx: &FormatContext) {
         // Format horizontally if all these are met:
         //   - no intermediate comments
         //   - all nodes' ArgumentStyle is horizontal
@@ -915,7 +915,7 @@ impl Output {
         }
     }
 
-    fn format_block(&mut self, block: &Block, ctx: &FormatContext) {
+    pub(super) fn format_block(&mut self, block: &Block, ctx: &FormatContext) {
         if block.shape.fits_in_one_line(self.remaining_width) {
             self.push(' ');
             self.push_str(&block.opening);
@@ -955,7 +955,7 @@ impl Output {
         }
     }
 
-    fn format_lambda(&mut self, lambda: &Lambda, ctx: &FormatContext) {
+    pub(super) fn format_lambda(&mut self, lambda: &Lambda, ctx: &FormatContext) {
         self.push_str("->");
         if let Some(params) = &lambda.parameters {
             self.format_block_parameters(params, ctx);
@@ -963,7 +963,7 @@ impl Output {
         self.format_block(&lambda.block, ctx);
     }
 
-    fn format_infix_chain(&mut self, chain: &InfixChain, ctx: &FormatContext) {
+    pub(super) fn format_infix_chain(&mut self, chain: &InfixChain, ctx: &FormatContext) {
         self.format(&chain.left, ctx);
         if chain.rights_shape.fits_in_one_line(self.remaining_width) {
             for right in &chain.rights {
@@ -992,14 +992,14 @@ impl Output {
         }
     }
 
-    fn format_assign(&mut self, assign: &Assign, ctx: &FormatContext) {
+    pub(super) fn format_assign(&mut self, assign: &Assign, ctx: &FormatContext) {
         self.format(&assign.target, ctx);
         self.push(' ');
         self.push_str(&assign.operator);
         self.format_assign_right(&assign.value, ctx);
     }
 
-    fn format_assign_right(&mut self, value: &Node, ctx: &FormatContext) {
+    pub(super) fn format_assign_right(&mut self, value: &Node, ctx: &FormatContext) {
         if value.shape.fits_in_one_line(self.remaining_width) || value.is_diagonal() {
             self.push(' ');
             self.format(value, ctx);
@@ -1019,7 +1019,11 @@ impl Output {
         }
     }
 
-    fn format_multi_assign_target(&mut self, multi: &MultiAssignTarget, ctx: &FormatContext) {
+    pub(super) fn format_multi_assign_target(
+        &mut self,
+        multi: &MultiAssignTarget,
+        ctx: &FormatContext,
+    ) {
         if multi.shape.fits_in_inline(self.remaining_width) {
             if let Some(lparen) = &multi.lparen {
                 self.push_str(lparen);
@@ -1063,14 +1067,14 @@ impl Output {
         }
     }
 
-    fn format_prefix(&mut self, prefix: &Prefix, ctx: &FormatContext) {
+    pub(super) fn format_prefix(&mut self, prefix: &Prefix, ctx: &FormatContext) {
         self.push_str(&prefix.operator);
         if let Some(expr) = &prefix.expression {
             self.format(expr, ctx);
         }
     }
 
-    fn format_array(&mut self, array: &Array, ctx: &FormatContext) {
+    pub(super) fn format_array(&mut self, array: &Array, ctx: &FormatContext) {
         if array.shape.fits_in_one_line(self.remaining_width) {
             if let Some(opening) = &array.opening {
                 self.push_str(opening);
@@ -1114,7 +1118,7 @@ impl Output {
         }
     }
 
-    fn format_hash(&mut self, hash: &Hash, ctx: &FormatContext) {
+    pub(super) fn format_hash(&mut self, hash: &Hash, ctx: &FormatContext) {
         if hash.shape.fits_in_one_line(self.remaining_width) {
             self.push_str(&hash.opening);
             if !hash.elements.is_empty() {
@@ -1157,7 +1161,7 @@ impl Output {
         }
     }
 
-    fn format_assoc(&mut self, assoc: &Assoc, ctx: &FormatContext) {
+    pub(super) fn format_assoc(&mut self, assoc: &Assoc, ctx: &FormatContext) {
         self.format(&assoc.key, ctx);
         if assoc.value.shape.fits_in_inline(self.remaining_width) || assoc.value.is_diagonal() {
             if let Some(op) = &assoc.operator {
@@ -1188,7 +1192,7 @@ impl Output {
         }
     }
 
-    fn format_begin(&mut self, begin: &Begin, ctx: &FormatContext) {
+    pub(super) fn format_begin(&mut self, begin: &Begin, ctx: &FormatContext) {
         self.push_str("begin");
         self.write_trailing_comment(&begin.keyword_trailing);
         self.format_block_body(&begin.body, ctx, true);
@@ -1196,7 +1200,7 @@ impl Output {
         self.push_str("end");
     }
 
-    fn format_def(&mut self, def: &Def, ctx: &FormatContext) {
+    pub(super) fn format_def(&mut self, def: &Def, ctx: &FormatContext) {
         self.push_str("def");
         if let Some(receiver) = &def.receiver {
             if receiver.shape.fits_in_one_line(self.remaining_width) || receiver.is_diagonal() {
@@ -1262,7 +1266,12 @@ impl Output {
         }
     }
 
-    fn format_block_body(&mut self, body: &BlockBody, ctx: &FormatContext, block_always: bool) {
+    pub(super) fn format_block_body(
+        &mut self,
+        body: &BlockBody,
+        ctx: &FormatContext,
+        block_always: bool,
+    ) {
         if body.shape.fits_in_inline(self.remaining_width) && !block_always {
             self.format_statements(&body.statements, ctx, block_always);
             return;
@@ -1302,7 +1311,7 @@ impl Output {
         }
     }
 
-    fn format_rescue(&mut self, rescue: &Rescue, ctx: &FormatContext) {
+    pub(super) fn format_rescue(&mut self, rescue: &Rescue, ctx: &FormatContext) {
         self.push_str("rescue");
         if !rescue.exceptions.is_empty() {
             if rescue
@@ -1378,7 +1387,11 @@ impl Output {
         }
     }
 
-    fn format_method_parameters(&mut self, params: &Option<MethodParameters>, ctx: &FormatContext) {
+    pub(super) fn format_method_parameters(
+        &mut self,
+        params: &Option<MethodParameters>,
+        ctx: &FormatContext,
+    ) {
         if let Some(params) = params {
             if params.shape.fits_in_one_line(self.remaining_width) {
                 let opening = params.opening.as_deref().unwrap_or(" ");
@@ -1427,7 +1440,11 @@ impl Output {
         }
     }
 
-    fn format_block_parameters(&mut self, params: &BlockParameters, ctx: &FormatContext) {
+    pub(super) fn format_block_parameters(
+        &mut self,
+        params: &BlockParameters,
+        ctx: &FormatContext,
+    ) {
         if params.shape.fits_in_one_line(self.remaining_width) {
             self.push_str(&params.opening);
             for (i, n) in params.params.iter().enumerate() {
@@ -1511,7 +1528,7 @@ impl Output {
         }
     }
 
-    fn format_class_like(&mut self, class: &ClassLike, ctx: &FormatContext) {
+    pub(super) fn format_class_like(&mut self, class: &ClassLike, ctx: &FormatContext) {
         self.push_str(&class.keyword);
         self.push(' ');
         self.push_str(&class.name);
@@ -1544,7 +1561,7 @@ impl Output {
         self.push_str("end");
     }
 
-    fn format_singleton_class(&mut self, class: &SingletonClass, ctx: &FormatContext) {
+    pub(super) fn format_singleton_class(&mut self, class: &SingletonClass, ctx: &FormatContext) {
         self.push_str("class <<");
         if class
             .expression
@@ -1577,7 +1594,7 @@ impl Output {
         self.push_str("end");
     }
 
-    fn format_range_like(&mut self, range: &RangeLike, ctx: &FormatContext) {
+    pub(super) fn format_range_like(&mut self, range: &RangeLike, ctx: &FormatContext) {
         if let Some(left) = &range.left {
             self.format(left, ctx);
         }
@@ -1609,7 +1626,7 @@ impl Output {
         }
     }
 
-    fn format_pre_post_exec(&mut self, exec: &PrePostExec, ctx: &FormatContext) {
+    pub(super) fn format_pre_post_exec(&mut self, exec: &PrePostExec, ctx: &FormatContext) {
         if exec.shape.fits_in_one_line(self.remaining_width) {
             self.push_str(&exec.keyword);
             self.push_str(" {");
@@ -1633,14 +1650,14 @@ impl Output {
         }
     }
 
-    fn format_alias(&mut self, alias: &Alias, ctx: &FormatContext) {
+    pub(super) fn format_alias(&mut self, alias: &Alias, ctx: &FormatContext) {
         self.push_str("alias ");
         self.format(&alias.new_name, ctx);
         self.push(' ');
         self.format(&alias.old_name, ctx);
     }
 
-    fn write_leading_trivia(
+    pub(super) fn write_leading_trivia(
         &mut self,
         trivia: &LeadingTrivia,
         ctx: &FormatContext,
@@ -1671,7 +1688,7 @@ impl Output {
         }
     }
 
-    fn write_trailing_comment(&mut self, trivia: &TrailingTrivia) {
+    pub(super) fn write_trailing_comment(&mut self, trivia: &TrailingTrivia) {
         if let Some(comment) = &trivia.comment() {
             self.push(' ');
             self.buffer.push_str(&comment.value);
@@ -1722,7 +1739,7 @@ impl Output {
         }
     }
 
-    fn write_heredoc_body(&mut self, pos: &Pos, ctx: &FormatContext) {
+    pub(super) fn write_heredoc_body(&mut self, pos: &Pos, ctx: &FormatContext) {
         let heredoc = ctx.heredoc_map.get(pos).expect("heredoc must exist");
         match heredoc.indent_mode {
             HeredocIndentMode::None | HeredocIndentMode::EndIndented => {
