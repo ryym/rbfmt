@@ -109,7 +109,7 @@ impl Output {
             Kind::ConstantPath(const_path) => const_path.format(self, ctx),
             Kind::Statements(statements) => statements.format(self, ctx, false),
             Kind::Parens(parens) => parens.format(self, ctx),
-            Kind::If(ifexpr) => self.format_if(ifexpr, ctx),
+            Kind::If(ifexpr) => ifexpr.format(self, ctx),
             Kind::Ternary(ternary) => self.format_ternary(ternary, ctx),
             Kind::Case(case) => self.format_case(case, ctx),
             Kind::While(whle) => self.format_while(whle, ctx),
@@ -208,49 +208,6 @@ impl Output {
                 }
             }
         }
-    }
-
-    pub(super) fn format_if(&mut self, expr: &If, ctx: &FormatContext) {
-        if expr.is_if {
-            self.push_str("if");
-        } else {
-            self.push_str("unless");
-        }
-
-        self.format_conditional(&expr.if_first, ctx);
-        if !expr.if_first.body.shape.is_empty() {
-            self.indent();
-            self.break_line(ctx);
-            expr.if_first.body.format(self, ctx, true);
-            self.dedent();
-        }
-
-        for elsif in &expr.elsifs {
-            self.break_line(ctx);
-            self.push_str("elsif");
-            self.format_conditional(elsif, ctx);
-            if !elsif.body.shape.is_empty() {
-                self.indent();
-                self.break_line(ctx);
-                elsif.body.format(self, ctx, true);
-                self.dedent();
-            }
-        }
-
-        if let Some(if_last) = &expr.if_last {
-            self.break_line(ctx);
-            self.push_str("else");
-            self.write_trailing_comment(&if_last.keyword_trailing);
-            if !if_last.body.shape.is_empty() {
-                self.indent();
-                self.break_line(ctx);
-                if_last.body.format(self, ctx, true);
-                self.dedent();
-            }
-        }
-
-        self.break_line(ctx);
-        self.push_str("end");
     }
 
     pub(super) fn format_case(&mut self, case: &Case, ctx: &FormatContext) {
@@ -466,7 +423,7 @@ impl Output {
         } else {
             self.push_str("until");
         }
-        self.format_conditional(&expr.content, ctx);
+        expr.content.format(self, ctx);
         if !expr.content.body.shape().is_empty() {
             self.indent();
             self.break_line(ctx);
@@ -549,32 +506,6 @@ impl Output {
             );
             self.format(&cond.predicate, ctx);
             self.write_trailing_comment(&cond.predicate.trailing_trivia);
-            self.dedent();
-        }
-    }
-
-    pub(super) fn format_conditional(&mut self, cond: &Conditional, ctx: &FormatContext) {
-        if cond.predicate.is_diagonal() {
-            self.push(' ');
-            self.indent();
-            self.format(&cond.predicate, ctx);
-            self.write_trailing_comment(&cond.predicate.trailing_trivia);
-            self.dedent();
-        } else {
-            self.indent();
-            self.indent();
-            self.break_line(ctx);
-            self.write_leading_trivia(
-                &cond.predicate.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
-            );
-            self.format(&cond.predicate, ctx);
-            self.write_trailing_comment(&cond.predicate.trailing_trivia);
-            self.dedent();
             self.dedent();
         }
     }

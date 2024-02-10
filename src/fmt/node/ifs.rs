@@ -1,4 +1,9 @@
-use crate::fmt::{shape::Shape, TrailingTrivia};
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+    trivia::EmptyLineHandling,
+    TrailingTrivia,
+};
 
 use super::{Node, Statements};
 
@@ -23,6 +28,49 @@ impl If {
     pub(crate) fn shape() -> Shape {
         Shape::Multilines
     }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        if self.is_if {
+            o.push_str("if");
+        } else {
+            o.push_str("unless");
+        }
+
+        self.if_first.format(o, ctx);
+        if !self.if_first.body.shape.is_empty() {
+            o.indent();
+            o.break_line(ctx);
+            self.if_first.body.format(o, ctx, true);
+            o.dedent();
+        }
+
+        for elsif in &self.elsifs {
+            o.break_line(ctx);
+            o.push_str("elsif");
+            elsif.format(o, ctx);
+            if !elsif.body.shape.is_empty() {
+                o.indent();
+                o.break_line(ctx);
+                elsif.body.format(o, ctx, true);
+                o.dedent();
+            }
+        }
+
+        if let Some(if_last) = &self.if_last {
+            o.break_line(ctx);
+            o.push_str("else");
+            o.write_trailing_comment(&if_last.keyword_trailing);
+            if !if_last.body.shape.is_empty() {
+                o.indent();
+                o.break_line(ctx);
+                if_last.body.format(o, ctx, true);
+                o.dedent();
+            }
+        }
+
+        o.break_line(ctx);
+        o.push_str("end");
+    }
 }
 
 #[derive(Debug)]
@@ -39,6 +87,32 @@ impl Conditional {
             shape,
             predicate: Box::new(predicate),
             body,
+        }
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        if self.predicate.is_diagonal() {
+            o.push(' ');
+            o.indent();
+            o.format(&self.predicate, ctx);
+            o.write_trailing_comment(&self.predicate.trailing_trivia);
+            o.dedent();
+        } else {
+            o.indent();
+            o.indent();
+            o.break_line(ctx);
+            o.write_leading_trivia(
+                &self.predicate.leading_trivia,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: true,
+                    end: true,
+                },
+            );
+            o.format(&self.predicate, ctx);
+            o.write_trailing_comment(&self.predicate.trailing_trivia);
+            o.dedent();
+            o.dedent();
         }
     }
 }
