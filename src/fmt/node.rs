@@ -1,5 +1,6 @@
 mod atom;
 mod block;
+mod call_like;
 mod case;
 mod constant_path;
 mod dyn_string_like;
@@ -7,6 +8,7 @@ mod fors;
 mod heredoc;
 mod ifs;
 mod infix_chain;
+mod lambda;
 mod method_chain;
 mod parens;
 mod postmodifier;
@@ -17,9 +19,9 @@ mod virtual_end;
 mod whiles;
 
 pub(crate) use self::{
-    atom::*, block::*, case::*, constant_path::*, dyn_string_like::*, fors::*, heredoc::*, ifs::*,
-    infix_chain::*, method_chain::*, parens::*, postmodifier::*, statements::*, string_like::*,
-    ternary::*, virtual_end::*, whiles::*,
+    atom::*, block::*, call_like::*, case::*, constant_path::*, dyn_string_like::*, fors::*,
+    heredoc::*, ifs::*, infix_chain::*, lambda::*, method_chain::*, parens::*, postmodifier::*,
+    statements::*, string_like::*, ternary::*, virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -287,51 +289,6 @@ impl Arguments {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.nodes.is_empty() && self.virtual_end.is_none()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Lambda {
-    pub shape: Shape,
-    pub parameters: Option<BlockParameters>,
-    pub block: Block,
-}
-
-impl Lambda {
-    pub(crate) fn new(params: Option<BlockParameters>, block: Block) -> Self {
-        let mut shape = Shape::inline("->".len());
-        if let Some(params) = &params {
-            shape.append(&params.shape);
-        }
-        shape.append(&Shape::inline(1));
-        shape.append(&block.shape);
-        Self {
-            shape,
-            parameters: params,
-            block,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct CallLike {
-    pub shape: Shape,
-    pub name: String,
-    pub arguments: Option<Arguments>,
-}
-
-impl CallLike {
-    pub(crate) fn new(name: String) -> Self {
-        Self {
-            shape: Shape::inline(name.len()),
-            name,
-            arguments: None,
-        }
-    }
-
-    pub(crate) fn set_arguments(&mut self, args: Arguments) {
-        self.shape.append(&args.shape);
-        self.arguments = Some(args);
     }
 }
 
