@@ -1,3 +1,4 @@
+mod assign;
 mod atom;
 mod block;
 mod call_like;
@@ -10,6 +11,7 @@ mod ifs;
 mod infix_chain;
 mod lambda;
 mod method_chain;
+mod multi_assign_target;
 mod parens;
 mod postmodifier;
 mod statements;
@@ -19,9 +21,10 @@ mod virtual_end;
 mod whiles;
 
 pub(crate) use self::{
-    atom::*, block::*, call_like::*, case::*, constant_path::*, dyn_string_like::*, fors::*,
-    heredoc::*, ifs::*, infix_chain::*, lambda::*, method_chain::*, parens::*, postmodifier::*,
-    statements::*, string_like::*, ternary::*, virtual_end::*, whiles::*,
+    assign::*, atom::*, block::*, call_like::*, case::*, constant_path::*, dyn_string_like::*,
+    fors::*, heredoc::*, ifs::*, infix_chain::*, lambda::*, method_chain::*,
+    multi_assign_target::*, parens::*, postmodifier::*, statements::*, string_like::*, ternary::*,
+    virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -289,75 +292,6 @@ impl Arguments {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.nodes.is_empty() && self.virtual_end.is_none()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Assign {
-    pub shape: Shape,
-    pub target: Box<Node>,
-    pub operator: String,
-    pub value: Box<Node>,
-}
-
-impl Assign {
-    pub(crate) fn new(target: Node, operator: String, value: Node) -> Self {
-        let shape = target
-            .shape
-            .add(&value.shape)
-            .add(&Shape::inline(operator.len() + "  ".len()));
-        Self {
-            shape,
-            target: Box::new(target),
-            operator,
-            value: Box::new(value),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct MultiAssignTarget {
-    pub shape: Shape,
-    pub lparen: Option<String>,
-    pub rparen: Option<String>,
-    pub targets: Vec<Node>,
-    pub with_implicit_rest: bool,
-    pub virtual_end: Option<VirtualEnd>,
-}
-
-impl MultiAssignTarget {
-    pub(crate) fn new(lparen: Option<String>, rparen: Option<String>) -> Self {
-        let parens_len = match (&lparen, &rparen) {
-            (Some(lp), Some(rp)) => lp.len() + rp.len(),
-            _ => 0,
-        };
-        Self {
-            shape: Shape::inline(parens_len),
-            lparen,
-            rparen,
-            targets: vec![],
-            with_implicit_rest: false,
-            virtual_end: None,
-        }
-    }
-
-    pub(crate) fn append_target(&mut self, target: Node) {
-        self.shape.insert(&target.shape);
-        self.targets.push(target);
-    }
-
-    pub(crate) fn set_implicit_rest(&mut self, yes: bool) {
-        if yes {
-            self.shape.insert(&Shape::inline(",".len()));
-        }
-        self.with_implicit_rest = yes;
-    }
-
-    pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
-        if let Some(end) = &end {
-            self.shape.append(&end.shape);
-        }
-        self.virtual_end = end;
     }
 }
 
