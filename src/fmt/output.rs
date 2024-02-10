@@ -97,7 +97,7 @@ impl Output {
 
     fn format(&mut self, node: &Node, ctx: &FormatContext) {
         match &node.kind {
-            Kind::Atom(atom) => self.format_atom(atom),
+            Kind::Atom(atom) => atom.format(self),
             Kind::StringLike(str) => self.format_string_like(str),
             Kind::DynStringLike(dstr) => self.format_dyn_string_like(dstr, ctx),
             Kind::HeredocOpening(opening) => self.format_heredoc_opening(opening),
@@ -128,10 +128,6 @@ impl Output {
             Kind::PrePostExec(exec) => self.format_pre_post_exec(exec, ctx),
             Kind::Alias(alias) => self.format_alias(alias, ctx),
         }
-    }
-
-    fn format_atom(&mut self, atom: &Atom) {
-        self.push_str(&atom.0);
     }
 
     fn format_string_like(&mut self, str: &StringLike) {
@@ -1724,7 +1720,7 @@ impl Output {
         self.remaining_width = self.remaining_width.saturating_sub(1);
     }
 
-    fn push_str(&mut self, str: &str) {
+    pub(super) fn push_str(&mut self, str: &str) {
         if self.remaining_width == self.config.line_width {
             self.put_indent();
         }

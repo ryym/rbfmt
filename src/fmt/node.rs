@@ -1,9 +1,12 @@
-use std::collections::HashMap;
+mod atom;
+
+pub(crate) use atom::Atom;
 
 use super::{
     shape::{ArgumentStyle, Shape},
     LeadingTrivia, TrailingTrivia,
 };
+use std::collections::HashMap;
 
 #[derive(Debug)]
 pub(crate) struct Node {
@@ -225,9 +228,6 @@ impl Kind {
         }
     }
 }
-
-#[derive(Debug)]
-pub(crate) struct Atom(pub String);
 
 #[derive(Debug)]
 pub(crate) struct StringLike {

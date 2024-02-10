@@ -19,7 +19,7 @@ pub(crate) fn format(node: Node, heredoc_map: HeredocMap) -> String {
 }
 
 #[derive(Debug)]
-struct FormatConfig {
+pub(crate) struct FormatConfig {
     line_width: usize,
     indent_size: usize,
 }
