@@ -106,12 +106,12 @@ impl EmbeddedStatements {
         if self.shape.is_inline() {
             let remaining = o.remaining_width;
             o.remaining_width = usize::MAX;
-            o.format_statements(&self.statements, ctx, false);
+            self.statements.format(o, ctx, false);
             o.remaining_width = remaining;
         } else {
             o.indent();
             o.break_line(ctx);
-            o.format_statements(&self.statements, ctx, true);
+            self.statements.format(o, ctx, true);
             o.break_line(ctx);
             o.dedent();
         }

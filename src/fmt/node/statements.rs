@@ -1,4 +1,8 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+    trivia::EmptyLineHandling,
+};
 
 use super::{Kind, Node, VirtualEnd};
 
@@ -40,5 +44,35 @@ impl Statements {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.nodes.is_empty() && self.virtual_end.is_none()
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext, block_always: bool) {
+        if self.shape.is_inline() && !block_always {
+            if let Some(node) = self.nodes.get(0) {
+                o.format(node, ctx);
+            }
+            return;
+        }
+        for (i, n) in self.nodes.iter().enumerate() {
+            if i > 0 {
+                o.break_line(ctx);
+            }
+            o.write_leading_trivia(
+                &n.leading_trivia,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: i == 0,
+                    end: false,
+                },
+            );
+            o.format(n, ctx);
+            o.write_trailing_comment(&n.trailing_trivia);
+        }
+        o.write_trivia_at_virtual_end(
+            ctx,
+            &self.virtual_end,
+            !self.nodes.is_empty(),
+            self.nodes.is_empty(),
+        );
     }
 }

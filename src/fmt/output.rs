@@ -107,7 +107,7 @@ impl Output {
             Kind::DynStringLike(dstr) => dstr.format(self, ctx),
             Kind::HeredocOpening(opening) => opening.format(self),
             Kind::ConstantPath(const_path) => const_path.format(self, ctx),
-            Kind::Statements(statements) => self.format_statements(statements, ctx, false),
+            Kind::Statements(statements) => statements.format(self, ctx, false),
             Kind::Parens(parens) => self.format_parens(parens, ctx),
             Kind::If(ifexpr) => self.format_if(ifexpr, ctx),
             Kind::Ternary(ternary) => self.format_ternary(ternary, ctx),
@@ -145,12 +145,12 @@ impl Output {
         if embedded.shape.is_inline() {
             let remaining = self.remaining_width;
             self.remaining_width = usize::MAX;
-            self.format_statements(&embedded.statements, ctx, false);
+            embedded.statements.format(self, ctx, false);
             self.remaining_width = remaining;
         } else {
             self.indent();
             self.break_line(ctx);
-            self.format_statements(&embedded.statements, ctx, true);
+            embedded.statements.format(self, ctx, true);
             self.break_line(ctx);
             self.dedent();
         }
@@ -163,52 +163,17 @@ impl Output {
         self.push_str(&var.variable);
     }
 
-    pub(super) fn format_statements(
-        &mut self,
-        statements: &Statements,
-        ctx: &FormatContext,
-        block_always: bool,
-    ) {
-        if statements.shape.is_inline() && !block_always {
-            if let Some(node) = statements.nodes.get(0) {
-                self.format(node, ctx);
-            }
-            return;
-        }
-        for (i, n) in statements.nodes.iter().enumerate() {
-            if i > 0 {
-                self.break_line(ctx);
-            }
-            self.write_leading_trivia(
-                &n.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: i == 0,
-                    end: false,
-                },
-            );
-            self.format(n, ctx);
-            self.write_trailing_comment(&n.trailing_trivia);
-        }
-        self.write_trivia_at_virtual_end(
-            ctx,
-            &statements.virtual_end,
-            !statements.nodes.is_empty(),
-            statements.nodes.is_empty(),
-        );
-    }
-
     pub(super) fn format_parens(&mut self, parens: &Parens, ctx: &FormatContext) {
         if parens.body.shape().is_empty() {
             self.push_str("()");
         } else {
             self.push('(');
             if parens.body.shape.fits_in_inline(self.remaining_width) {
-                self.format_statements(&parens.body, ctx, false);
+                parens.body.format(self, ctx, false);
             } else {
                 self.indent();
                 self.break_line(ctx);
-                self.format_statements(&parens.body, ctx, true);
+                parens.body.format(self, ctx, true);
                 self.dedent();
                 self.break_line(ctx);
             }
@@ -274,7 +239,7 @@ impl Output {
         if !expr.if_first.body.shape.is_empty() {
             self.indent();
             self.break_line(ctx);
-            self.format_statements(&expr.if_first.body, ctx, true);
+            expr.if_first.body.format(self, ctx, true);
             self.dedent();
         }
 
@@ -285,7 +250,7 @@ impl Output {
             if !elsif.body.shape.is_empty() {
                 self.indent();
                 self.break_line(ctx);
-                self.format_statements(&elsif.body, ctx, true);
+                elsif.body.format(self, ctx, true);
                 self.dedent();
             }
         }
@@ -297,7 +262,7 @@ impl Output {
             if !if_last.body.shape.is_empty() {
                 self.indent();
                 self.break_line(ctx);
-                self.format_statements(&if_last.body, ctx, true);
+                if_last.body.format(self, ctx, true);
                 self.dedent();
             }
         }
@@ -362,7 +327,7 @@ impl Output {
             if !otherwise.body.shape.is_empty() {
                 self.indent();
                 self.break_line(ctx);
-                self.format_statements(&otherwise.body, ctx, true);
+                otherwise.body.format(self, ctx, true);
                 self.dedent();
             }
         }
@@ -383,7 +348,7 @@ impl Output {
             }
             if !when.body.shape.is_empty() {
                 self.push_str(" then ");
-                self.format_statements(&when.body, ctx, false);
+                when.body.format(self, ctx, false);
             }
         } else {
             if when.conditions_shape.fits_in_one_line(self.remaining_width) {
@@ -443,7 +408,7 @@ impl Output {
             if !when.body.shape.is_empty() {
                 self.indent();
                 self.break_line(ctx);
-                self.format_statements(&when.body, ctx, true);
+                when.body.format(self, ctx, true);
                 self.dedent();
             }
         }
@@ -523,7 +488,7 @@ impl Output {
         if !expr.content.body.shape().is_empty() {
             self.indent();
             self.break_line(ctx);
-            self.format_statements(&expr.content.body, ctx, true);
+            expr.content.body.format(self, ctx, true);
             self.dedent();
         }
         self.break_line(ctx);
@@ -573,7 +538,7 @@ impl Output {
         if !expr.body.shape().is_empty() {
             self.indent();
             self.break_line(ctx);
-            self.format_statements(&expr.body, ctx, true);
+            expr.body.format(self, ctx, true);
             self.dedent();
         }
         self.break_line(ctx);
@@ -581,7 +546,7 @@ impl Output {
     }
 
     pub(super) fn format_postmodifier(&mut self, modifier: &Postmodifier, ctx: &FormatContext) {
-        self.format_statements(&modifier.conditional.body, ctx, false);
+        modifier.conditional.body.format(self, ctx, false);
         self.push(' ');
         self.push_str(&modifier.keyword);
         let cond = &modifier.conditional;
@@ -1238,14 +1203,14 @@ impl Output {
         block_always: bool,
     ) {
         if body.shape.fits_in_inline(self.remaining_width) && !block_always {
-            self.format_statements(&body.statements, ctx, block_always);
+            body.statements.format(self, ctx, block_always);
             return;
         }
 
         if !body.statements.shape().is_empty() {
             self.indent();
             self.break_line(ctx);
-            self.format_statements(&body.statements, ctx, true);
+            body.statements.format(self, ctx, true);
             self.dedent();
         }
         for rescue in &body.rescues {
@@ -1259,7 +1224,7 @@ impl Output {
             if !rescue_else.body.shape().is_empty() {
                 self.indent();
                 self.break_line(ctx);
-                self.format_statements(&rescue_else.body, ctx, true);
+                rescue_else.body.format(self, ctx, true);
                 self.dedent();
             }
         }
@@ -1270,7 +1235,7 @@ impl Output {
             if !ensure.body.shape().is_empty() {
                 self.indent();
                 self.break_line(ctx);
-                self.format_statements(&ensure.body, ctx, true);
+                ensure.body.format(self, ctx, true);
                 self.dedent();
             }
         }
@@ -1347,7 +1312,7 @@ impl Output {
         if !rescue.statements.shape().is_empty() {
             self.indent();
             self.break_line(ctx);
-            self.format_statements(&rescue.statements, ctx, true);
+            rescue.statements.format(self, ctx, true);
             self.dedent();
         }
     }
@@ -1597,7 +1562,7 @@ impl Output {
             self.push_str(" {");
             if !exec.statements.shape.is_empty() {
                 self.push(' ');
-                self.format_statements(&exec.statements, ctx, false);
+                exec.statements.format(self, ctx, false);
                 self.push(' ');
             }
             self.push('}');
@@ -1607,7 +1572,7 @@ impl Output {
             if !exec.statements.shape.is_empty() {
                 self.indent();
                 self.break_line(ctx);
-                self.format_statements(&exec.statements, ctx, true);
+                exec.statements.format(self, ctx, true);
                 self.dedent();
             }
             self.break_line(ctx);
