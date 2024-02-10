@@ -1,11 +1,17 @@
 mod shape;
+mod trivia;
+
+pub(crate) use trivia::{Comment, LeadingTrivia, LineTrivia, TrailingTrivia};
 
 use std::{
     collections::{HashMap, VecDeque},
     mem,
 };
 
-use self::shape::{ArgumentStyle, Shape};
+use self::{
+    shape::{ArgumentStyle, Shape},
+    trivia::EmptyLineHandling,
+};
 
 pub(crate) fn format(node: Node, heredoc_map: HeredocMap) -> String {
     let config = FormatConfig {
@@ -47,9 +53,9 @@ impl Node {
         trailing_trivia: TrailingTrivia,
     ) -> Self {
         let shape = leading_trivia
-            .shape
+            .shape()
             .add(&kind.shape())
-            .add(&trailing_trivia.shape);
+            .add(trailing_trivia.shape());
         Self {
             leading_trivia,
             trailing_trivia,
@@ -63,7 +69,7 @@ impl Node {
     }
 
     pub(crate) fn is_diagonal(&self) -> bool {
-        if self.leading_trivia.shape.is_empty() {
+        if self.leading_trivia.shape().is_empty() {
             self.kind.is_diagonal()
         } else {
             false
@@ -421,7 +427,7 @@ impl ConstantPath {
     }
 
     pub(crate) fn append_part(&mut self, leading: LeadingTrivia, path: String) {
-        self.shape.append(&leading.shape);
+        self.shape.append(leading.shape());
         self.shape.append(&Shape::inline("::".len() + path.len()));
         self.parts.push((leading, path));
     }
@@ -436,7 +442,7 @@ pub(crate) struct VirtualEnd {
 impl VirtualEnd {
     pub(crate) fn new(leading_trivia: LeadingTrivia) -> Self {
         Self {
-            shape: leading_trivia.shape,
+            shape: *leading_trivia.shape(),
             leading_trivia,
         }
     }
@@ -563,7 +569,7 @@ impl Ternary {
         let shape = predicate
             .shape
             .add(&Shape::inline(" ? ".len()))
-            .add(&predicate_trailing.shape)
+            .add(predicate_trailing.shape())
             .add(&then.shape)
             .add(&Shape::inline(" : ".len()))
             .add(&otherwise.shape);
@@ -759,7 +765,7 @@ impl MessageCall {
     ) -> Self {
         let operator_len = operator.as_ref().map_or(0, |s| s.len());
         let msg_shape = Shape::inline(name.len() + operator_len);
-        let mut shape = leading_trivia.shape.add(&msg_shape);
+        let mut shape = leading_trivia.shape().add(&msg_shape);
         if let Some(args) = &arguments {
             shape.append(&args.shape);
         }
@@ -879,7 +885,7 @@ impl Block {
     }
 
     pub(crate) fn set_opening_trailing(&mut self, trailing: TrailingTrivia) {
-        self.shape.insert(&trailing.shape);
+        self.shape.insert(trailing.shape());
         self.opening_trailing = trailing;
     }
 
@@ -937,9 +943,9 @@ impl MethodChain {
         last_call_trailing: TrailingTrivia,
         msg_call: MessageCall,
     ) {
-        self.shape.append(&last_call_trailing.shape);
+        self.shape.append(last_call_trailing.shape());
         self.shape.append(&msg_call.shape);
-        self.calls_shape.append(&last_call_trailing.shape);
+        self.calls_shape.append(last_call_trailing.shape());
         self.calls_shape.append(&msg_call.shape);
 
         if !last_call_trailing.is_none() {
@@ -951,7 +957,7 @@ impl MethodChain {
                     _ => None,
                 })
                 .expect("call must exist when last trailing exist");
-            last_call.shape.append(&last_call_trailing.shape);
+            last_call.shape.append(last_call_trailing.shape());
             last_call.trailing_trivia = last_call_trailing;
         }
 
@@ -1594,7 +1600,7 @@ impl BlockParameters {
     }
 
     pub(crate) fn set_closing_trailing(&mut self, trailing: TrailingTrivia) {
-        self.shape.append(&trailing.shape);
+        self.shape.append(trailing.shape());
         self.closing_trailing = trailing;
     }
 }
@@ -1691,77 +1697,6 @@ impl Alias {
             old_name: Box::new(old_name),
         }
     }
-}
-
-#[derive(Debug)]
-pub(crate) struct LeadingTrivia {
-    lines: Vec<LineTrivia>,
-    shape: Shape,
-}
-
-impl LeadingTrivia {
-    pub(crate) fn new() -> Self {
-        Self {
-            lines: vec![],
-            shape: Shape::inline(0),
-        }
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        self.lines.is_empty()
-    }
-
-    pub(crate) fn append_line(&mut self, trivia: LineTrivia) {
-        if matches!(trivia, LineTrivia::Comment(_)) {
-            self.shape = Shape::Multilines;
-        }
-        self.lines.push(trivia);
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct TrailingTrivia {
-    comment: Option<Comment>,
-    shape: Shape,
-}
-
-impl TrailingTrivia {
-    pub(crate) fn new(comment: Option<Comment>) -> Self {
-        let shape = if comment.is_some() {
-            Shape::LineEnd {
-                // Do not take into account the length of trailing comment.
-                len: 0,
-            }
-        } else {
-            Shape::inline(0)
-        };
-        Self { comment, shape }
-    }
-
-    pub(crate) fn none() -> Self {
-        Self::new(None)
-    }
-
-    pub(crate) fn is_none(&self) -> bool {
-        self.comment.is_none()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Comment {
-    pub value: String,
-}
-
-#[derive(Debug)]
-pub(crate) enum LineTrivia {
-    EmptyLine,
-    Comment(Comment),
-}
-
-#[derive(Debug)]
-enum EmptyLineHandling {
-    Trim { start: bool, end: bool },
-    Skip,
 }
 
 pub(crate) type HeredocMap = HashMap<Pos, Heredoc>;
@@ -2044,7 +1979,7 @@ impl Formatter {
     ) {
         if let Some(end) = end {
             let mut trailing_empty_lines = 0;
-            let leading_lines = &end.leading_trivia.lines;
+            let leading_lines = &end.leading_trivia.lines();
             for trivia in leading_lines.iter().rev() {
                 match trivia {
                     LineTrivia::EmptyLine => {
@@ -3433,8 +3368,8 @@ impl Formatter {
         if trivia.is_empty() {
             return;
         }
-        let last_idx = trivia.lines.len() - 1;
-        for (i, trivia) in trivia.lines.iter().enumerate() {
+        let last_idx = trivia.lines().len() - 1;
+        for (i, trivia) in trivia.lines().iter().enumerate() {
             match trivia {
                 LineTrivia::EmptyLine => {
                     let should_skip = match emp_line_handling {
@@ -3456,7 +3391,7 @@ impl Formatter {
     }
 
     fn write_trailing_comment(&mut self, trivia: &TrailingTrivia) {
-        if let Some(comment) = &trivia.comment {
+        if let Some(comment) = &trivia.comment() {
             self.push(' ');
             self.buffer.push_str(&comment.value);
         }
