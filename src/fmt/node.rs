@@ -1,4 +1,6 @@
+mod array;
 mod assign;
+mod assoc;
 mod atom;
 mod block;
 mod call_like;
@@ -6,6 +8,7 @@ mod case;
 mod constant_path;
 mod dyn_string_like;
 mod fors;
+mod hash;
 mod heredoc;
 mod ifs;
 mod infix_chain;
@@ -22,10 +25,10 @@ mod virtual_end;
 mod whiles;
 
 pub(crate) use self::{
-    assign::*, atom::*, block::*, call_like::*, case::*, constant_path::*, dyn_string_like::*,
-    fors::*, heredoc::*, ifs::*, infix_chain::*, lambda::*, method_chain::*,
-    multi_assign_target::*, parens::*, postmodifier::*, prefix::*, statements::*, string_like::*,
-    ternary::*, virtual_end::*, whiles::*,
+    array::*, assign::*, assoc::*, atom::*, block::*, call_like::*, case::*, constant_path::*,
+    dyn_string_like::*, fors::*, hash::*, heredoc::*, ifs::*, infix_chain::*, lambda::*,
+    method_chain::*, multi_assign_target::*, parens::*, postmodifier::*, prefix::*, statements::*,
+    string_like::*, ternary::*, virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -293,123 +296,6 @@ impl Arguments {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.nodes.is_empty() && self.virtual_end.is_none()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Array {
-    pub shape: Shape,
-    pub opening: Option<String>,
-    pub closing: Option<String>,
-    pub elements: Vec<Node>,
-    pub virtual_end: Option<VirtualEnd>,
-}
-
-impl Array {
-    pub(crate) fn new(opening: Option<String>, closing: Option<String>) -> Self {
-        let opening_len = opening.as_ref().map_or(0, |s| s.len());
-        let closing_len = closing.as_ref().map_or(0, |s| s.len());
-        let shape = Shape::inline(opening_len + closing_len);
-        Self {
-            shape,
-            opening,
-            closing,
-            elements: vec![],
-            virtual_end: None,
-        }
-    }
-
-    pub(crate) fn separator(&self) -> &str {
-        if let Some(opening) = &self.opening {
-            if opening.as_bytes()[0] == b'%' {
-                return "";
-            }
-        }
-        ","
-    }
-
-    pub(crate) fn append_element(&mut self, element: Node) {
-        if !self.elements.is_empty() {
-            let sep_len = self.separator().len() + 1; // space
-            self.shape.insert(&Shape::inline(sep_len));
-        }
-        self.shape.insert(&element.shape);
-        self.elements.push(element);
-    }
-
-    pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
-        if let Some(end) = &end {
-            self.shape.insert(&end.shape);
-        }
-        self.virtual_end = end;
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Hash {
-    pub shape: Shape,
-    pub opening: String,
-    pub closing: String,
-    pub elements: Vec<Node>,
-    pub virtual_end: Option<VirtualEnd>,
-}
-
-impl Hash {
-    pub(crate) fn new(opening: String, closing: String, should_be_inline: bool) -> Self {
-        let shape = if should_be_inline {
-            Shape::inline(opening.len() + closing.len())
-        } else {
-            Shape::Multilines
-        };
-        Self {
-            shape,
-            opening,
-            closing,
-            elements: vec![],
-            virtual_end: None,
-        }
-    }
-
-    pub(crate) fn append_element(&mut self, element: Node) {
-        if self.elements.is_empty() {
-            self.shape.insert(&Shape::inline("  ".len()));
-        } else {
-            self.shape.insert(&Shape::inline(", ".len()));
-        }
-        self.shape.insert(&element.shape);
-        self.elements.push(element);
-    }
-
-    pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
-        if let Some(end) = &end {
-            self.shape.insert(&end.shape);
-        }
-        self.virtual_end = end;
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Assoc {
-    pub shape: Shape,
-    pub key: Box<Node>,
-    pub value: Box<Node>,
-    pub operator: Option<String>,
-}
-
-impl Assoc {
-    pub(crate) fn new(key: Node, operator: Option<String>, value: Node) -> Self {
-        let mut shape = key.shape.add(&value.shape);
-        shape.append(&Shape::inline(1)); // space
-        if let Some(op) = &operator {
-            shape.append(&Shape::inline(op.len()));
-            shape.append(&Shape::inline(1)); // space
-        }
-        Self {
-            shape,
-            key: Box::new(key),
-            value: Box::new(value),
-            operator,
-        }
     }
 }
 
