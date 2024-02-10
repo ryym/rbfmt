@@ -4,7 +4,12 @@ use super::{
     trivia::{EmptyLineHandling, LeadingTrivia, LineTrivia, TrailingTrivia},
     FormatConfig,
 };
-use std::{collections::VecDeque, mem};
+use std::{
+    collections::{HashMap, VecDeque},
+    mem,
+};
+
+pub(crate) type HeredocMap = HashMap<Pos, Heredoc>;
 
 #[derive(Debug)]
 pub(crate) struct FormatContext {

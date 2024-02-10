@@ -44,7 +44,6 @@ use super::{
     shape::{ArgumentStyle, Shape},
     LeadingTrivia, TrailingTrivia,
 };
-use std::collections::HashMap;
 
 #[derive(Debug)]
 pub(crate) struct Node {
@@ -263,5 +262,3 @@ impl Kind {
         }
     }
 }
-
-pub(crate) type HeredocMap = HashMap<Pos, Heredoc>;

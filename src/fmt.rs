@@ -4,6 +4,7 @@ mod shape;
 mod trivia;
 
 pub(crate) use node::*;
+pub(crate) use output::HeredocMap;
 pub(crate) use trivia::{Comment, LeadingTrivia, LineTrivia, TrailingTrivia};
 
 use self::output::{FormatContext, Output};
