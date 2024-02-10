@@ -2,9 +2,14 @@ mod atom;
 mod constant_path;
 mod dyn_string_like;
 mod heredoc;
+mod statements;
 mod string_like;
+mod virtual_end;
 
-pub(crate) use self::{atom::*, constant_path::*, dyn_string_like::*, heredoc::*, string_like::*};
+pub(crate) use self::{
+    atom::*, constant_path::*, dyn_string_like::*, heredoc::*, statements::*, string_like::*,
+    virtual_end::*,
+};
 
 use super::{
     shape::{ArgumentStyle, Shape},
@@ -227,62 +232,6 @@ impl Kind {
             },
             _ => ArgumentStyle::Vertical,
         }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct VirtualEnd {
-    pub shape: Shape,
-    pub leading_trivia: LeadingTrivia,
-}
-
-impl VirtualEnd {
-    pub(crate) fn new(leading_trivia: LeadingTrivia) -> Self {
-        Self {
-            shape: *leading_trivia.shape(),
-            leading_trivia,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Statements {
-    pub shape: Shape,
-    pub nodes: Vec<Node>,
-    pub virtual_end: Option<VirtualEnd>,
-}
-
-impl Statements {
-    pub(crate) fn new() -> Self {
-        Self {
-            shape: Shape::inline(0),
-            nodes: vec![],
-            virtual_end: None,
-        }
-    }
-
-    pub(crate) fn append_node(&mut self, node: Node) {
-        if self.nodes.is_empty() && !matches!(node.kind, Kind::HeredocOpening(_)) {
-            self.shape = node.shape;
-        } else {
-            self.shape = Shape::Multilines;
-        }
-        self.nodes.push(node);
-    }
-
-    pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
-        if let Some(end) = &end {
-            self.shape.append(&end.shape);
-        }
-        self.virtual_end = end;
-    }
-
-    pub(crate) fn shape(&self) -> Shape {
-        self.shape
-    }
-
-    fn is_empty(&self) -> bool {
-        self.nodes.is_empty() && self.virtual_end.is_none()
     }
 }
 
