@@ -6,6 +6,7 @@ mod fors;
 mod heredoc;
 mod ifs;
 mod parens;
+mod postmodifier;
 mod statements;
 mod string_like;
 mod ternary;
@@ -14,7 +15,7 @@ mod whiles;
 
 pub(crate) use self::{
     atom::*, case::*, constant_path::*, dyn_string_like::*, fors::*, heredoc::*, ifs::*, parens::*,
-    statements::*, string_like::*, ternary::*, virtual_end::*, whiles::*,
+    postmodifier::*, statements::*, string_like::*, ternary::*, virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -237,25 +238,6 @@ impl Kind {
                 }),
             },
             _ => ArgumentStyle::Vertical,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Postmodifier {
-    pub shape: Shape,
-    pub keyword: String,
-    pub conditional: Conditional,
-}
-
-impl Postmodifier {
-    pub(crate) fn new(keyword: String, conditional: Conditional) -> Self {
-        let kwd_shape = Shape::inline(keyword.len() + 2); // keyword and spaces around it.
-        let shape = conditional.shape.add(&kwd_shape);
-        Self {
-            shape,
-            keyword,
-            conditional,
         }
     }
 }
