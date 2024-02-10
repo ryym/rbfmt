@@ -2,10 +2,12 @@ mod array;
 mod assign;
 mod assoc;
 mod atom;
+mod begin;
 mod block;
 mod call_like;
 mod case;
 mod constant_path;
+mod def;
 mod dyn_string_like;
 mod fors;
 mod hash;
@@ -25,10 +27,10 @@ mod virtual_end;
 mod whiles;
 
 pub(crate) use self::{
-    array::*, assign::*, assoc::*, atom::*, block::*, call_like::*, case::*, constant_path::*,
-    dyn_string_like::*, fors::*, hash::*, heredoc::*, ifs::*, infix_chain::*, lambda::*,
-    method_chain::*, multi_assign_target::*, parens::*, postmodifier::*, prefix::*, statements::*,
-    string_like::*, ternary::*, virtual_end::*, whiles::*,
+    array::*, assign::*, assoc::*, atom::*, begin::*, block::*, call_like::*, case::*,
+    constant_path::*, def::*, dyn_string_like::*, fors::*, hash::*, heredoc::*, ifs::*,
+    infix_chain::*, lambda::*, method_chain::*, multi_assign_target::*, parens::*, postmodifier::*,
+    prefix::*, statements::*, string_like::*, ternary::*, virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -296,115 +298,6 @@ impl Arguments {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.nodes.is_empty() && self.virtual_end.is_none()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Begin {
-    pub keyword_trailing: TrailingTrivia,
-    pub body: BlockBody,
-}
-
-impl Begin {
-    fn shape() -> Shape {
-        Shape::Multilines
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Def {
-    pub shape: Shape,
-    pub receiver: Option<Box<Node>>,
-    pub name: String,
-    pub parameters: Option<MethodParameters>,
-    pub body: DefBody,
-}
-
-impl Def {
-    pub(crate) fn new(receiver: Option<Node>, name: String) -> Self {
-        let mut shape = Shape::inline("def ".len() + name.len());
-        if let Some(receiver) = &receiver {
-            shape.insert(&receiver.shape);
-        }
-        Self {
-            shape,
-            receiver: receiver.map(Box::new),
-            name,
-            parameters: None,
-            body: DefBody::Block {
-                head_trailing: TrailingTrivia::none(),
-                body: BlockBody::new(Statements::new()),
-            },
-        }
-    }
-
-    pub(crate) fn set_parameters(&mut self, parameters: MethodParameters) {
-        self.shape.append(&parameters.shape);
-        self.parameters = Some(parameters);
-    }
-
-    pub(crate) fn set_body(&mut self, body: DefBody) {
-        self.shape.append(&body.shape());
-        self.body = body;
-    }
-}
-
-#[derive(Debug)]
-pub(crate) enum DefBody {
-    Short {
-        body: Box<Node>,
-    },
-    Block {
-        head_trailing: TrailingTrivia,
-        body: BlockBody,
-    },
-}
-
-impl DefBody {
-    pub(crate) fn shape(&self) -> Shape {
-        match self {
-            Self::Short { body } => body.shape,
-            Self::Block { .. } => Shape::Multilines,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct MethodParameters {
-    pub shape: Shape,
-    pub opening: Option<String>,
-    pub closing: Option<String>,
-    pub params: Vec<Node>,
-    pub virtual_end: Option<VirtualEnd>,
-}
-
-impl MethodParameters {
-    pub(crate) fn new(opening: Option<String>, closing: Option<String>) -> Self {
-        let opening_len = opening.as_ref().map_or(0, |o| o.len());
-        let closing_len = closing.as_ref().map_or(0, |c| c.len());
-        let shape = Shape::inline(opening_len + closing_len);
-        Self {
-            shape,
-            opening,
-            closing,
-            params: vec![],
-            virtual_end: None,
-        }
-    }
-
-    pub(crate) fn append_param(&mut self, node: Node) {
-        self.shape.insert(&node.shape);
-        if !self.params.is_empty() {
-            self.shape.insert(&Shape::inline(", ".len()));
-        }
-        self.params.push(node);
-    }
-
-    pub(crate) fn set_virtual_end(&mut self, end: Option<VirtualEnd>) {
-        if let Some(end) = &end {
-            self.shape.append(&end.shape);
-        }
-        self.virtual_end = end;
     }
 }
 
