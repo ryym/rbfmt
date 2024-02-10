@@ -2,6 +2,7 @@ mod atom;
 mod case;
 mod constant_path;
 mod dyn_string_like;
+mod fors;
 mod heredoc;
 mod ifs;
 mod parens;
@@ -9,10 +10,11 @@ mod statements;
 mod string_like;
 mod ternary;
 mod virtual_end;
+mod whiles;
 
 pub(crate) use self::{
-    atom::*, case::*, constant_path::*, dyn_string_like::*, heredoc::*, ifs::*, parens::*,
-    statements::*, string_like::*, ternary::*, virtual_end::*,
+    atom::*, case::*, constant_path::*, dyn_string_like::*, fors::*, heredoc::*, ifs::*, parens::*,
+    statements::*, string_like::*, ternary::*, virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -236,31 +238,6 @@ impl Kind {
             },
             _ => ArgumentStyle::Vertical,
         }
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct While {
-    pub is_while: bool,
-    pub content: Conditional,
-}
-
-impl While {
-    pub(crate) fn shape() -> Shape {
-        Shape::Multilines
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct For {
-    pub index: Box<Node>,
-    pub collection: Box<Node>,
-    pub body: Statements,
-}
-
-impl For {
-    pub(crate) fn shape() -> Shape {
-        Shape::Multilines
     }
 }
 
