@@ -14,6 +14,7 @@ mod method_chain;
 mod multi_assign_target;
 mod parens;
 mod postmodifier;
+mod prefix;
 mod statements;
 mod string_like;
 mod ternary;
@@ -23,8 +24,8 @@ mod whiles;
 pub(crate) use self::{
     assign::*, atom::*, block::*, call_like::*, case::*, constant_path::*, dyn_string_like::*,
     fors::*, heredoc::*, ifs::*, infix_chain::*, lambda::*, method_chain::*,
-    multi_assign_target::*, parens::*, postmodifier::*, statements::*, string_like::*, ternary::*,
-    virtual_end::*, whiles::*,
+    multi_assign_target::*, parens::*, postmodifier::*, prefix::*, statements::*, string_like::*,
+    ternary::*, virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -341,27 +342,6 @@ impl Array {
             self.shape.insert(&end.shape);
         }
         self.virtual_end = end;
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct Prefix {
-    pub shape: Shape,
-    pub operator: String,
-    pub expression: Option<Box<Node>>,
-}
-
-impl Prefix {
-    pub(crate) fn new(operator: String, expression: Option<Node>) -> Self {
-        let mut shape = Shape::inline(operator.len());
-        if let Some(expr) = &expression {
-            shape.append(&expr.shape);
-        }
-        Self {
-            shape,
-            operator,
-            expression: expression.map(Box::new),
-        }
     }
 }
 
