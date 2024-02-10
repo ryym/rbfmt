@@ -1,4 +1,9 @@
-use crate::fmt::{shape::Shape, LeadingTrivia};
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+    trivia::EmptyLineHandling,
+    LeadingTrivia,
+};
 
 use super::Node;
 
@@ -23,5 +28,34 @@ impl ConstantPath {
         self.shape.append(leading.shape());
         self.shape.append(&Shape::inline("::".len() + path.len()));
         self.parts.push((leading, path));
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        if let Some(root) = &self.root {
+            o.format(root, ctx);
+        }
+        o.push_str("::");
+        let last_idx = self.parts.len() - 1;
+        for (i, (leading, path)) in self.parts.iter().enumerate() {
+            if leading.is_empty() {
+                o.push_str(path);
+            } else {
+                o.indent();
+                o.break_line(ctx);
+                o.write_leading_trivia(
+                    leading,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: true,
+                        end: true,
+                    },
+                );
+                o.push_str(path);
+                o.dedent();
+            }
+            if i < last_idx {
+                o.push_str("::");
+            }
+        }
     }
 }

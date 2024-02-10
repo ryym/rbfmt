@@ -106,7 +106,7 @@ impl Output {
             Kind::StringLike(str) => str.format(self),
             Kind::DynStringLike(dstr) => dstr.format(self, ctx),
             Kind::HeredocOpening(opening) => opening.format(self),
-            Kind::ConstantPath(const_path) => self.format_constant_path(const_path, ctx),
+            Kind::ConstantPath(const_path) => const_path.format(self, ctx),
             Kind::Statements(statements) => self.format_statements(statements, ctx, false),
             Kind::Parens(parens) => self.format_parens(parens, ctx),
             Kind::If(ifexpr) => self.format_if(ifexpr, ctx),
@@ -161,35 +161,6 @@ impl Output {
     pub(super) fn format_embedded_variable(&mut self, var: &EmbeddedVariable) {
         self.push_str(&var.operator);
         self.push_str(&var.variable);
-    }
-
-    pub(super) fn format_constant_path(&mut self, const_path: &ConstantPath, ctx: &FormatContext) {
-        if let Some(root) = &const_path.root {
-            self.format(root, ctx);
-        }
-        self.push_str("::");
-        let last_idx = const_path.parts.len() - 1;
-        for (i, (leading, path)) in const_path.parts.iter().enumerate() {
-            if leading.is_empty() {
-                self.push_str(path);
-            } else {
-                self.indent();
-                self.break_line(ctx);
-                self.write_leading_trivia(
-                    leading,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: true,
-                        end: true,
-                    },
-                );
-                self.push_str(path);
-                self.dedent();
-            }
-            if i < last_idx {
-                self.push_str("::");
-            }
-        }
     }
 
     pub(super) fn format_statements(
