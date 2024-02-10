@@ -6,7 +6,7 @@ mod trivia;
 pub(crate) use node::*;
 pub(crate) use trivia::{Comment, LeadingTrivia, LineTrivia, TrailingTrivia};
 
-use self::output::{FormatContext, Formatter};
+use self::output::{FormatContext, Output};
 
 pub(crate) fn format(node: Node, heredoc_map: HeredocMap) -> String {
     let config = FormatConfig {
@@ -14,8 +14,8 @@ pub(crate) fn format(node: Node, heredoc_map: HeredocMap) -> String {
         indent_size: 2,
     };
     let ctx = FormatContext { heredoc_map };
-    let formatter = Formatter::new(config);
-    formatter.execute(&node, &ctx)
+    let output = Output::new(config);
+    output.execute(&node, &ctx)
 }
 
 #[derive(Debug)]

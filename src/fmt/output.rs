@@ -12,13 +12,13 @@ pub(crate) struct FormatContext {
 }
 
 #[derive(Debug)]
-pub(crate) struct FormatDraft {
+struct Draft {
     index: usize,
-    snapshot: FormatStateSnapshot,
+    snapshot: OutputSnapshot,
 }
 
 #[derive(Debug)]
-struct FormatStateSnapshot {
+struct OutputSnapshot {
     buffer_len: usize,
     remaining_width: usize,
     line_count: usize,
@@ -33,17 +33,17 @@ pub(crate) enum DraftResult {
 }
 
 #[derive(Debug)]
-pub(crate) struct Formatter {
+pub(crate) struct Output {
     config: FormatConfig,
     remaining_width: usize,
     line_count: usize,
     buffer: String,
     indent: usize,
     heredoc_queue: VecDeque<Pos>,
-    drafts: Vec<FormatDraft>,
+    drafts: Vec<Draft>,
 }
 
-impl Formatter {
+impl Output {
     pub(crate) fn new(config: FormatConfig) -> Self {
         Self {
             remaining_width: config.line_width,
@@ -58,9 +58,9 @@ impl Formatter {
 
     fn draft(&mut self, mut f: impl FnMut(&mut Self) -> DraftResult) -> DraftResult {
         let index = self.drafts.len();
-        let draft = FormatDraft {
+        let draft = Draft {
             index,
-            snapshot: FormatStateSnapshot {
+            snapshot: OutputSnapshot {
                 buffer_len: self.buffer.len(),
                 remaining_width: self.remaining_width,
                 line_count: self.line_count,
@@ -90,7 +90,7 @@ impl Formatter {
     pub(crate) fn execute(mut self, node: &Node, ctx: &FormatContext) -> String {
         self.format(node, ctx);
         if !self.buffer.is_empty() {
-            self.break_line(&ctx);
+            self.break_line(ctx);
         }
         self.buffer
     }
