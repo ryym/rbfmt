@@ -81,11 +81,7 @@ impl Node {
     }
 
     pub(crate) fn is_diagonal(&self) -> bool {
-        if self.leading_trivia.shape().is_empty() {
-            self.kind.is_diagonal()
-        } else {
-            false
-        }
+        self.leading_trivia.shape().is_empty() && self.kind.is_diagonal()
     }
 
     pub(crate) fn argument_style(&self) -> ArgumentStyle {
