@@ -127,3 +127,15 @@ if true
     not-formatted-well
   H1
 end
+
+foo(a, <<~B, c, d)
+    b
+B
+foo(
+  a,
+  <<~B,
+    b
+  B
+  c,
+  d, # d
+)

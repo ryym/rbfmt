@@ -137,18 +137,22 @@ impl Output {
     }
 
     pub(super) fn break_line(&mut self, ctx: &FormatContext) {
-        self.buffer.push('\n');
-        self.remaining_width = self.config.line_width;
-        self.line_count += 1;
+        self.break_line_without_popping_heredoc();
         let mut queue = mem::take(&mut self.heredoc_queue);
         while let Some(state) = queue.pop_front() {
             self.write_heredoc_body(&state, ctx);
         }
     }
 
+    fn break_line_without_popping_heredoc(&mut self) {
+        self.buffer.push('\n');
+        self.remaining_width = self.config.line_width;
+        self.line_count += 1;
+    }
+
     fn write_heredoc_body(&mut self, state: &HeredocState, ctx: &FormatContext) {
         let heredoc = ctx.heredoc_map.get(&state.pos).expect("heredoc must exist");
-        heredoc.format(self, ctx, &state);
-        self.buffer.push('\n');
+        heredoc.format(self, ctx, state);
+        self.break_line_without_popping_heredoc();
     }
 }
