@@ -1,6 +1,6 @@
 use super::{
     node::{Heredoc, Pos, VirtualEnd},
-    FormatConfig,
+    FormatConfig, HeredocState,
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -26,7 +26,7 @@ struct OutputSnapshot {
     remaining_width: usize,
     line_count: usize,
     indent: usize,
-    heredoc_queue: VecDeque<Pos>,
+    heredoc_queue: VecDeque<HeredocState>,
 }
 
 #[derive(Debug)]
@@ -42,7 +42,7 @@ pub(crate) struct Output {
     pub line_count: usize,
     pub buffer: String,
     pub indent: usize,
-    pub heredoc_queue: VecDeque<Pos>,
+    pub heredoc_queue: VecDeque<HeredocState>,
     drafts: Vec<Draft>,
 }
 
@@ -141,14 +141,14 @@ impl Output {
         self.remaining_width = self.config.line_width;
         self.line_count += 1;
         let mut queue = mem::take(&mut self.heredoc_queue);
-        while let Some(pos) = queue.pop_front() {
-            self.write_heredoc_body(&pos, ctx);
+        while let Some(state) = queue.pop_front() {
+            self.write_heredoc_body(&state, ctx);
         }
     }
 
-    fn write_heredoc_body(&mut self, pos: &Pos, ctx: &FormatContext) {
-        let heredoc = ctx.heredoc_map.get(pos).expect("heredoc must exist");
-        heredoc.format(self, ctx);
+    fn write_heredoc_body(&mut self, state: &HeredocState, ctx: &FormatContext) {
+        let heredoc = ctx.heredoc_map.get(&state.pos).expect("heredoc must exist");
+        heredoc.format(self, ctx, &state);
         self.buffer.push('\n');
     }
 }

@@ -125,5 +125,5 @@ H2
 if true
   <<~H1
     not-formatted-well
-H1
+  H1
 end

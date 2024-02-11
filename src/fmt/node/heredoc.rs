@@ -5,6 +5,12 @@ use crate::fmt::{
 
 use super::{EmbeddedStatements, EmbeddedVariable, StringLike};
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct HeredocState {
+    pub pos: Pos,
+    pub opening_line_indent: usize,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct Pos(pub usize);
 
@@ -34,7 +40,10 @@ impl HeredocOpening {
     pub(crate) fn format(&self, o: &mut Output) {
         o.push_str(self.indent_mode.prefix_symbols());
         o.push_str(&self.id);
-        o.heredoc_queue.push_back(self.pos);
+        o.heredoc_queue.push_back(HeredocState {
+            pos: self.pos,
+            opening_line_indent: o.indent,
+        });
     }
 }
 
@@ -46,7 +55,9 @@ pub(crate) struct Heredoc {
 }
 
 impl Heredoc {
-    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext, state: &HeredocState) {
+        let actual_indent = o.indent;
+        o.indent = state.opening_line_indent;
         match self.indent_mode {
             HeredocIndentMode::None | HeredocIndentMode::EndIndented => {
                 for part in &self.parts {
@@ -89,6 +100,7 @@ impl Heredoc {
                 o.push_str(&self.id);
             }
         }
+        o.indent = actual_indent;
     }
 }
 
