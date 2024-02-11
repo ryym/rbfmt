@@ -174,7 +174,7 @@ impl MethodChain {
             for call in self.calls.iter() {
                 if let Some(call_op) = &call.operator {
                     o.break_line(ctx);
-                    o.write_leading_trivia(&call.leading_trivia, ctx, EmptyLineHandling::Skip);
+                    call.leading_trivia.format(o, ctx, EmptyLineHandling::Skip);
                     o.push_str(call_op);
                 }
                 o.push_str(&call.name);

@@ -52,7 +52,10 @@ impl InfixChain {
                 o.push_str(&right.operator);
                 o.indent();
                 o.break_line(ctx);
-                o.write_leading_trivia(&right.value.leading_trivia, ctx, EmptyLineHandling::none());
+                right
+                    .value
+                    .leading_trivia
+                    .format(o, ctx, EmptyLineHandling::none());
                 o.format(&right.value, ctx);
                 o.dedent();
             }

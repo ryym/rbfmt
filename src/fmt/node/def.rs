@@ -90,7 +90,8 @@ impl Def {
                 } else {
                     o.indent();
                     o.break_line(ctx);
-                    o.write_leading_trivia(&body.leading_trivia, ctx, EmptyLineHandling::trim());
+                    body.leading_trivia
+                        .format(o, ctx, EmptyLineHandling::trim());
                     o.format(body, ctx);
                     o.write_trailing_comment(&body.trailing_trivia);
                     o.dedent();
@@ -188,8 +189,8 @@ impl MethodParameters {
                 let last_idx = self.params.len() - 1;
                 for (i, n) in self.params.iter().enumerate() {
                     o.break_line(ctx);
-                    o.write_leading_trivia(
-                        &n.leading_trivia,
+                    n.leading_trivia.format(
+                        o,
                         ctx,
                         EmptyLineHandling::Trim {
                             start: i == 0,

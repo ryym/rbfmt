@@ -57,8 +57,8 @@ impl Statements {
             if i > 0 {
                 o.break_line(ctx);
             }
-            o.write_leading_trivia(
-                &n.leading_trivia,
+            n.leading_trivia.format(
+                o,
                 ctx,
                 EmptyLineHandling::Trim {
                     start: i == 0,

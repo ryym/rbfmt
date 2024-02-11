@@ -34,7 +34,9 @@ impl ClassLike {
             } else {
                 o.indent();
                 o.break_line(ctx);
-                o.write_leading_trivia(&superself.leading_trivia, ctx, EmptyLineHandling::trim());
+                superself
+                    .leading_trivia
+                    .format(o, ctx, EmptyLineHandling::trim());
                 o.format(superself, ctx);
                 o.write_trailing_comment(&superself.trailing_trivia);
                 o.dedent();

@@ -32,7 +32,8 @@ impl Case {
                 } else {
                     o.indent();
                     o.break_line(ctx);
-                    o.write_leading_trivia(&pred.leading_trivia, ctx, EmptyLineHandling::trim());
+                    pred.leading_trivia
+                        .format(o, ctx, EmptyLineHandling::trim());
                     o.format(pred, ctx);
                     o.write_trailing_comment(&pred.trailing_trivia);
                     o.dedent();
@@ -47,7 +48,8 @@ impl Case {
         } else {
             o.indent();
             o.break_line(ctx);
-            o.write_leading_trivia(&self.first_branch_leading, ctx, EmptyLineHandling::trim());
+            self.first_branch_leading
+                .format(o, ctx, EmptyLineHandling::trim());
             o.dedent();
         }
         for (i, branch) in self.branches.iter().enumerate() {
@@ -139,11 +141,9 @@ impl CaseWhen {
                 } else {
                     o.indent();
                     o.break_line(ctx);
-                    o.write_leading_trivia(
-                        &self.conditions[0].leading_trivia,
-                        ctx,
-                        EmptyLineHandling::trim(),
-                    );
+                    self.conditions[0]
+                        .leading_trivia
+                        .format(o, ctx, EmptyLineHandling::trim());
                     o.format(&self.conditions[0], ctx);
                     o.dedent();
                 }
@@ -156,11 +156,8 @@ impl CaseWhen {
                     let last_idx = self.conditions.len() - 1;
                     for (i, cond) in self.conditions.iter().enumerate().skip(1) {
                         o.break_line(ctx);
-                        o.write_leading_trivia(
-                            &cond.leading_trivia,
-                            ctx,
-                            EmptyLineHandling::none(),
-                        );
+                        cond.leading_trivia
+                            .format(o, ctx, EmptyLineHandling::none());
                         o.format(cond, ctx);
                         if i < last_idx {
                             o.push(',');

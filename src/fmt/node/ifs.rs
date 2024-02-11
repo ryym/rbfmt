@@ -101,11 +101,9 @@ impl Conditional {
             o.indent();
             o.indent();
             o.break_line(ctx);
-            o.write_leading_trivia(
-                &self.predicate.leading_trivia,
-                ctx,
-                EmptyLineHandling::trim(),
-            );
+            self.predicate
+                .leading_trivia
+                .format(o, ctx, EmptyLineHandling::trim());
             o.format(&self.predicate, ctx);
             o.write_trailing_comment(&self.predicate.trailing_trivia);
             o.dedent();

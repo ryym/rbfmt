@@ -67,8 +67,8 @@ impl Hash {
             o.indent();
             for (i, element) in self.elements.iter().enumerate() {
                 o.break_line(ctx);
-                o.write_leading_trivia(
-                    &element.leading_trivia,
+                element.leading_trivia.format(
+                    o,
                     ctx,
                     EmptyLineHandling::Trim {
                         start: i == 0,

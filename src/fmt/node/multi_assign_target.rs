@@ -74,8 +74,8 @@ impl MultiAssignTarget {
             let last_idx = self.targets.len() - 1;
             for (i, target) in self.targets.iter().enumerate() {
                 o.break_line(ctx);
-                o.write_leading_trivia(
-                    &target.leading_trivia,
+                target.leading_trivia.format(
+                    o,
                     ctx,
                     EmptyLineHandling::Trim {
                         start: i == 0,

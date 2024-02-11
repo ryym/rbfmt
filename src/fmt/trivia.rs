@@ -1,4 +1,7 @@
-use super::shape::Shape;
+use super::{
+    output::{FormatContext, Output},
+    shape::Shape,
+};
 
 #[derive(Debug)]
 pub(crate) struct LeadingTrivia {
@@ -31,6 +34,37 @@ impl LeadingTrivia {
             self.shape = Shape::Multilines;
         }
         self.lines.push(trivia);
+    }
+
+    pub(crate) fn format(
+        &self,
+        o: &mut Output,
+        ctx: &FormatContext,
+        emp_line_handling: EmptyLineHandling,
+    ) {
+        if self.is_empty() {
+            return;
+        }
+        let last_idx = self.lines().len() - 1;
+        for (i, trivia) in self.lines().iter().enumerate() {
+            match trivia {
+                LineTrivia::EmptyLine => {
+                    let should_skip = match emp_line_handling {
+                        EmptyLineHandling::Skip => true,
+                        EmptyLineHandling::Trim { start, end } => {
+                            (start && i == 0) || (end && i == last_idx)
+                        }
+                    };
+                    if !should_skip {
+                        o.break_line(ctx);
+                    }
+                }
+                LineTrivia::Comment(comment) => {
+                    o.push_str(&comment.value);
+                    o.break_line(ctx);
+                }
+            }
+        }
     }
 }
 

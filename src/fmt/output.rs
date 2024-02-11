@@ -1,8 +1,4 @@
-use super::{
-    node::*,
-    trivia::{EmptyLineHandling, LeadingTrivia, LineTrivia, TrailingTrivia},
-    FormatConfig,
-};
+use super::{node::*, trivia::TrailingTrivia, FormatConfig};
 use std::{
     collections::{HashMap, VecDeque},
     mem,
@@ -143,37 +139,6 @@ impl Output {
     ) {
         if let Some(end) = end {
             end.format(self, ctx, break_first, trim_start);
-        }
-    }
-
-    pub(super) fn write_leading_trivia(
-        &mut self,
-        trivia: &LeadingTrivia,
-        ctx: &FormatContext,
-        emp_line_handling: EmptyLineHandling,
-    ) {
-        if trivia.is_empty() {
-            return;
-        }
-        let last_idx = trivia.lines().len() - 1;
-        for (i, trivia) in trivia.lines().iter().enumerate() {
-            match trivia {
-                LineTrivia::EmptyLine => {
-                    let should_skip = match emp_line_handling {
-                        EmptyLineHandling::Skip => true,
-                        EmptyLineHandling::Trim { start, end } => {
-                            (start && i == 0) || (end && i == last_idx)
-                        }
-                    };
-                    if !should_skip {
-                        self.break_line(ctx);
-                    }
-                }
-                LineTrivia::Comment(comment) => {
-                    self.push_str(&comment.value);
-                    self.break_line(ctx);
-                }
-            }
         }
     }
 

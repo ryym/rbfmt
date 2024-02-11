@@ -36,11 +36,9 @@ impl Postmodifier {
         } else {
             o.indent();
             o.break_line(ctx);
-            o.write_leading_trivia(
-                &cond.predicate.leading_trivia,
-                ctx,
-                EmptyLineHandling::trim(),
-            );
+            cond.predicate
+                .leading_trivia
+                .format(o, ctx, EmptyLineHandling::trim());
             o.format(&cond.predicate, ctx);
             o.write_trailing_comment(&cond.predicate.trailing_trivia);
             o.dedent();

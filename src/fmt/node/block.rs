@@ -189,8 +189,8 @@ impl BlockParameters {
                         continue;
                     }
                     o.break_line(ctx);
-                    o.write_leading_trivia(
-                        &n.leading_trivia,
+                    n.leading_trivia.format(
+                        o,
                         ctx,
                         EmptyLineHandling::Trim {
                             start: i == 0,
@@ -210,7 +210,7 @@ impl BlockParameters {
                 let last_idx = self.locals.len() - 1;
                 for (i, n) in self.locals.iter().enumerate() {
                     o.break_line(ctx);
-                    o.write_leading_trivia(&n.leading_trivia, ctx, EmptyLineHandling::trim());
+                    n.leading_trivia.format(o, ctx, EmptyLineHandling::trim());
                     o.format(n, ctx);
                     if i < last_idx {
                         o.push(',');
@@ -370,11 +370,9 @@ impl Rescue {
                     let last_idx = self.exceptions.len() - 1;
                     for (i, exception) in self.exceptions.iter().enumerate().skip(1) {
                         o.break_line(ctx);
-                        o.write_leading_trivia(
-                            &exception.leading_trivia,
-                            ctx,
-                            EmptyLineHandling::none(),
-                        );
+                        exception
+                            .leading_trivia
+                            .format(o, ctx, EmptyLineHandling::none());
                         o.format(exception, ctx);
                         if i < last_idx {
                             o.push(',');
@@ -394,7 +392,9 @@ impl Rescue {
             } else {
                 o.indent();
                 o.break_line(ctx);
-                o.write_leading_trivia(&reference.leading_trivia, ctx, EmptyLineHandling::trim());
+                reference
+                    .leading_trivia
+                    .format(o, ctx, EmptyLineHandling::trim());
                 o.format(reference, ctx);
                 o.write_trailing_comment(&reference.trailing_trivia);
                 o.dedent();

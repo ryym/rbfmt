@@ -29,11 +29,9 @@ impl SingletonClass {
             o.indent();
             o.indent();
             o.break_line(ctx);
-            o.write_leading_trivia(
-                &self.expression.leading_trivia,
-                ctx,
-                EmptyLineHandling::none(),
-            );
+            self.expression
+                .leading_trivia
+                .format(o, ctx, EmptyLineHandling::none());
             o.format(&self.expression, ctx);
             o.write_trailing_comment(&self.expression.trailing_trivia);
             o.dedent();

@@ -105,8 +105,8 @@ impl Arguments {
                 let last_idx = self.nodes.len() - 1;
                 for (i, arg) in self.nodes.iter().enumerate() {
                     o.break_line(ctx);
-                    o.write_leading_trivia(
-                        &arg.leading_trivia,
+                    arg.leading_trivia.format(
+                        o,
                         ctx,
                         EmptyLineHandling::Trim {
                             start: i == 0,
@@ -146,8 +146,8 @@ impl Arguments {
                     let last_idx = self.nodes.len() - 1;
                     for (i, arg) in self.nodes.iter().enumerate().skip(1) {
                         o.break_line(ctx);
-                        o.write_leading_trivia(
-                            &arg.leading_trivia,
+                        arg.leading_trivia.format(
+                            o,
                             ctx,
                             EmptyLineHandling::Trim {
                                 start: i == 0,
