@@ -186,50 +186,9 @@ impl Output {
         }
     }
 
-    pub(super) fn write_heredoc_body(&mut self, pos: &Pos, ctx: &FormatContext) {
+    fn write_heredoc_body(&mut self, pos: &Pos, ctx: &FormatContext) {
         let heredoc = ctx.heredoc_map.get(pos).expect("heredoc must exist");
-        match heredoc.indent_mode {
-            HeredocIndentMode::None | HeredocIndentMode::EndIndented => {
-                for part in &heredoc.parts {
-                    match part {
-                        HeredocPart::Str(str) => {
-                            // Ignore non-UTF8 source code for now.
-                            let value = String::from_utf8_lossy(&str.value);
-                            self.push_str_without_indent(&value);
-                        }
-                        HeredocPart::Statements(embedded) => {
-                            embedded.format(self, ctx);
-                        }
-                        HeredocPart::Variable(var) => {
-                            var.format(self);
-                        }
-                    }
-                }
-                if matches!(heredoc.indent_mode, HeredocIndentMode::EndIndented) {
-                    self.put_indent();
-                }
-                self.push_str(&heredoc.id);
-            }
-            HeredocIndentMode::AllIndented => {
-                for part in &heredoc.parts {
-                    match part {
-                        HeredocPart::Str(str) => {
-                            // Ignore non-UTF8 source code for now.
-                            let value = String::from_utf8_lossy(&str.value);
-                            self.push_str_without_indent(&value);
-                        }
-                        HeredocPart::Statements(embedded) => {
-                            embedded.format(self, ctx);
-                        }
-                        HeredocPart::Variable(var) => {
-                            var.format(self);
-                        }
-                    }
-                }
-                self.put_indent();
-                self.push_str(&heredoc.id);
-            }
-        }
+        heredoc.format(self, ctx);
         self.buffer.push('\n');
     }
 }

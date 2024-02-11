@@ -1,4 +1,7 @@
-use crate::fmt::{output::Output, shape::Shape};
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+};
 
 use super::{EmbeddedStatements, EmbeddedVariable, StringLike};
 
@@ -40,6 +43,53 @@ pub(crate) struct Heredoc {
     pub id: String,
     pub indent_mode: HeredocIndentMode,
     pub parts: Vec<HeredocPart>,
+}
+
+impl Heredoc {
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        match self.indent_mode {
+            HeredocIndentMode::None | HeredocIndentMode::EndIndented => {
+                for part in &self.parts {
+                    match part {
+                        HeredocPart::Str(str) => {
+                            // Ignore non-UTF8 source code for now.
+                            let value = String::from_utf8_lossy(&str.value);
+                            o.push_str_without_indent(&value);
+                        }
+                        HeredocPart::Statements(embedded) => {
+                            embedded.format(o, ctx);
+                        }
+                        HeredocPart::Variable(var) => {
+                            var.format(o);
+                        }
+                    }
+                }
+                if matches!(self.indent_mode, HeredocIndentMode::EndIndented) {
+                    o.put_indent();
+                }
+                o.push_str(&self.id);
+            }
+            HeredocIndentMode::AllIndented => {
+                for part in &self.parts {
+                    match part {
+                        HeredocPart::Str(str) => {
+                            // Ignore non-UTF8 source code for now.
+                            let value = String::from_utf8_lossy(&str.value);
+                            o.push_str_without_indent(&value);
+                        }
+                        HeredocPart::Statements(embedded) => {
+                            embedded.format(o, ctx);
+                        }
+                        HeredocPart::Variable(var) => {
+                            var.format(o);
+                        }
+                    }
+                }
+                o.put_indent();
+                o.push_str(&self.id);
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
