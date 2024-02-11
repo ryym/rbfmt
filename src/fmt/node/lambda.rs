@@ -30,7 +30,7 @@ impl Lambda {
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         o.push_str("->");
         if let Some(params) = &self.parameters {
-            o.format_block_parameters(params, ctx);
+            params.format(o, ctx);
         }
         self.block.format(o, ctx);
     }

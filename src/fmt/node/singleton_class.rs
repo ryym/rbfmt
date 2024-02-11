@@ -42,7 +42,7 @@ impl SingletonClass {
             o.dedent();
             o.dedent();
         }
-        o.format_block_body(&self.body, ctx, true);
+        self.body.format(o, ctx, true);
         o.break_line(ctx);
         o.push_str("end");
     }

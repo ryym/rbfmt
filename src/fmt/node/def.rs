@@ -103,7 +103,7 @@ impl Def {
                 body,
             } => {
                 o.write_trailing_comment(head_trailing);
-                o.format_block_body(body, ctx, true);
+                body.format(o, ctx, true);
                 o.break_line(ctx);
                 o.push_str("end");
             }

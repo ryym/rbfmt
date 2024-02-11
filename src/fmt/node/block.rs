@@ -1,6 +1,7 @@
 use crate::fmt::{
     output::{FormatContext, Output},
     shape::Shape,
+    trivia::EmptyLineHandling,
     TrailingTrivia,
 };
 
@@ -65,11 +66,11 @@ impl Block {
             o.push_str(&self.opening);
             if let Some(params) = &self.parameters {
                 o.push(' ');
-                o.format_block_parameters(params, ctx);
+                params.format(o, ctx);
             }
             if !self.body.shape.is_empty() {
                 o.push(' ');
-                o.format_block_body(&self.body, ctx, false);
+                self.body.format(o, ctx, false);
                 o.push(' ');
             }
             if &self.closing == "end" {
@@ -83,16 +84,16 @@ impl Block {
             if let Some(params) = &self.parameters {
                 if self.opening_trailing.is_none() {
                     o.push(' ');
-                    o.format_block_parameters(params, ctx);
+                    params.format(o, ctx);
                 } else {
                     o.indent();
                     o.break_line(ctx);
-                    o.format_block_parameters(params, ctx);
+                    params.format(o, ctx);
                     o.dedent();
                 }
             }
             if !self.body.shape.is_empty() {
-                o.format_block_body(&self.body, ctx, true);
+                self.body.format(o, ctx, true);
             }
             o.break_line(ctx);
             o.push_str(&self.closing);
@@ -152,6 +153,85 @@ impl BlockParameters {
         self.shape.append(trailing.shape());
         self.closing_trailing = trailing;
     }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        if self.shape.fits_in_one_line(o.remaining_width) {
+            o.push_str(&self.opening);
+            for (i, n) in self.params.iter().enumerate() {
+                if n.shape.is_empty() {
+                    o.push(',');
+                } else {
+                    if i > 0 {
+                        o.push_str(", ");
+                    }
+                    o.format(n, ctx);
+                }
+            }
+            if !self.locals.is_empty() {
+                o.push_str("; ");
+                for (i, n) in self.locals.iter().enumerate() {
+                    if i > 0 {
+                        o.push_str(", ");
+                    }
+                    o.format(n, ctx);
+                }
+            }
+            o.push_str(&self.closing);
+            o.write_trailing_comment(&self.closing_trailing);
+        } else {
+            o.push_str(&self.opening);
+            o.indent();
+            if !self.params.is_empty() {
+                let last_idx = self.params.len() - 1;
+                for (i, n) in self.params.iter().enumerate() {
+                    if n.shape.is_empty() {
+                        o.write_trailing_comment(&n.trailing_trivia);
+                        continue;
+                    }
+                    o.break_line(ctx);
+                    o.write_leading_trivia(
+                        &n.leading_trivia,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: i == 0,
+                            end: false,
+                        },
+                    );
+                    o.format(n, ctx);
+                    if i < last_idx {
+                        o.push(',');
+                    }
+                    o.write_trailing_comment(&n.trailing_trivia);
+                }
+            }
+            if !self.locals.is_empty() {
+                o.break_line(ctx);
+                o.push(';');
+                let last_idx = self.locals.len() - 1;
+                for (i, n) in self.locals.iter().enumerate() {
+                    o.break_line(ctx);
+                    o.write_leading_trivia(
+                        &n.leading_trivia,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: false,
+                            end: false,
+                        },
+                    );
+                    o.format(n, ctx);
+                    if i < last_idx {
+                        o.push(',');
+                    }
+                    o.write_trailing_comment(&n.trailing_trivia);
+                }
+            }
+            o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, self.params.is_empty());
+            o.dedent();
+            o.break_line(ctx);
+            o.push_str(&self.closing);
+            o.write_trailing_comment(&self.closing_trailing);
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -194,6 +274,46 @@ impl BlockBody {
     fn is_empty(&self) -> bool {
         self.statements.is_empty() && self.rescues.is_empty() && self.ensure.is_none()
     }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext, block_always: bool) {
+        if self.shape.fits_in_inline(o.remaining_width) && !block_always {
+            self.statements.format(o, ctx, block_always);
+            return;
+        }
+
+        if !self.statements.shape().is_empty() {
+            o.indent();
+            o.break_line(ctx);
+            self.statements.format(o, ctx, true);
+            o.dedent();
+        }
+        for rescue in &self.rescues {
+            o.break_line(ctx);
+            rescue.format(o, ctx);
+        }
+        if let Some(rescue_else) = &self.rescue_else {
+            o.break_line(ctx);
+            o.push_str("else");
+            o.write_trailing_comment(&rescue_else.keyword_trailing);
+            if !rescue_else.body.shape().is_empty() {
+                o.indent();
+                o.break_line(ctx);
+                rescue_else.body.format(o, ctx, true);
+                o.dedent();
+            }
+        }
+        if let Some(ensure) = &self.ensure {
+            o.break_line(ctx);
+            o.push_str("ensure");
+            o.write_trailing_comment(&ensure.keyword_trailing);
+            if !ensure.body.shape().is_empty() {
+                o.indent();
+                o.break_line(ctx);
+                ensure.body.format(o, ctx, true);
+                o.dedent();
+            }
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -231,5 +351,78 @@ impl Rescue {
 
     pub(crate) fn set_statements(&mut self, statements: Statements) {
         self.statements = statements;
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        o.push_str("rescue");
+        if !self.exceptions.is_empty() {
+            if self.exceptions_shape.fits_in_one_line(o.remaining_width) {
+                o.push(' ');
+                for (i, exception) in self.exceptions.iter().enumerate() {
+                    if i > 0 {
+                        o.push_str(", ");
+                    }
+                    o.format(exception, ctx);
+                    o.write_trailing_comment(&exception.trailing_trivia);
+                }
+            } else {
+                o.push(' ');
+                o.format(&self.exceptions[0], ctx);
+                if self.exceptions.len() > 1 {
+                    o.push(',');
+                }
+                o.write_trailing_comment(&self.exceptions[0].trailing_trivia);
+                if self.exceptions.len() > 1 {
+                    o.indent();
+                    let last_idx = self.exceptions.len() - 1;
+                    for (i, exception) in self.exceptions.iter().enumerate().skip(1) {
+                        o.break_line(ctx);
+                        o.write_leading_trivia(
+                            &exception.leading_trivia,
+                            ctx,
+                            EmptyLineHandling::Trim {
+                                start: false,
+                                end: false,
+                            },
+                        );
+                        o.format(exception, ctx);
+                        if i < last_idx {
+                            o.push(',');
+                        }
+                        o.write_trailing_comment(&exception.trailing_trivia);
+                    }
+                    o.dedent();
+                }
+            }
+        }
+        if let Some(reference) = &self.reference {
+            o.push_str(" =>");
+            if reference.shape.fits_in_one_line(o.remaining_width) || reference.is_diagonal() {
+                o.push(' ');
+                o.format(reference, ctx);
+                o.write_trailing_comment(&reference.trailing_trivia);
+            } else {
+                o.indent();
+                o.break_line(ctx);
+                o.write_leading_trivia(
+                    &reference.leading_trivia,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: true,
+                        end: false,
+                    },
+                );
+                o.format(reference, ctx);
+                o.write_trailing_comment(&reference.trailing_trivia);
+                o.dedent();
+            }
+        }
+        o.write_trailing_comment(&self.head_trailing);
+        if !self.statements.shape().is_empty() {
+            o.indent();
+            o.break_line(ctx);
+            self.statements.format(o, ctx, true);
+            o.dedent();
+        }
     }
 }
