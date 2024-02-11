@@ -181,59 +181,6 @@ impl Output {
         }
     }
 
-    pub(super) fn format_method_parameters(
-        &mut self,
-        params: &Option<MethodParameters>,
-        ctx: &FormatContext,
-    ) {
-        if let Some(params) = params {
-            if params.shape.fits_in_one_line(self.remaining_width) {
-                let opening = params.opening.as_deref().unwrap_or(" ");
-                self.push_str(opening);
-                for (i, n) in params.params.iter().enumerate() {
-                    if i > 0 {
-                        self.push_str(", ");
-                    }
-                    self.format(n, ctx);
-                }
-                if let Some(closing) = &params.closing {
-                    self.push_str(closing);
-                }
-            } else {
-                self.push('(');
-                self.indent();
-                if !params.params.is_empty() {
-                    let last_idx = params.params.len() - 1;
-                    for (i, n) in params.params.iter().enumerate() {
-                        self.break_line(ctx);
-                        self.write_leading_trivia(
-                            &n.leading_trivia,
-                            ctx,
-                            EmptyLineHandling::Trim {
-                                start: i == 0,
-                                end: false,
-                            },
-                        );
-                        self.format(n, ctx);
-                        if i < last_idx {
-                            self.push(',');
-                        }
-                        self.write_trailing_comment(&n.trailing_trivia);
-                    }
-                }
-                self.write_trivia_at_virtual_end(
-                    ctx,
-                    &params.virtual_end,
-                    true,
-                    params.params.is_empty(),
-                );
-                self.dedent();
-                self.break_line(ctx);
-                self.push(')');
-            }
-        }
-    }
-
     pub(super) fn write_leading_trivia(
         &mut self,
         trivia: &LeadingTrivia,

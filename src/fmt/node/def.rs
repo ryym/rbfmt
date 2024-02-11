@@ -59,19 +59,25 @@ impl Def {
             o.push('.');
             if receiver.trailing_trivia.is_none() {
                 o.push_str(&self.name);
-                o.format_method_parameters(&self.parameters, ctx);
+                if let Some(params) = &self.parameters {
+                    params.format(o, ctx);
+                }
             } else {
                 o.write_trailing_comment(&receiver.trailing_trivia);
                 o.indent();
                 o.break_line(ctx);
                 o.push_str(&self.name);
-                o.format_method_parameters(&self.parameters, ctx);
+                if let Some(params) = &self.parameters {
+                    params.format(o, ctx);
+                }
                 o.dedent();
             }
         } else {
             o.push(' ');
             o.push_str(&self.name);
-            o.format_method_parameters(&self.parameters, ctx);
+            if let Some(params) = &self.parameters {
+                params.format(o, ctx);
+            }
         }
         match &self.body {
             // self foo = body
@@ -167,5 +173,47 @@ impl MethodParameters {
             self.shape.append(&end.shape);
         }
         self.virtual_end = end;
+    }
+
+    pub(super) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        if self.shape.fits_in_one_line(o.remaining_width) {
+            let opening = self.opening.as_deref().unwrap_or(" ");
+            o.push_str(opening);
+            for (i, n) in self.params.iter().enumerate() {
+                if i > 0 {
+                    o.push_str(", ");
+                }
+                o.format(n, ctx);
+            }
+            if let Some(closing) = &self.closing {
+                o.push_str(closing);
+            }
+        } else {
+            o.push('(');
+            o.indent();
+            if !self.params.is_empty() {
+                let last_idx = self.params.len() - 1;
+                for (i, n) in self.params.iter().enumerate() {
+                    o.break_line(ctx);
+                    o.write_leading_trivia(
+                        &n.leading_trivia,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: i == 0,
+                            end: false,
+                        },
+                    );
+                    o.format(n, ctx);
+                    if i < last_idx {
+                        o.push(',');
+                    }
+                    o.write_trailing_comment(&n.trailing_trivia);
+                }
+            }
+            o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, self.params.is_empty());
+            o.dedent();
+            o.break_line(ctx);
+            o.push(')');
+        }
     }
 }
