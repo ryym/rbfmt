@@ -32,6 +32,6 @@ impl Lambda {
         if let Some(params) = &self.parameters {
             o.format_block_parameters(params, ctx);
         }
-        o.format_block(&self.block, ctx);
+        self.block.format(o, ctx);
     }
 }

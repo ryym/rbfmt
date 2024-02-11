@@ -1,4 +1,8 @@
-use crate::fmt::{shape::Shape, TrailingTrivia};
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+    TrailingTrivia,
+};
 
 use super::{Else, Node, Statements, VirtualEnd};
 
@@ -53,6 +57,46 @@ impl Block {
     pub(crate) fn min_first_line_len(&self) -> usize {
         let params_opening_len = self.parameters.as_ref().map_or(0, |_| 2); // " |"
         self.opening.len() + params_opening_len
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        if self.shape.fits_in_one_line(o.remaining_width) {
+            o.push(' ');
+            o.push_str(&self.opening);
+            if let Some(params) = &self.parameters {
+                o.push(' ');
+                o.format_block_parameters(params, ctx);
+            }
+            if !self.body.shape.is_empty() {
+                o.push(' ');
+                o.format_block_body(&self.body, ctx, false);
+                o.push(' ');
+            }
+            if &self.closing == "end" {
+                o.push(' ');
+            }
+            o.push_str(&self.closing);
+        } else {
+            o.push(' ');
+            o.push_str(&self.opening);
+            o.write_trailing_comment(&self.opening_trailing);
+            if let Some(params) = &self.parameters {
+                if self.opening_trailing.is_none() {
+                    o.push(' ');
+                    o.format_block_parameters(params, ctx);
+                } else {
+                    o.indent();
+                    o.break_line(ctx);
+                    o.format_block_parameters(params, ctx);
+                    o.dedent();
+                }
+            }
+            if !self.body.shape.is_empty() {
+                o.format_block_body(&self.body, ctx, true);
+            }
+            o.break_line(ctx);
+            o.push_str(&self.closing);
+        }
     }
 }
 

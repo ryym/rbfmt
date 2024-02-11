@@ -80,7 +80,7 @@ impl MethodChain {
                 for idx_call in &receiver.index_calls {
                     idx_call.arguments.format(o, ctx);
                     if let Some(block) = &idx_call.block {
-                        o.format_block(block, ctx);
+                        block.format(o, ctx);
                     }
                 }
             }
@@ -90,12 +90,12 @@ impl MethodChain {
                     args.format(o, ctx);
                 }
                 if let Some(block) = &call.block {
-                    o.format_block(block, ctx);
+                    block.format(o, ctx);
                 }
                 for idx_call in &call.index_calls {
                     idx_call.arguments.format(o, ctx);
                     if let Some(block) = &idx_call.block {
-                        o.format_block(block, ctx);
+                        block.format(o, ctx);
                     }
                 }
                 o.write_trailing_comment(&call.trailing_trivia);
@@ -150,7 +150,7 @@ impl MethodChain {
                             return DraftResult::Rollback;
                         }
                     }
-                    d.format_block(block, ctx);
+                    block.format(d, ctx);
                 }
                 for idx_call in &call.index_calls {
                     // XXX: Handle single arg index as non-breakable
@@ -159,7 +159,7 @@ impl MethodChain {
                     }
                     idx_call.arguments.format(d, ctx);
                     if let Some(block) = &idx_call.block {
-                        d.format_block(block, ctx);
+                        block.format(d, ctx);
                     }
                 }
                 if prev_line_count < d.line_count {
@@ -182,12 +182,12 @@ impl MethodChain {
                     args.format(o, ctx);
                 }
                 if let Some(block) = &call.block {
-                    o.format_block(block, ctx);
+                    block.format(o, ctx);
                 }
                 for idx_call in &call.index_calls {
                     idx_call.arguments.format(o, ctx);
                     if let Some(block) = &idx_call.block {
-                        o.format_block(block, ctx);
+                        block.format(o, ctx);
                     }
                 }
                 o.write_trailing_comment(&call.trailing_trivia);

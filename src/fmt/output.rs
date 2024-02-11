@@ -209,46 +209,6 @@ impl Output {
         }
     }
 
-    pub(super) fn format_block(&mut self, block: &Block, ctx: &FormatContext) {
-        if block.shape.fits_in_one_line(self.remaining_width) {
-            self.push(' ');
-            self.push_str(&block.opening);
-            if let Some(params) = &block.parameters {
-                self.push(' ');
-                self.format_block_parameters(params, ctx);
-            }
-            if !block.body.shape.is_empty() {
-                self.push(' ');
-                self.format_block_body(&block.body, ctx, false);
-                self.push(' ');
-            }
-            if &block.closing == "end" {
-                self.push(' ');
-            }
-            self.push_str(&block.closing);
-        } else {
-            self.push(' ');
-            self.push_str(&block.opening);
-            self.write_trailing_comment(&block.opening_trailing);
-            if let Some(params) = &block.parameters {
-                if block.opening_trailing.is_none() {
-                    self.push(' ');
-                    self.format_block_parameters(params, ctx);
-                } else {
-                    self.indent();
-                    self.break_line(ctx);
-                    self.format_block_parameters(params, ctx);
-                    self.dedent();
-                }
-            }
-            if !block.body.shape.is_empty() {
-                self.format_block_body(&block.body, ctx, true);
-            }
-            self.break_line(ctx);
-            self.push_str(&block.closing);
-        }
-    }
-
     pub(super) fn format_block_body(
         &mut self,
         body: &BlockBody,
