@@ -36,7 +36,7 @@ impl Assign {
     }
 
     fn format_assign_right(&self, o: &mut Output, ctx: &FormatContext) {
-        if self.value.shape.fits_in_one_line(o.remaining_width) || self.value.is_diagonal() {
+        if self.value.shape.fits_in_one_line(o.remaining_width) || self.value.can_continue_line() {
             o.push(' ');
             self.value.format(o, ctx);
         } else {

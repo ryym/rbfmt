@@ -47,7 +47,7 @@ impl Def {
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         o.push_str("def");
         if let Some(receiver) = &self.receiver {
-            if receiver.shape.fits_in_one_line(o.remaining_width) || receiver.is_diagonal() {
+            if receiver.shape.fits_in_one_line(o.remaining_width) || receiver.can_continue_line() {
                 o.push(' ');
                 receiver.format(o, ctx);
             } else {
@@ -83,7 +83,7 @@ impl Def {
             // self foo = body
             DefBody::Short { body } => {
                 o.push_str(" =");
-                if body.shape.fits_in_one_line(o.remaining_width) || body.is_diagonal() {
+                if body.shape.fits_in_one_line(o.remaining_width) || body.can_continue_line() {
                     o.push(' ');
                     body.format(o, ctx);
                     body.trailing_trivia.format(o);

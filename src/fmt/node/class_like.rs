@@ -27,7 +27,9 @@ impl ClassLike {
         o.push_str(&self.name);
         if let Some(superclass) = &self.superclass {
             o.push_str(" <");
-            if superclass.shape.fits_in_one_line(o.remaining_width) || superclass.is_diagonal() {
+            if superclass.shape.fits_in_one_line(o.remaining_width)
+                || superclass.can_continue_line()
+            {
                 o.push(' ');
                 superclass.format(o, ctx);
                 superclass.trailing_trivia.format(o);

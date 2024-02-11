@@ -80,8 +80,8 @@ impl Node {
         self.kind.format(o, ctx);
     }
 
-    pub(crate) fn is_diagonal(&self) -> bool {
-        self.leading_trivia.shape().is_empty() && self.kind.is_diagonal()
+    pub(crate) fn can_continue_line(&self) -> bool {
+        self.leading_trivia.shape().is_empty() && self.kind.can_continue_line()
     }
 
     pub(crate) fn argument_style(&self) -> ArgumentStyle {
@@ -198,14 +198,14 @@ impl Kind {
         }
     }
 
-    pub(crate) fn is_diagonal(&self) -> bool {
+    pub(crate) fn can_continue_line(&self) -> bool {
         match self {
             Self::Statements(statements) => {
                 if statements.nodes.len() > 1 {
                     return false;
                 }
                 match statements.nodes.get(0) {
-                    Some(node) => node.is_diagonal(),
+                    Some(node) => node.can_continue_line(),
                     None => statements.virtual_end.is_none(),
                 }
             }

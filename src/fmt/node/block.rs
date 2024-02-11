@@ -385,7 +385,8 @@ impl Rescue {
         }
         if let Some(reference) = &self.reference {
             o.push_str(" =>");
-            if reference.shape.fits_in_one_line(o.remaining_width) || reference.is_diagonal() {
+            if reference.shape.fits_in_one_line(o.remaining_width) || reference.can_continue_line()
+            {
                 o.push(' ');
                 reference.format(o, ctx);
                 reference.trailing_trivia.format(o);

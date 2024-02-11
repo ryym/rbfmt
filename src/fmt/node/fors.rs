@@ -20,7 +20,7 @@ impl For {
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         o.push_str("for");
-        if self.index.shape.fits_in_inline(o.remaining_width) || self.index.is_diagonal() {
+        if self.index.shape.fits_in_inline(o.remaining_width) || self.index.can_continue_line() {
             o.push(' ');
             self.index.format(o, ctx);
         } else {
@@ -34,7 +34,7 @@ impl For {
         }
         o.push_str(" in");
         let collection = &self.collection;
-        if collection.shape.fits_in_inline(o.remaining_width) || collection.is_diagonal() {
+        if collection.shape.fits_in_inline(o.remaining_width) || collection.can_continue_line() {
             o.push(' ');
             collection.format(o, ctx);
             collection.trailing_trivia.format(o);

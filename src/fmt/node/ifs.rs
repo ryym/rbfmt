@@ -91,7 +91,7 @@ impl Conditional {
     }
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
-        if self.predicate.is_diagonal() {
+        if self.predicate.can_continue_line() {
             o.push(' ');
             o.indent();
             self.predicate.format(o, ctx);

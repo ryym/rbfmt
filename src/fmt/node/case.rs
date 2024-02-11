@@ -25,7 +25,7 @@ impl Case {
         o.push_str("case");
         match &self.predicate {
             Some(pred) => {
-                if pred.shape.fits_in_one_line(o.remaining_width) || pred.is_diagonal() {
+                if pred.shape.fits_in_one_line(o.remaining_width) || pred.can_continue_line() {
                     o.push(' ');
                     pred.format(o, ctx);
                     pred.trailing_trivia.format(o);
@@ -135,7 +135,7 @@ impl CaseWhen {
                     cond.trailing_trivia.format(o);
                 }
             } else {
-                if self.conditions[0].is_diagonal() {
+                if self.conditions[0].can_continue_line() {
                     o.push(' ');
                     self.conditions[0].format(o, ctx);
                 } else {

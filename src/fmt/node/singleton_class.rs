@@ -20,7 +20,7 @@ impl SingletonClass {
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         o.push_str("class <<");
         if self.expression.shape.fits_in_one_line(o.remaining_width)
-            || self.expression.is_diagonal()
+            || self.expression.can_continue_line()
         {
             o.push(' ');
             self.expression.format(o, ctx);

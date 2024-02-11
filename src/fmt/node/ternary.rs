@@ -74,7 +74,7 @@ impl Ternary {
             o.break_line(ctx);
             o.push(':');
             if self.otherwise.shape.fits_in_one_line(o.remaining_width)
-                || self.otherwise.is_diagonal()
+                || self.otherwise.can_continue_line()
             {
                 o.push(' ');
                 self.otherwise.format(o, ctx);

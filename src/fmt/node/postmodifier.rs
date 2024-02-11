@@ -29,7 +29,7 @@ impl Postmodifier {
         o.push(' ');
         o.push_str(&self.keyword);
         let cond = &self.conditional;
-        if cond.predicate.is_diagonal() {
+        if cond.predicate.can_continue_line() {
             o.push(' ');
             cond.predicate.format(o, ctx);
             cond.predicate.trailing_trivia.format(o);

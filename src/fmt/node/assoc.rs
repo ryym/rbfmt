@@ -32,7 +32,7 @@ impl Assoc {
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         self.key.format(o, ctx);
-        if self.value.shape.fits_in_inline(o.remaining_width) || self.value.is_diagonal() {
+        if self.value.shape.fits_in_inline(o.remaining_width) || self.value.can_continue_line() {
             if let Some(op) = &self.operator {
                 o.push(' ');
                 o.push_str(op);

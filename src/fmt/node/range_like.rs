@@ -38,7 +38,7 @@ impl RangeLike {
         }
         o.push_str(&self.operator);
         if let Some(right) = &self.right {
-            if right.shape.fits_in_one_line(o.remaining_width) || right.is_diagonal() {
+            if right.shape.fits_in_one_line(o.remaining_width) || right.can_continue_line() {
                 let need_space = match &right.kind {
                     Kind::RangeLike(range) => range.left.is_none(),
                     _ => false,
