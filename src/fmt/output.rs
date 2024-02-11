@@ -115,7 +115,7 @@ impl Output {
             Kind::While(whle) => whle.format(self, ctx),
             Kind::For(expr) => expr.format(self, ctx),
             Kind::Postmodifier(modifier) => modifier.format(self, ctx),
-            Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
+            Kind::MethodChain(chain) => chain.format(self, ctx),
             Kind::Lambda(lambda) => self.format_lambda(lambda, ctx),
             Kind::CallLike(call) => self.format_call_like(call, ctx),
             Kind::InfixChain(chain) => self.format_infix_chain(chain, ctx),
@@ -207,130 +207,6 @@ impl Output {
                     }
                 }
             }
-        }
-    }
-
-    pub(super) fn format_method_chain(&mut self, chain: &MethodChain, ctx: &FormatContext) {
-        match &chain.head {
-            MethodChainHead::Receiver(receiver) => {
-                self.format(&receiver.node, ctx);
-                self.write_trailing_comment(&receiver.node.trailing_trivia);
-                for idx_call in &receiver.index_calls {
-                    self.format_arguments(&idx_call.arguments, ctx);
-                    if let Some(block) = &idx_call.block {
-                        self.format_block(block, ctx);
-                    }
-                }
-            }
-            MethodChainHead::FirstCall(call) => {
-                self.push_str(&call.name);
-                if let Some(args) = &call.arguments {
-                    self.format_arguments(args, ctx);
-                }
-                if let Some(block) = &call.block {
-                    self.format_block(block, ctx);
-                }
-                for idx_call in &call.index_calls {
-                    self.format_arguments(&idx_call.arguments, ctx);
-                    if let Some(block) = &idx_call.block {
-                        self.format_block(block, ctx);
-                    }
-                }
-                self.write_trailing_comment(&call.trailing_trivia);
-            }
-        }
-        if chain.calls.is_empty() {
-            return;
-        }
-
-        // Format horizontally if all these are met:
-        //   - no intermediate comments
-        //   - one or zero blocks
-        //   - only one multilines arguments or block
-        //   - no more arguments after multilines call
-        // Problems:
-        //   - The format can change to vertical by a subtle modification
-        //   - Sometimes the vertical format is more beautiful
-        let draft_result = self.draft(|d| {
-            if chain.head.has_trailing_trivia() {
-                return DraftResult::Rollback;
-            }
-            let mut call_expanded = false;
-            let mut non_empty_block_exists = false;
-            let last_idx = chain.calls.len() - 1;
-            for (i, call) in chain.calls.iter().enumerate() {
-                if i < last_idx && !call.trailing_trivia.is_none() {
-                    return DraftResult::Rollback;
-                }
-                match call.min_first_line_len() {
-                    Some(len) if len <= d.remaining_width => {}
-                    _ => return DraftResult::Rollback,
-                };
-                let prev_line_count = d.line_count;
-                if let Some(call_op) = &call.operator {
-                    d.push_str(call_op);
-                }
-                d.push_str(&call.name);
-                if let Some(args) = &call.arguments {
-                    if !args.is_empty() && call_expanded {
-                        return DraftResult::Rollback;
-                    }
-                    d.format_arguments(args, ctx);
-                }
-                if let Some(block) = &call.block {
-                    if !block.is_empty() {
-                        if call_expanded {
-                            return DraftResult::Rollback;
-                        }
-                        if !non_empty_block_exists {
-                            non_empty_block_exists = true
-                        } else {
-                            return DraftResult::Rollback;
-                        }
-                    }
-                    d.format_block(block, ctx);
-                }
-                for idx_call in &call.index_calls {
-                    // XXX: Handle single arg index as non-breakable
-                    if !idx_call.arguments.is_empty() && call_expanded {
-                        return DraftResult::Rollback;
-                    }
-                    d.format_arguments(&idx_call.arguments, ctx);
-                    if let Some(block) = &idx_call.block {
-                        d.format_block(block, ctx);
-                    }
-                }
-                if prev_line_count < d.line_count {
-                    call_expanded = true
-                }
-            }
-            DraftResult::Commit
-        });
-
-        if !matches!(draft_result, DraftResult::Commit) {
-            self.indent();
-            for call in chain.calls.iter() {
-                if let Some(call_op) = &call.operator {
-                    self.break_line(ctx);
-                    self.write_leading_trivia(&call.leading_trivia, ctx, EmptyLineHandling::Skip);
-                    self.push_str(call_op);
-                }
-                self.push_str(&call.name);
-                if let Some(args) = &call.arguments {
-                    self.format_arguments(args, ctx);
-                }
-                if let Some(block) = &call.block {
-                    self.format_block(block, ctx);
-                }
-                for idx_call in &call.index_calls {
-                    self.format_arguments(&idx_call.arguments, ctx);
-                    if let Some(block) = &idx_call.block {
-                        self.format_block(block, ctx);
-                    }
-                }
-                self.write_trailing_comment(&call.trailing_trivia);
-            }
-            self.dedent();
         }
     }
 
