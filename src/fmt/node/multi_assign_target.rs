@@ -1,4 +1,8 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+    trivia::EmptyLineHandling,
+};
 
 use super::{Node, VirtualEnd};
 
@@ -45,5 +49,49 @@ impl MultiAssignTarget {
             self.shape.append(&end.shape);
         }
         self.virtual_end = end;
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        if self.shape.fits_in_inline(o.remaining_width) {
+            if let Some(lparen) = &self.lparen {
+                o.push_str(lparen);
+            }
+            for (i, target) in self.targets.iter().enumerate() {
+                if i > 0 {
+                    o.push_str(", ");
+                }
+                o.format(target, ctx);
+            }
+            if self.with_implicit_rest {
+                o.push(',');
+            }
+            if let Some(rparen) = &self.rparen {
+                o.push_str(rparen);
+            }
+        } else {
+            o.push('(');
+            o.indent();
+            let last_idx = self.targets.len() - 1;
+            for (i, target) in self.targets.iter().enumerate() {
+                o.break_line(ctx);
+                o.write_leading_trivia(
+                    &target.leading_trivia,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: i == 0,
+                        end: false,
+                    },
+                );
+                o.format(target, ctx);
+                if i < last_idx || self.with_implicit_rest {
+                    o.push(',');
+                }
+                o.write_trailing_comment(&target.trailing_trivia);
+            }
+            o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, false);
+            o.dedent();
+            o.break_line(ctx);
+            o.push(')');
+        }
     }
 }

@@ -1,4 +1,8 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+    trivia::EmptyLineHandling,
+};
 
 use super::Node;
 
@@ -21,6 +25,33 @@ impl Assign {
             target: Box::new(target),
             operator,
             value: Box::new(value),
+        }
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        o.format(&self.target, ctx);
+        o.push(' ');
+        o.push_str(&self.operator);
+        self.format_assign_right(o, ctx);
+    }
+
+    fn format_assign_right(&self, o: &mut Output, ctx: &FormatContext) {
+        if self.value.shape.fits_in_one_line(o.remaining_width) || self.value.is_diagonal() {
+            o.push(' ');
+            o.format(&self.value, ctx);
+        } else {
+            o.break_line(ctx);
+            o.indent();
+            o.write_leading_trivia(
+                &self.value.leading_trivia,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: true,
+                    end: true,
+                },
+            );
+            o.format(&self.value, ctx);
+            o.dedent();
         }
     }
 }

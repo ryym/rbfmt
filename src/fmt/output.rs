@@ -119,8 +119,8 @@ impl Output {
             Kind::Lambda(lambda) => lambda.format(self, ctx),
             Kind::CallLike(call) => call.format(self, ctx),
             Kind::InfixChain(chain) => chain.format(self, ctx),
-            Kind::Assign(assign) => self.format_assign(assign, ctx),
-            Kind::MultiAssignTarget(multi) => self.format_multi_assign_target(multi, ctx),
+            Kind::Assign(assign) => assign.format(self, ctx),
+            Kind::MultiAssignTarget(multi) => multi.format(self, ctx),
             Kind::Prefix(prefix) => self.format_prefix(prefix, ctx),
             Kind::Array(array) => self.format_array(array, ctx),
             Kind::Hash(hash) => self.format_hash(hash, ctx),
@@ -364,81 +364,6 @@ impl Output {
             }
             self.break_line(ctx);
             self.push_str(&block.closing);
-        }
-    }
-
-    pub(super) fn format_assign(&mut self, assign: &Assign, ctx: &FormatContext) {
-        self.format(&assign.target, ctx);
-        self.push(' ');
-        self.push_str(&assign.operator);
-        self.format_assign_right(&assign.value, ctx);
-    }
-
-    pub(super) fn format_assign_right(&mut self, value: &Node, ctx: &FormatContext) {
-        if value.shape.fits_in_one_line(self.remaining_width) || value.is_diagonal() {
-            self.push(' ');
-            self.format(value, ctx);
-        } else {
-            self.break_line(ctx);
-            self.indent();
-            self.write_leading_trivia(
-                &value.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
-            );
-            self.format(value, ctx);
-            self.dedent();
-        }
-    }
-
-    pub(super) fn format_multi_assign_target(
-        &mut self,
-        multi: &MultiAssignTarget,
-        ctx: &FormatContext,
-    ) {
-        if multi.shape.fits_in_inline(self.remaining_width) {
-            if let Some(lparen) = &multi.lparen {
-                self.push_str(lparen);
-            }
-            for (i, target) in multi.targets.iter().enumerate() {
-                if i > 0 {
-                    self.push_str(", ");
-                }
-                self.format(target, ctx);
-            }
-            if multi.with_implicit_rest {
-                self.push(',');
-            }
-            if let Some(rparen) = &multi.rparen {
-                self.push_str(rparen);
-            }
-        } else {
-            self.push('(');
-            self.indent();
-            let last_idx = multi.targets.len() - 1;
-            for (i, target) in multi.targets.iter().enumerate() {
-                self.break_line(ctx);
-                self.write_leading_trivia(
-                    &target.leading_trivia,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: i == 0,
-                        end: false,
-                    },
-                );
-                self.format(target, ctx);
-                if i < last_idx || multi.with_implicit_rest {
-                    self.push(',');
-                }
-                self.write_trailing_comment(&target.trailing_trivia);
-            }
-            self.write_trivia_at_virtual_end(ctx, &multi.virtual_end, true, false);
-            self.dedent();
-            self.break_line(ctx);
-            self.push(')');
         }
     }
 
