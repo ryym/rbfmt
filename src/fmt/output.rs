@@ -134,34 +134,6 @@ impl Output {
         }
     }
 
-    pub(super) fn format_embedded_statements(
-        &mut self,
-        embedded: &EmbeddedStatements,
-        ctx: &FormatContext,
-    ) {
-        self.push_str(&embedded.opening);
-
-        if embedded.shape.is_inline() {
-            let remaining = self.remaining_width;
-            self.remaining_width = usize::MAX;
-            embedded.statements.format(self, ctx, false);
-            self.remaining_width = remaining;
-        } else {
-            self.indent();
-            self.break_line(ctx);
-            embedded.statements.format(self, ctx, true);
-            self.break_line(ctx);
-            self.dedent();
-        }
-
-        self.push_str(&embedded.closing);
-    }
-
-    pub(super) fn format_embedded_variable(&mut self, var: &EmbeddedVariable) {
-        self.push_str(&var.operator);
-        self.push_str(&var.variable);
-    }
-
     pub(super) fn write_trivia_at_virtual_end(
         &mut self,
         ctx: &FormatContext,
@@ -356,10 +328,10 @@ impl Output {
                             self.push_str_without_indent(&value);
                         }
                         HeredocPart::Statements(embedded) => {
-                            self.format_embedded_statements(embedded, ctx);
+                            embedded.format(self, ctx);
                         }
                         HeredocPart::Variable(var) => {
-                            self.format_embedded_variable(var);
+                            var.format(self);
                         }
                     }
                 }
@@ -377,10 +349,10 @@ impl Output {
                             self.push_str_without_indent(&value);
                         }
                         HeredocPart::Statements(embedded) => {
-                            self.format_embedded_statements(embedded, ctx);
+                            embedded.format(self, ctx);
                         }
                         HeredocPart::Variable(var) => {
-                            self.format_embedded_variable(var);
+                            var.format(self);
                         }
                     }
                 }
