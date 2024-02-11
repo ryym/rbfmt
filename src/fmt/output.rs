@@ -125,8 +125,8 @@ impl Output {
             Kind::Array(array) => array.format(self, ctx),
             Kind::Hash(hash) => hash.format(self, ctx),
             Kind::Assoc(assoc) => assoc.format(self, ctx),
-            Kind::Begin(begin) => self.format_begin(begin, ctx),
-            Kind::Def(def) => self.format_def(def, ctx),
+            Kind::Begin(begin) => begin.format(self, ctx),
+            Kind::Def(def) => def.format(self, ctx),
             Kind::ClassLike(class) => self.format_class_like(class, ctx),
             Kind::SingletonClass(class) => self.format_singleton_class(class, ctx),
             Kind::RangeLike(range) => self.format_range_like(range, ctx),
@@ -364,80 +364,6 @@ impl Output {
             }
             self.break_line(ctx);
             self.push_str(&block.closing);
-        }
-    }
-
-    pub(super) fn format_begin(&mut self, begin: &Begin, ctx: &FormatContext) {
-        self.push_str("begin");
-        self.write_trailing_comment(&begin.keyword_trailing);
-        self.format_block_body(&begin.body, ctx, true);
-        self.break_line(ctx);
-        self.push_str("end");
-    }
-
-    pub(super) fn format_def(&mut self, def: &Def, ctx: &FormatContext) {
-        self.push_str("def");
-        if let Some(receiver) = &def.receiver {
-            if receiver.shape.fits_in_one_line(self.remaining_width) || receiver.is_diagonal() {
-                self.push(' ');
-                self.format(receiver, ctx);
-            } else {
-                self.indent();
-                self.break_line(ctx);
-                // no leading trivia here.
-                self.format(receiver, ctx);
-            }
-            self.push('.');
-            if receiver.trailing_trivia.is_none() {
-                self.push_str(&def.name);
-                self.format_method_parameters(&def.parameters, ctx);
-            } else {
-                self.write_trailing_comment(&receiver.trailing_trivia);
-                self.indent();
-                self.break_line(ctx);
-                self.push_str(&def.name);
-                self.format_method_parameters(&def.parameters, ctx);
-                self.dedent();
-            }
-        } else {
-            self.push(' ');
-            self.push_str(&def.name);
-            self.format_method_parameters(&def.parameters, ctx);
-        }
-        match &def.body {
-            // def foo = body
-            DefBody::Short { body } => {
-                self.push_str(" =");
-                if body.shape.fits_in_one_line(self.remaining_width) || body.is_diagonal() {
-                    self.push(' ');
-                    self.format(body, ctx);
-                    self.write_trailing_comment(&body.trailing_trivia);
-                } else {
-                    self.indent();
-                    self.break_line(ctx);
-                    self.write_leading_trivia(
-                        &body.leading_trivia,
-                        ctx,
-                        EmptyLineHandling::Trim {
-                            start: true,
-                            end: true,
-                        },
-                    );
-                    self.format(body, ctx);
-                    self.write_trailing_comment(&body.trailing_trivia);
-                    self.dedent();
-                }
-            }
-            // def foo\n body\n end
-            DefBody::Block {
-                head_trailing,
-                body,
-            } => {
-                self.write_trailing_comment(head_trailing);
-                self.format_block_body(body, ctx, true);
-                self.break_line(ctx);
-                self.push_str("end");
-            }
         }
     }
 
