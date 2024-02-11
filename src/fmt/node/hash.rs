@@ -1,4 +1,8 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+    trivia::EmptyLineHandling,
+};
 
 use super::{Node, VirtualEnd};
 
@@ -42,5 +46,43 @@ impl Hash {
             self.shape.insert(&end.shape);
         }
         self.virtual_end = end;
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        if self.shape.fits_in_one_line(o.remaining_width) {
+            o.push_str(&self.opening);
+            if !self.elements.is_empty() {
+                o.push(' ');
+                for (i, n) in self.elements.iter().enumerate() {
+                    if i > 0 {
+                        o.push_str(", ");
+                    }
+                    o.format(n, ctx);
+                }
+                o.push(' ');
+            }
+            o.push_str(&self.closing);
+        } else {
+            o.push_str(&self.opening);
+            o.indent();
+            for (i, element) in self.elements.iter().enumerate() {
+                o.break_line(ctx);
+                o.write_leading_trivia(
+                    &element.leading_trivia,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: i == 0,
+                        end: false,
+                    },
+                );
+                o.format(element, ctx);
+                o.push(',');
+                o.write_trailing_comment(&element.trailing_trivia);
+            }
+            o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, self.elements.is_empty());
+            o.dedent();
+            o.break_line(ctx);
+            o.push_str(&self.closing);
+        }
     }
 }

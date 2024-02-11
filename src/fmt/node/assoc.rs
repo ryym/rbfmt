@@ -1,4 +1,8 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+    trivia::EmptyLineHandling,
+};
 
 use super::Node;
 
@@ -23,6 +27,37 @@ impl Assoc {
             key: Box::new(key),
             value: Box::new(value),
             operator,
+        }
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        o.format(&self.key, ctx);
+        if self.value.shape.fits_in_inline(o.remaining_width) || self.value.is_diagonal() {
+            if let Some(op) = &self.operator {
+                o.push(' ');
+                o.push_str(op);
+            }
+            if !self.value.shape.is_empty() {
+                o.push(' ');
+                o.format(&self.value, ctx);
+            }
+        } else {
+            if let Some(op) = &self.operator {
+                o.push(' ');
+                o.push_str(op);
+            }
+            o.break_line(ctx);
+            o.indent();
+            o.write_leading_trivia(
+                &self.value.leading_trivia,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: true,
+                    end: true,
+                },
+            );
+            o.format(&self.value, ctx);
+            o.dedent();
         }
     }
 }

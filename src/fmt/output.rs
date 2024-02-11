@@ -122,9 +122,9 @@ impl Output {
             Kind::Assign(assign) => assign.format(self, ctx),
             Kind::MultiAssignTarget(multi) => multi.format(self, ctx),
             Kind::Prefix(prefix) => prefix.format(self, ctx),
-            Kind::Array(array) => self.format_array(array, ctx),
-            Kind::Hash(hash) => self.format_hash(hash, ctx),
-            Kind::Assoc(assoc) => self.format_assoc(assoc, ctx),
+            Kind::Array(array) => array.format(self, ctx),
+            Kind::Hash(hash) => hash.format(self, ctx),
+            Kind::Assoc(assoc) => assoc.format(self, ctx),
             Kind::Begin(begin) => self.format_begin(begin, ctx),
             Kind::Def(def) => self.format_def(def, ctx),
             Kind::ClassLike(class) => self.format_class_like(class, ctx),
@@ -364,124 +364,6 @@ impl Output {
             }
             self.break_line(ctx);
             self.push_str(&block.closing);
-        }
-    }
-
-    pub(super) fn format_array(&mut self, array: &Array, ctx: &FormatContext) {
-        if array.shape.fits_in_one_line(self.remaining_width) {
-            if let Some(opening) = &array.opening {
-                self.push_str(opening);
-            }
-            for (i, n) in array.elements.iter().enumerate() {
-                if i > 0 {
-                    self.push_str(array.separator());
-                    self.push(' ');
-                }
-                self.format(n, ctx);
-            }
-            if let Some(closing) = &array.closing {
-                self.push_str(closing);
-            }
-        } else {
-            self.push_str(array.opening.as_deref().unwrap_or("["));
-            self.indent();
-            for (i, element) in array.elements.iter().enumerate() {
-                self.break_line(ctx);
-                self.write_leading_trivia(
-                    &element.leading_trivia,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: i == 0,
-                        end: false,
-                    },
-                );
-                self.format(element, ctx);
-                self.push_str(array.separator());
-                self.write_trailing_comment(&element.trailing_trivia);
-            }
-            self.write_trivia_at_virtual_end(
-                ctx,
-                &array.virtual_end,
-                true,
-                array.elements.is_empty(),
-            );
-            self.dedent();
-            self.break_line(ctx);
-            self.push_str(array.closing.as_deref().unwrap_or("]"));
-        }
-    }
-
-    pub(super) fn format_hash(&mut self, hash: &Hash, ctx: &FormatContext) {
-        if hash.shape.fits_in_one_line(self.remaining_width) {
-            self.push_str(&hash.opening);
-            if !hash.elements.is_empty() {
-                self.push(' ');
-                for (i, n) in hash.elements.iter().enumerate() {
-                    if i > 0 {
-                        self.push_str(", ");
-                    }
-                    self.format(n, ctx);
-                }
-                self.push(' ');
-            }
-            self.push_str(&hash.closing);
-        } else {
-            self.push_str(&hash.opening);
-            self.indent();
-            for (i, element) in hash.elements.iter().enumerate() {
-                self.break_line(ctx);
-                self.write_leading_trivia(
-                    &element.leading_trivia,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: i == 0,
-                        end: false,
-                    },
-                );
-                self.format(element, ctx);
-                self.push(',');
-                self.write_trailing_comment(&element.trailing_trivia);
-            }
-            self.write_trivia_at_virtual_end(
-                ctx,
-                &hash.virtual_end,
-                true,
-                hash.elements.is_empty(),
-            );
-            self.dedent();
-            self.break_line(ctx);
-            self.push_str(&hash.closing);
-        }
-    }
-
-    pub(super) fn format_assoc(&mut self, assoc: &Assoc, ctx: &FormatContext) {
-        self.format(&assoc.key, ctx);
-        if assoc.value.shape.fits_in_inline(self.remaining_width) || assoc.value.is_diagonal() {
-            if let Some(op) = &assoc.operator {
-                self.push(' ');
-                self.push_str(op);
-            }
-            if !assoc.value.shape.is_empty() {
-                self.push(' ');
-                self.format(&assoc.value, ctx);
-            }
-        } else {
-            if let Some(op) = &assoc.operator {
-                self.push(' ');
-                self.push_str(op);
-            }
-            self.break_line(ctx);
-            self.indent();
-            self.write_leading_trivia(
-                &assoc.value.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
-            );
-            self.format(&assoc.value, ctx);
-            self.dedent();
         }
     }
 
