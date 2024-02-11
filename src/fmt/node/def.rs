@@ -49,12 +49,12 @@ impl Def {
         if let Some(receiver) = &self.receiver {
             if receiver.shape.fits_in_one_line(o.remaining_width) || receiver.is_diagonal() {
                 o.push(' ');
-                o.format(receiver, ctx);
+                receiver.format(o, ctx);
             } else {
                 o.indent();
                 o.break_line(ctx);
                 // no leading trivia here.
-                o.format(receiver, ctx);
+                receiver.format(o, ctx);
             }
             o.push('.');
             if receiver.trailing_trivia.is_none() {
@@ -85,14 +85,14 @@ impl Def {
                 o.push_str(" =");
                 if body.shape.fits_in_one_line(o.remaining_width) || body.is_diagonal() {
                     o.push(' ');
-                    o.format(body, ctx);
+                    body.format(o, ctx);
                     body.trailing_trivia.format(o);
                 } else {
                     o.indent();
                     o.break_line(ctx);
                     body.leading_trivia
                         .format(o, ctx, EmptyLineHandling::trim());
-                    o.format(body, ctx);
+                    body.format(o, ctx);
                     body.trailing_trivia.format(o);
                     o.dedent();
                 }
@@ -177,7 +177,7 @@ impl MethodParameters {
                 if i > 0 {
                     o.push_str(", ");
                 }
-                o.format(n, ctx);
+                n.format(o, ctx);
             }
             if let Some(closing) = &self.closing {
                 o.push_str(closing);
@@ -197,7 +197,7 @@ impl MethodParameters {
                             end: false,
                         },
                     );
-                    o.format(n, ctx);
+                    n.format(o, ctx);
                     if i < last_idx {
                         o.push(',');
                     }

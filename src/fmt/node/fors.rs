@@ -22,21 +22,21 @@ impl For {
         o.push_str("for");
         if self.index.shape.fits_in_inline(o.remaining_width) || self.index.is_diagonal() {
             o.push(' ');
-            o.format(&self.index, ctx);
+            self.index.format(o, ctx);
         } else {
             o.indent();
             o.break_line(ctx);
             self.index
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
-            o.format(&self.index, ctx);
+            self.index.format(o, ctx);
             o.dedent();
         }
         o.push_str(" in");
         let collection = &self.collection;
         if collection.shape.fits_in_inline(o.remaining_width) || collection.is_diagonal() {
             o.push(' ');
-            o.format(collection, ctx);
+            collection.format(o, ctx);
             collection.trailing_trivia.format(o);
         } else {
             o.indent();
@@ -44,7 +44,7 @@ impl For {
             collection
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
-            o.format(collection, ctx);
+            collection.format(o, ctx);
             collection.trailing_trivia.format(o);
             o.dedent();
         }

@@ -29,7 +29,7 @@ impl Assign {
     }
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
-        o.format(&self.target, ctx);
+        self.target.format(o, ctx);
         o.push(' ');
         o.push_str(&self.operator);
         self.format_assign_right(o, ctx);
@@ -38,14 +38,14 @@ impl Assign {
     fn format_assign_right(&self, o: &mut Output, ctx: &FormatContext) {
         if self.value.shape.fits_in_one_line(o.remaining_width) || self.value.is_diagonal() {
             o.push(' ');
-            o.format(&self.value, ctx);
+            self.value.format(o, ctx);
         } else {
             o.break_line(ctx);
             o.indent();
             self.value
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
-            o.format(&self.value, ctx);
+            self.value.format(o, ctx);
             o.dedent();
         }
     }

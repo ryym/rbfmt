@@ -31,7 +31,7 @@ impl Assoc {
     }
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
-        o.format(&self.key, ctx);
+        self.key.format(o, ctx);
         if self.value.shape.fits_in_inline(o.remaining_width) || self.value.is_diagonal() {
             if let Some(op) = &self.operator {
                 o.push(' ');
@@ -39,7 +39,7 @@ impl Assoc {
             }
             if !self.value.shape.is_empty() {
                 o.push(' ');
-                o.format(&self.value, ctx);
+                self.value.format(o, ctx);
             }
         } else {
             if let Some(op) = &self.operator {
@@ -51,7 +51,7 @@ impl Assoc {
             self.value
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
-            o.format(&self.value, ctx);
+            self.value.format(o, ctx);
             o.dedent();
         }
     }

@@ -75,7 +75,7 @@ impl MethodChain {
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         match &self.head {
             MethodChainHead::Receiver(receiver) => {
-                o.format(&receiver.node, ctx);
+                receiver.node.format(o, ctx);
                 receiver.node.trailing_trivia.format(o);
                 for idx_call in &receiver.index_calls {
                     idx_call.arguments.format(o, ctx);

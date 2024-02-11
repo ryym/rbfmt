@@ -94,7 +94,7 @@ impl Conditional {
         if self.predicate.is_diagonal() {
             o.push(' ');
             o.indent();
-            o.format(&self.predicate, ctx);
+            self.predicate.format(o, ctx);
             self.predicate.trailing_trivia.format(o);
             o.dedent();
         } else {
@@ -104,7 +104,7 @@ impl Conditional {
             self.predicate
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
-            o.format(&self.predicate, ctx);
+            self.predicate.format(o, ctx);
             self.predicate.trailing_trivia.format(o);
             o.dedent();
             o.dedent();

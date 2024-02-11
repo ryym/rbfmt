@@ -60,7 +60,7 @@ impl MultiAssignTarget {
                 if i > 0 {
                     o.push_str(", ");
                 }
-                o.format(target, ctx);
+                target.format(o, ctx);
             }
             if self.with_implicit_rest {
                 o.push(',');
@@ -82,7 +82,7 @@ impl MultiAssignTarget {
                         end: false,
                     },
                 );
-                o.format(target, ctx);
+                target.format(o, ctx);
                 if i < last_idx || self.with_implicit_rest {
                     o.push(',');
                 }

@@ -15,8 +15,12 @@ pub(crate) fn format(node: Node, heredoc_map: HeredocMap) -> String {
         indent_size: 2,
     };
     let ctx = FormatContext { heredoc_map };
-    let output = Output::new(config);
-    output.execute(&node, &ctx)
+    let mut output = Output::new(config);
+    node.format(&mut output, &ctx);
+    if !output.buffer.is_empty() {
+        output.break_line(&ctx);
+    }
+    output.buffer
 }
 
 #[derive(Debug)]

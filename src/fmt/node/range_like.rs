@@ -34,7 +34,7 @@ impl RangeLike {
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         if let Some(left) = &self.left {
-            o.format(left, ctx);
+            left.format(o, ctx);
         }
         o.push_str(&self.operator);
         if let Some(right) = &self.right {
@@ -46,14 +46,14 @@ impl RangeLike {
                 if need_space {
                     o.push(' ');
                 }
-                o.format(right, ctx);
+                right.format(o, ctx);
             } else {
                 o.indent();
                 o.break_line(ctx);
                 right
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::trim());
-                o.format(right, ctx);
+                right.format(o, ctx);
                 o.dedent();
             }
         }

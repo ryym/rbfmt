@@ -164,7 +164,7 @@ impl BlockParameters {
                     if i > 0 {
                         o.push_str(", ");
                     }
-                    o.format(n, ctx);
+                    n.format(o, ctx);
                 }
             }
             if !self.locals.is_empty() {
@@ -173,7 +173,7 @@ impl BlockParameters {
                     if i > 0 {
                         o.push_str(", ");
                     }
-                    o.format(n, ctx);
+                    n.format(o, ctx);
                 }
             }
             o.push_str(&self.closing);
@@ -197,7 +197,7 @@ impl BlockParameters {
                             end: false,
                         },
                     );
-                    o.format(n, ctx);
+                    n.format(o, ctx);
                     if i < last_idx {
                         o.push(',');
                     }
@@ -211,7 +211,7 @@ impl BlockParameters {
                 for (i, n) in self.locals.iter().enumerate() {
                     o.break_line(ctx);
                     n.leading_trivia.format(o, ctx, EmptyLineHandling::trim());
-                    o.format(n, ctx);
+                    n.format(o, ctx);
                     if i < last_idx {
                         o.push(',');
                     }
@@ -355,12 +355,12 @@ impl Rescue {
                     if i > 0 {
                         o.push_str(", ");
                     }
-                    o.format(exception, ctx);
+                    exception.format(o, ctx);
                     exception.trailing_trivia.format(o);
                 }
             } else {
                 o.push(' ');
-                o.format(&self.exceptions[0], ctx);
+                self.exceptions[0].format(o, ctx);
                 if self.exceptions.len() > 1 {
                     o.push(',');
                 }
@@ -373,7 +373,7 @@ impl Rescue {
                         exception
                             .leading_trivia
                             .format(o, ctx, EmptyLineHandling::none());
-                        o.format(exception, ctx);
+                        exception.format(o, ctx);
                         if i < last_idx {
                             o.push(',');
                         }
@@ -387,7 +387,7 @@ impl Rescue {
             o.push_str(" =>");
             if reference.shape.fits_in_one_line(o.remaining_width) || reference.is_diagonal() {
                 o.push(' ');
-                o.format(reference, ctx);
+                reference.format(o, ctx);
                 reference.trailing_trivia.format(o);
             } else {
                 o.indent();
@@ -395,7 +395,7 @@ impl Rescue {
                 reference
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::trim());
-                o.format(reference, ctx);
+                reference.format(o, ctx);
                 reference.trailing_trivia.format(o);
                 o.dedent();
             }

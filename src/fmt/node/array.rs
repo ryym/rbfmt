@@ -64,7 +64,7 @@ impl Array {
                     o.push_str(self.separator());
                     o.push(' ');
                 }
-                o.format(n, ctx);
+                n.format(o, ctx);
             }
             if let Some(closing) = &self.closing {
                 o.push_str(closing);
@@ -82,7 +82,7 @@ impl Array {
                         end: false,
                     },
                 );
-                o.format(element, ctx);
+                element.format(o, ctx);
                 o.push_str(self.separator());
                 element.trailing_trivia.format(o);
             }

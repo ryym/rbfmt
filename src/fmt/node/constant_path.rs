@@ -32,7 +32,7 @@ impl ConstantPath {
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         if let Some(root) = &self.root {
-            o.format(root, ctx);
+            root.format(o, ctx);
         }
         o.push_str("::");
         let last_idx = self.parts.len() - 1;

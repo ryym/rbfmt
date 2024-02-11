@@ -38,13 +38,13 @@ impl InfixChain {
     }
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
-        o.format(&self.left, ctx);
+        self.left.format(o, ctx);
         if self.rights_shape.fits_in_one_line(o.remaining_width) {
             for right in &self.rights {
                 o.push(' ');
                 o.push_str(&right.operator);
                 o.push(' ');
-                o.format(&right.value, ctx);
+                right.value.format(o, ctx);
             }
         } else {
             for right in &self.rights {
@@ -56,7 +56,7 @@ impl InfixChain {
                     .value
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::none());
-                o.format(&right.value, ctx);
+                right.value.format(o, ctx);
                 o.dedent();
             }
         }

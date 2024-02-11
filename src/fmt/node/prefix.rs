@@ -28,7 +28,7 @@ impl Prefix {
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         o.push_str(&self.operator);
         if let Some(expr) = &self.expression {
-            o.format(expr, ctx);
+            expr.format(o, ctx);
         }
     }
 }

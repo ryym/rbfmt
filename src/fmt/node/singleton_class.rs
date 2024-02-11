@@ -23,7 +23,7 @@ impl SingletonClass {
             || self.expression.is_diagonal()
         {
             o.push(' ');
-            o.format(&self.expression, ctx);
+            self.expression.format(o, ctx);
             self.expression.trailing_trivia.format(o);
         } else {
             o.indent();
@@ -32,7 +32,7 @@ impl SingletonClass {
             self.expression
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::none());
-            o.format(&self.expression, ctx);
+            self.expression.format(o, ctx);
             self.expression.trailing_trivia.format(o);
             o.dedent();
             o.dedent();

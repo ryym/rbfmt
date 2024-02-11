@@ -41,6 +41,7 @@ pub(crate) use self::{
 };
 
 use super::{
+    output::{FormatContext, Output},
     shape::{ArgumentStyle, Shape},
     LeadingTrivia, TrailingTrivia,
 };
@@ -73,6 +74,10 @@ impl Node {
 
     pub(crate) fn without_trivia(kind: Kind) -> Self {
         Self::new(LeadingTrivia::new(), kind, TrailingTrivia::none())
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        self.kind.format(o, ctx);
     }
 
     pub(crate) fn is_diagonal(&self) -> bool {
@@ -127,6 +132,41 @@ pub(crate) enum Kind {
 }
 
 impl Kind {
+    pub(super) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        match self {
+            Kind::Atom(atom) => atom.format(o),
+            Kind::StringLike(str) => str.format(o),
+            Kind::DynStringLike(dstr) => dstr.format(o, ctx),
+            Kind::HeredocOpening(opening) => opening.format(o),
+            Kind::ConstantPath(const_path) => const_path.format(o, ctx),
+            Kind::Statements(statements) => statements.format(o, ctx, false),
+            Kind::Parens(parens) => parens.format(o, ctx),
+            Kind::If(ifexpr) => ifexpr.format(o, ctx),
+            Kind::Ternary(ternary) => ternary.format(o, ctx),
+            Kind::Case(case) => case.format(o, ctx),
+            Kind::While(whle) => whle.format(o, ctx),
+            Kind::For(expr) => expr.format(o, ctx),
+            Kind::Postmodifier(modifier) => modifier.format(o, ctx),
+            Kind::MethodChain(chain) => chain.format(o, ctx),
+            Kind::Lambda(lambda) => lambda.format(o, ctx),
+            Kind::CallLike(call) => call.format(o, ctx),
+            Kind::InfixChain(chain) => chain.format(o, ctx),
+            Kind::Assign(assign) => assign.format(o, ctx),
+            Kind::MultiAssignTarget(multi) => multi.format(o, ctx),
+            Kind::Prefix(prefix) => prefix.format(o, ctx),
+            Kind::Array(array) => array.format(o, ctx),
+            Kind::Hash(hash) => hash.format(o, ctx),
+            Kind::Assoc(assoc) => assoc.format(o, ctx),
+            Kind::Begin(begin) => begin.format(o, ctx),
+            Kind::Def(def) => def.format(o, ctx),
+            Kind::ClassLike(class) => class.format(o, ctx),
+            Kind::SingletonClass(class) => class.format(o, ctx),
+            Kind::RangeLike(range) => range.format(o, ctx),
+            Kind::PrePostExec(exec) => exec.format(o, ctx),
+            Kind::Alias(alias) => alias.format(o, ctx),
+        }
+    }
+
     pub(crate) fn shape(&self) -> Shape {
         match self {
             Self::Atom(atom) => Shape::inline(atom.0.len()),

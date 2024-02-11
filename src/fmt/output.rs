@@ -87,49 +87,6 @@ impl Output {
         result
     }
 
-    pub(crate) fn execute(mut self, node: &Node, ctx: &FormatContext) -> String {
-        self.format(node, ctx);
-        if !self.buffer.is_empty() {
-            self.break_line(ctx);
-        }
-        self.buffer
-    }
-
-    pub(super) fn format(&mut self, node: &Node, ctx: &FormatContext) {
-        match &node.kind {
-            Kind::Atom(atom) => atom.format(self),
-            Kind::StringLike(str) => str.format(self),
-            Kind::DynStringLike(dstr) => dstr.format(self, ctx),
-            Kind::HeredocOpening(opening) => opening.format(self),
-            Kind::ConstantPath(const_path) => const_path.format(self, ctx),
-            Kind::Statements(statements) => statements.format(self, ctx, false),
-            Kind::Parens(parens) => parens.format(self, ctx),
-            Kind::If(ifexpr) => ifexpr.format(self, ctx),
-            Kind::Ternary(ternary) => ternary.format(self, ctx),
-            Kind::Case(case) => case.format(self, ctx),
-            Kind::While(whle) => whle.format(self, ctx),
-            Kind::For(expr) => expr.format(self, ctx),
-            Kind::Postmodifier(modifier) => modifier.format(self, ctx),
-            Kind::MethodChain(chain) => chain.format(self, ctx),
-            Kind::Lambda(lambda) => lambda.format(self, ctx),
-            Kind::CallLike(call) => call.format(self, ctx),
-            Kind::InfixChain(chain) => chain.format(self, ctx),
-            Kind::Assign(assign) => assign.format(self, ctx),
-            Kind::MultiAssignTarget(multi) => multi.format(self, ctx),
-            Kind::Prefix(prefix) => prefix.format(self, ctx),
-            Kind::Array(array) => array.format(self, ctx),
-            Kind::Hash(hash) => hash.format(self, ctx),
-            Kind::Assoc(assoc) => assoc.format(self, ctx),
-            Kind::Begin(begin) => begin.format(self, ctx),
-            Kind::Def(def) => def.format(self, ctx),
-            Kind::ClassLike(class) => class.format(self, ctx),
-            Kind::SingletonClass(class) => class.format(self, ctx),
-            Kind::RangeLike(range) => range.format(self, ctx),
-            Kind::PrePostExec(exec) => exec.format(self, ctx),
-            Kind::Alias(alias) => alias.format(self, ctx),
-        }
-    }
-
     pub(super) fn write_trivia_at_virtual_end(
         &mut self,
         ctx: &FormatContext,

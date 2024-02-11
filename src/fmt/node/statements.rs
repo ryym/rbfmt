@@ -49,7 +49,7 @@ impl Statements {
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext, block_always: bool) {
         if self.shape.is_inline() && !block_always {
             if let Some(node) = self.nodes.get(0) {
-                o.format(node, ctx);
+                node.format(o, ctx);
             }
             return;
         }
@@ -65,7 +65,7 @@ impl Statements {
                     end: false,
                 },
             );
-            o.format(n, ctx);
+            n.format(o, ctx);
             n.trailing_trivia.format(o);
         }
         o.write_trivia_at_virtual_end(

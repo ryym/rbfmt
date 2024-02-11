@@ -24,8 +24,8 @@ impl Alias {
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         o.push_str("alias ");
-        o.format(&self.new_name, ctx);
+        self.new_name.format(o, ctx);
         o.push(' ');
-        o.format(&self.old_name, ctx);
+        self.old_name.format(o, ctx);
     }
 }

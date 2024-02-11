@@ -57,7 +57,7 @@ impl Hash {
                     if i > 0 {
                         o.push_str(", ");
                     }
-                    o.format(n, ctx);
+                    n.format(o, ctx);
                 }
                 o.push(' ');
             }
@@ -75,7 +75,7 @@ impl Hash {
                         end: false,
                     },
                 );
-                o.format(element, ctx);
+                element.format(o, ctx);
                 o.push(',');
                 element.trailing_trivia.format(o);
             }

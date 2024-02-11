@@ -29,7 +29,7 @@ impl ClassLike {
             o.push_str(" <");
             if superself.shape.fits_in_one_line(o.remaining_width) || superself.is_diagonal() {
                 o.push(' ');
-                o.format(superself, ctx);
+                superself.format(o, ctx);
                 superself.trailing_trivia.format(o);
             } else {
                 o.indent();
@@ -37,7 +37,7 @@ impl ClassLike {
                 superself
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::trim());
-                o.format(superself, ctx);
+                superself.format(o, ctx);
                 superself.trailing_trivia.format(o);
                 o.dedent();
             }

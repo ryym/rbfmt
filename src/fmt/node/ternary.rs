@@ -41,14 +41,14 @@ impl Ternary {
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         // Format `predicate`.
-        o.format(&self.predicate, ctx);
+        self.predicate.format(o, ctx);
         o.push_str(" ?");
 
         // Format `then`.
         if self.predicate_trailing.is_none() && self.then.shape.fits_in_one_line(o.remaining_width)
         {
             o.push(' ');
-            o.format(&self.then, ctx);
+            self.then.format(o, ctx);
             self.then.trailing_trivia.format(o);
         } else {
             self.predicate_trailing.format(o);
@@ -57,7 +57,7 @@ impl Ternary {
             self.then
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
-            o.format(&self.then, ctx);
+            self.then.format(o, ctx);
             self.then.trailing_trivia.format(o);
             o.dedent();
         }
@@ -68,7 +68,7 @@ impl Ternary {
             && self.otherwise.shape.fits_in_one_line(o.remaining_width)
         {
             o.push_str(" : ");
-            o.format(&self.otherwise, ctx);
+            self.otherwise.format(o, ctx);
             self.otherwise.trailing_trivia.format(o);
         } else {
             o.break_line(ctx);
@@ -77,7 +77,7 @@ impl Ternary {
                 || self.otherwise.is_diagonal()
             {
                 o.push(' ');
-                o.format(&self.otherwise, ctx);
+                self.otherwise.format(o, ctx);
                 self.otherwise.trailing_trivia.format(o);
             } else {
                 o.indent();
@@ -85,7 +85,7 @@ impl Ternary {
                 self.otherwise
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::trim());
-                o.format(&self.otherwise, ctx);
+                self.otherwise.format(o, ctx);
                 self.otherwise.trailing_trivia.format(o);
                 o.dedent();
             }

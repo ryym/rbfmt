@@ -31,7 +31,7 @@ impl Postmodifier {
         let cond = &self.conditional;
         if cond.predicate.is_diagonal() {
             o.push(' ');
-            o.format(&cond.predicate, ctx);
+            cond.predicate.format(o, ctx);
             cond.predicate.trailing_trivia.format(o);
         } else {
             o.indent();
@@ -39,7 +39,7 @@ impl Postmodifier {
             cond.predicate
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
-            o.format(&cond.predicate, ctx);
+            cond.predicate.format(o, ctx);
             cond.predicate.trailing_trivia.format(o);
             o.dedent();
         }

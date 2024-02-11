@@ -69,7 +69,7 @@ impl Arguments {
                 match arg.argument_style() {
                     ArgumentStyle::Vertical => match arg.shape {
                         Shape::Inline { len } if len <= d.remaining_width => {
-                            d.format(arg, ctx);
+                            arg.format(d, ctx);
                         }
                         _ => return DraftResult::Rollback,
                     },
@@ -78,7 +78,7 @@ impl Arguments {
                             return DraftResult::Rollback;
                         }
                         let prev_line_count = d.line_count;
-                        d.format(arg, ctx);
+                        arg.format(d, ctx);
                         if prev_line_count < d.line_count && i < self.nodes.len() - 1 {
                             return DraftResult::Rollback;
                         }
@@ -113,7 +113,7 @@ impl Arguments {
                             end: false,
                         },
                     );
-                    o.format(arg, ctx);
+                    arg.format(o, ctx);
                     if i < last_idx || self.last_comma_allowed {
                         o.push(',');
                     }
@@ -128,7 +128,7 @@ impl Arguments {
             }
         } else if !self.nodes.is_empty() {
             o.push(' ');
-            o.format(&self.nodes[0], ctx);
+            self.nodes[0].format(o, ctx);
             if self.nodes.len() > 1 {
                 o.push(',');
             }
@@ -139,7 +139,7 @@ impl Arguments {
                     && self.nodes[1].shape.fits_in_one_line(o.remaining_width) =>
                 {
                     o.push(' ');
-                    o.format(&self.nodes[1], ctx);
+                    self.nodes[1].format(o, ctx);
                 }
                 _ => {
                     o.indent();
@@ -154,7 +154,7 @@ impl Arguments {
                                 end: false,
                             },
                         );
-                        o.format(arg, ctx);
+                        arg.format(o, ctx);
                         if i < last_idx {
                             o.push(',');
                         }

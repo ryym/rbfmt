@@ -27,14 +27,14 @@ impl Case {
             Some(pred) => {
                 if pred.shape.fits_in_one_line(o.remaining_width) || pred.is_diagonal() {
                     o.push(' ');
-                    o.format(pred, ctx);
+                    pred.format(o, ctx);
                     pred.trailing_trivia.format(o);
                 } else {
                     o.indent();
                     o.break_line(ctx);
                     pred.leading_trivia
                         .format(o, ctx, EmptyLineHandling::trim());
-                    o.format(pred, ctx);
+                    pred.format(o, ctx);
                     pred.trailing_trivia.format(o);
                     o.dedent();
                 }
@@ -116,7 +116,7 @@ impl CaseWhen {
                 if i > 0 {
                     o.push_str(", ");
                 }
-                o.format(cond, ctx);
+                cond.format(o, ctx);
                 cond.trailing_trivia.format(o);
             }
             if !self.body.shape.is_empty() {
@@ -131,20 +131,20 @@ impl CaseWhen {
                     } else {
                         o.push_str(", ");
                     }
-                    o.format(cond, ctx);
+                    cond.format(o, ctx);
                     cond.trailing_trivia.format(o);
                 }
             } else {
                 if self.conditions[0].is_diagonal() {
                     o.push(' ');
-                    o.format(&self.conditions[0], ctx);
+                    self.conditions[0].format(o, ctx);
                 } else {
                     o.indent();
                     o.break_line(ctx);
                     self.conditions[0]
                         .leading_trivia
                         .format(o, ctx, EmptyLineHandling::trim());
-                    o.format(&self.conditions[0], ctx);
+                    self.conditions[0].format(o, ctx);
                     o.dedent();
                 }
                 if self.conditions.len() > 1 {
@@ -158,7 +158,7 @@ impl CaseWhen {
                         o.break_line(ctx);
                         cond.leading_trivia
                             .format(o, ctx, EmptyLineHandling::none());
-                        o.format(cond, ctx);
+                        cond.format(o, ctx);
                         if i < last_idx {
                             o.push(',');
                         }
