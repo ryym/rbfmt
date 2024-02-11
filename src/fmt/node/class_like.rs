@@ -34,14 +34,7 @@ impl ClassLike {
             } else {
                 o.indent();
                 o.break_line(ctx);
-                o.write_leading_trivia(
-                    &superself.leading_trivia,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: true,
-                        end: true,
-                    },
-                );
+                o.write_leading_trivia(&superself.leading_trivia, ctx, EmptyLineHandling::trim());
                 o.format(superself, ctx);
                 o.write_trailing_comment(&superself.trailing_trivia);
                 o.dedent();

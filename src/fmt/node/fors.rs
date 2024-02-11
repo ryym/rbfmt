@@ -26,14 +26,7 @@ impl For {
         } else {
             o.indent();
             o.break_line(ctx);
-            o.write_leading_trivia(
-                &self.index.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
-            );
+            o.write_leading_trivia(&self.index.leading_trivia, ctx, EmptyLineHandling::trim());
             o.format(&self.index, ctx);
             o.dedent();
         }
@@ -46,14 +39,7 @@ impl For {
         } else {
             o.indent();
             o.break_line(ctx);
-            o.write_leading_trivia(
-                &collection.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
-            );
+            o.write_leading_trivia(&collection.leading_trivia, ctx, EmptyLineHandling::trim());
             o.format(collection, ctx);
             o.write_trailing_comment(&collection.trailing_trivia);
             o.dedent();

@@ -48,14 +48,7 @@ impl Assoc {
             }
             o.break_line(ctx);
             o.indent();
-            o.write_leading_trivia(
-                &self.value.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
-            );
+            o.write_leading_trivia(&self.value.leading_trivia, ctx, EmptyLineHandling::trim());
             o.format(&self.value, ctx);
             o.dedent();
         }

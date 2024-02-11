@@ -54,14 +54,7 @@ impl Ternary {
             o.write_trailing_comment(&self.predicate_trailing);
             o.indent();
             o.break_line(ctx);
-            o.write_leading_trivia(
-                &self.then.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
-            );
+            o.write_leading_trivia(&self.then.leading_trivia, ctx, EmptyLineHandling::trim());
             o.format(&self.then, ctx);
             o.write_trailing_comment(&self.then.trailing_trivia);
             o.dedent();
@@ -90,10 +83,7 @@ impl Ternary {
                 o.write_leading_trivia(
                     &self.otherwise.leading_trivia,
                     ctx,
-                    EmptyLineHandling::Trim {
-                        start: true,
-                        end: true,
-                    },
+                    EmptyLineHandling::trim(),
                 );
                 o.format(&self.otherwise, ctx);
                 o.write_trailing_comment(&self.otherwise.trailing_trivia);

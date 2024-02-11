@@ -39,10 +39,7 @@ impl Postmodifier {
             o.write_leading_trivia(
                 &cond.predicate.leading_trivia,
                 ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
+                EmptyLineHandling::trim(),
             );
             o.format(&cond.predicate, ctx);
             o.write_trailing_comment(&cond.predicate.trailing_trivia);

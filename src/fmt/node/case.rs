@@ -32,14 +32,7 @@ impl Case {
                 } else {
                     o.indent();
                     o.break_line(ctx);
-                    o.write_leading_trivia(
-                        &pred.leading_trivia,
-                        ctx,
-                        EmptyLineHandling::Trim {
-                            start: true,
-                            end: true,
-                        },
-                    );
+                    o.write_leading_trivia(&pred.leading_trivia, ctx, EmptyLineHandling::trim());
                     o.format(pred, ctx);
                     o.write_trailing_comment(&pred.trailing_trivia);
                     o.dedent();
@@ -54,14 +47,7 @@ impl Case {
         } else {
             o.indent();
             o.break_line(ctx);
-            o.write_leading_trivia(
-                &self.first_branch_leading,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
-            );
+            o.write_leading_trivia(&self.first_branch_leading, ctx, EmptyLineHandling::trim());
             o.dedent();
         }
         for (i, branch) in self.branches.iter().enumerate() {
@@ -156,10 +142,7 @@ impl CaseWhen {
                     o.write_leading_trivia(
                         &self.conditions[0].leading_trivia,
                         ctx,
-                        EmptyLineHandling::Trim {
-                            start: true,
-                            end: true,
-                        },
+                        EmptyLineHandling::trim(),
                     );
                     o.format(&self.conditions[0], ctx);
                     o.dedent();
@@ -176,10 +159,7 @@ impl CaseWhen {
                         o.write_leading_trivia(
                             &cond.leading_trivia,
                             ctx,
-                            EmptyLineHandling::Trim {
-                                start: false,
-                                end: false,
-                            },
+                            EmptyLineHandling::none(),
                         );
                         o.format(cond, ctx);
                         if i < last_idx {

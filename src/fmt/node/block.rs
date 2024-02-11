@@ -210,14 +210,7 @@ impl BlockParameters {
                 let last_idx = self.locals.len() - 1;
                 for (i, n) in self.locals.iter().enumerate() {
                     o.break_line(ctx);
-                    o.write_leading_trivia(
-                        &n.leading_trivia,
-                        ctx,
-                        EmptyLineHandling::Trim {
-                            start: false,
-                            end: false,
-                        },
-                    );
+                    o.write_leading_trivia(&n.leading_trivia, ctx, EmptyLineHandling::trim());
                     o.format(n, ctx);
                     if i < last_idx {
                         o.push(',');
@@ -380,10 +373,7 @@ impl Rescue {
                         o.write_leading_trivia(
                             &exception.leading_trivia,
                             ctx,
-                            EmptyLineHandling::Trim {
-                                start: false,
-                                end: false,
-                            },
+                            EmptyLineHandling::none(),
                         );
                         o.format(exception, ctx);
                         if i < last_idx {
@@ -404,14 +394,7 @@ impl Rescue {
             } else {
                 o.indent();
                 o.break_line(ctx);
-                o.write_leading_trivia(
-                    &reference.leading_trivia,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: true,
-                        end: false,
-                    },
-                );
+                o.write_leading_trivia(&reference.leading_trivia, ctx, EmptyLineHandling::trim());
                 o.format(reference, ctx);
                 o.write_trailing_comment(&reference.trailing_trivia);
                 o.dedent();

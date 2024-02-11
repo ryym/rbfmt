@@ -86,3 +86,19 @@ pub(crate) enum EmptyLineHandling {
     Trim { start: bool, end: bool },
     Skip,
 }
+
+impl EmptyLineHandling {
+    pub(crate) fn trim() -> Self {
+        Self::Trim {
+            start: true,
+            end: true,
+        }
+    }
+
+    pub(crate) fn none() -> Self {
+        Self::Trim {
+            start: false,
+            end: false,
+        }
+    }
+}

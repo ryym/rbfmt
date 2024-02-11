@@ -104,10 +104,7 @@ impl Conditional {
             o.write_leading_trivia(
                 &self.predicate.leading_trivia,
                 ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
+                EmptyLineHandling::trim(),
             );
             o.format(&self.predicate, ctx);
             o.write_trailing_comment(&self.predicate.trailing_trivia);

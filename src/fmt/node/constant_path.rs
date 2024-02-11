@@ -42,14 +42,7 @@ impl ConstantPath {
             } else {
                 o.indent();
                 o.break_line(ctx);
-                o.write_leading_trivia(
-                    leading,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: true,
-                        end: true,
-                    },
-                );
+                o.write_leading_trivia(leading, ctx, EmptyLineHandling::trim());
                 o.push_str(path);
                 o.dedent();
             }

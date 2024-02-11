@@ -50,14 +50,7 @@ impl RangeLike {
             } else {
                 o.indent();
                 o.break_line(ctx);
-                o.write_leading_trivia(
-                    &right.leading_trivia,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: true,
-                        end: true,
-                    },
-                );
+                o.write_leading_trivia(&right.leading_trivia, ctx, EmptyLineHandling::trim());
                 o.format(right, ctx);
                 o.dedent();
             }

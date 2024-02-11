@@ -90,14 +90,7 @@ impl Def {
                 } else {
                     o.indent();
                     o.break_line(ctx);
-                    o.write_leading_trivia(
-                        &body.leading_trivia,
-                        ctx,
-                        EmptyLineHandling::Trim {
-                            start: true,
-                            end: true,
-                        },
-                    );
+                    o.write_leading_trivia(&body.leading_trivia, ctx, EmptyLineHandling::trim());
                     o.format(body, ctx);
                     o.write_trailing_comment(&body.trailing_trivia);
                     o.dedent();

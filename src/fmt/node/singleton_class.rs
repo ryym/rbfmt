@@ -32,10 +32,7 @@ impl SingletonClass {
             o.write_leading_trivia(
                 &self.expression.leading_trivia,
                 ctx,
-                EmptyLineHandling::Trim {
-                    start: false,
-                    end: false,
-                },
+                EmptyLineHandling::none(),
             );
             o.format(&self.expression, ctx);
             o.write_trailing_comment(&self.expression.trailing_trivia);
