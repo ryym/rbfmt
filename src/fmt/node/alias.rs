@@ -1,4 +1,7 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+};
 
 use super::Node;
 
@@ -17,5 +20,12 @@ impl Alias {
             new_name: Box::new(new_name),
             old_name: Box::new(old_name),
         }
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        o.push_str("alias ");
+        o.format(&self.new_name, ctx);
+        o.push(' ');
+        o.format(&self.old_name, ctx);
     }
 }

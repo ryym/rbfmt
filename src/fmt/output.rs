@@ -130,8 +130,8 @@ impl Output {
             Kind::ClassLike(class) => class.format(self, ctx),
             Kind::SingletonClass(class) => class.format(self, ctx),
             Kind::RangeLike(range) => range.format(self, ctx),
-            Kind::PrePostExec(exec) => self.format_pre_post_exec(exec, ctx),
-            Kind::Alias(alias) => self.format_alias(alias, ctx),
+            Kind::PrePostExec(exec) => exec.format(self, ctx),
+            Kind::Alias(alias) => alias.format(self, ctx),
         }
     }
 
@@ -627,37 +627,6 @@ impl Output {
             self.push_str(&params.closing);
             self.write_trailing_comment(&params.closing_trailing);
         }
-    }
-
-    pub(super) fn format_pre_post_exec(&mut self, exec: &PrePostExec, ctx: &FormatContext) {
-        if exec.shape.fits_in_one_line(self.remaining_width) {
-            self.push_str(&exec.keyword);
-            self.push_str(" {");
-            if !exec.statements.shape.is_empty() {
-                self.push(' ');
-                exec.statements.format(self, ctx, false);
-                self.push(' ');
-            }
-            self.push('}');
-        } else {
-            self.push_str(&exec.keyword);
-            self.push_str(" {");
-            if !exec.statements.shape.is_empty() {
-                self.indent();
-                self.break_line(ctx);
-                exec.statements.format(self, ctx, true);
-                self.dedent();
-            }
-            self.break_line(ctx);
-            self.push('}');
-        }
-    }
-
-    pub(super) fn format_alias(&mut self, alias: &Alias, ctx: &FormatContext) {
-        self.push_str("alias ");
-        self.format(&alias.new_name, ctx);
-        self.push(' ');
-        self.format(&alias.old_name, ctx);
     }
 
     pub(super) fn write_leading_trivia(
