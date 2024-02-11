@@ -114,7 +114,7 @@ impl Output {
             Kind::Case(case) => case.format(self, ctx),
             Kind::While(whle) => whle.format(self, ctx),
             Kind::For(expr) => expr.format(self, ctx),
-            Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
+            Kind::Postmodifier(modifier) => modifier.format(self, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
             Kind::Lambda(lambda) => self.format_lambda(lambda, ctx),
             Kind::CallLike(call) => self.format_call_like(call, ctx),
@@ -207,32 +207,6 @@ impl Output {
                     }
                 }
             }
-        }
-    }
-
-    pub(super) fn format_postmodifier(&mut self, modifier: &Postmodifier, ctx: &FormatContext) {
-        modifier.conditional.body.format(self, ctx, false);
-        self.push(' ');
-        self.push_str(&modifier.keyword);
-        let cond = &modifier.conditional;
-        if cond.predicate.is_diagonal() {
-            self.push(' ');
-            self.format(&cond.predicate, ctx);
-            self.write_trailing_comment(&cond.predicate.trailing_trivia);
-        } else {
-            self.indent();
-            self.break_line(ctx);
-            self.write_leading_trivia(
-                &cond.predicate.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
-            );
-            self.format(&cond.predicate, ctx);
-            self.write_trailing_comment(&cond.predicate.trailing_trivia);
-            self.dedent();
         }
     }
 

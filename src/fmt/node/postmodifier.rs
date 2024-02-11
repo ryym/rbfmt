@@ -1,4 +1,8 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+    trivia::EmptyLineHandling,
+};
 
 use super::Conditional;
 
@@ -17,6 +21,32 @@ impl Postmodifier {
             shape,
             keyword,
             conditional,
+        }
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        self.conditional.body.format(o, ctx, false);
+        o.push(' ');
+        o.push_str(&self.keyword);
+        let cond = &self.conditional;
+        if cond.predicate.is_diagonal() {
+            o.push(' ');
+            o.format(&cond.predicate, ctx);
+            o.write_trailing_comment(&cond.predicate.trailing_trivia);
+        } else {
+            o.indent();
+            o.break_line(ctx);
+            o.write_leading_trivia(
+                &cond.predicate.leading_trivia,
+                ctx,
+                EmptyLineHandling::Trim {
+                    start: true,
+                    end: true,
+                },
+            );
+            o.format(&cond.predicate, ctx);
+            o.write_trailing_comment(&cond.predicate.trailing_trivia);
+            o.dedent();
         }
     }
 }
