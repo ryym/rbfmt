@@ -1,4 +1,8 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{DraftResult, FormatContext, Output},
+    shape::{ArgumentStyle, Shape},
+    trivia::EmptyLineHandling,
+};
 
 use super::{Node, VirtualEnd};
 
@@ -43,5 +47,122 @@ impl Arguments {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.nodes.is_empty() && self.virtual_end.is_none()
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        // Format horizontally if all these are met:
+        //   - no intermediate comments
+        //   - all nodes' ArgumentStyle is horizontal
+        //   - only the last argument can span in multilines
+        let draft_result = o.draft(|d| {
+            if self.virtual_end.is_some() {
+                return DraftResult::Rollback;
+            }
+            d.push_str(self.opening.as_ref().map_or(" ", |s| s));
+            for (i, arg) in self.nodes.iter().enumerate() {
+                if i > 0 {
+                    d.push_str(", ");
+                }
+                if matches!(arg.shape, Shape::LineEnd { .. }) {
+                    return DraftResult::Rollback;
+                }
+                match arg.argument_style() {
+                    ArgumentStyle::Vertical => match arg.shape {
+                        Shape::Inline { len } if len <= d.remaining_width => {
+                            d.format(arg, ctx);
+                        }
+                        _ => return DraftResult::Rollback,
+                    },
+                    ArgumentStyle::Horizontal { min_first_line_len } => {
+                        if d.remaining_width < min_first_line_len {
+                            return DraftResult::Rollback;
+                        }
+                        let prev_line_count = d.line_count;
+                        d.format(arg, ctx);
+                        if prev_line_count < d.line_count && i < self.nodes.len() - 1 {
+                            return DraftResult::Rollback;
+                        }
+                    }
+                }
+            }
+            if let Some(closing) = &self.closing {
+                if d.remaining_width < closing.len() {
+                    return DraftResult::Rollback;
+                }
+                d.push_str(closing);
+            }
+            DraftResult::Commit
+        });
+
+        if matches!(draft_result, DraftResult::Commit) {
+            return;
+        }
+
+        if let Some(opening) = &self.opening {
+            o.push_str(opening);
+            o.indent();
+            if !self.nodes.is_empty() {
+                let last_idx = self.nodes.len() - 1;
+                for (i, arg) in self.nodes.iter().enumerate() {
+                    o.break_line(ctx);
+                    o.write_leading_trivia(
+                        &arg.leading_trivia,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: i == 0,
+                            end: false,
+                        },
+                    );
+                    o.format(arg, ctx);
+                    if i < last_idx || self.last_comma_allowed {
+                        o.push(',');
+                    }
+                    o.write_trailing_comment(&arg.trailing_trivia);
+                }
+            }
+            o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, self.nodes.is_empty());
+            o.dedent();
+            o.break_line(ctx);
+            if let Some(closing) = &self.closing {
+                o.push_str(closing);
+            }
+        } else if !self.nodes.is_empty() {
+            o.push(' ');
+            o.format(&self.nodes[0], ctx);
+            if self.nodes.len() > 1 {
+                o.push(',');
+            }
+            o.write_trailing_comment(&self.nodes[0].trailing_trivia);
+            match self.nodes.len() {
+                1 => {}
+                2 if self.nodes[0].trailing_trivia.is_none()
+                    && self.nodes[1].shape.fits_in_one_line(o.remaining_width) =>
+                {
+                    o.push(' ');
+                    o.format(&self.nodes[1], ctx);
+                }
+                _ => {
+                    o.indent();
+                    let last_idx = self.nodes.len() - 1;
+                    for (i, arg) in self.nodes.iter().enumerate().skip(1) {
+                        o.break_line(ctx);
+                        o.write_leading_trivia(
+                            &arg.leading_trivia,
+                            ctx,
+                            EmptyLineHandling::Trim {
+                                start: i == 0,
+                                end: false,
+                            },
+                        );
+                        o.format(arg, ctx);
+                        if i < last_idx {
+                            o.push(',');
+                        }
+                        o.write_trailing_comment(&arg.trailing_trivia);
+                    }
+                    o.dedent();
+                }
+            }
+        }
     }
 }

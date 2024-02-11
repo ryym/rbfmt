@@ -29,7 +29,7 @@ impl CallLike {
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         o.push_str(&self.name);
         if let Some(args) = &self.arguments {
-            o.format_arguments(args, ctx);
+            args.format(o, ctx);
         }
     }
 }

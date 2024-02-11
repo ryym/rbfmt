@@ -78,7 +78,7 @@ impl MethodChain {
                 o.format(&receiver.node, ctx);
                 o.write_trailing_comment(&receiver.node.trailing_trivia);
                 for idx_call in &receiver.index_calls {
-                    o.format_arguments(&idx_call.arguments, ctx);
+                    idx_call.arguments.format(o, ctx);
                     if let Some(block) = &idx_call.block {
                         o.format_block(block, ctx);
                     }
@@ -87,13 +87,13 @@ impl MethodChain {
             MethodChainHead::FirstCall(call) => {
                 o.push_str(&call.name);
                 if let Some(args) = &call.arguments {
-                    o.format_arguments(args, ctx);
+                    args.format(o, ctx);
                 }
                 if let Some(block) = &call.block {
                     o.format_block(block, ctx);
                 }
                 for idx_call in &call.index_calls {
-                    o.format_arguments(&idx_call.arguments, ctx);
+                    idx_call.arguments.format(o, ctx);
                     if let Some(block) = &idx_call.block {
                         o.format_block(block, ctx);
                     }
@@ -137,7 +137,7 @@ impl MethodChain {
                     if !args.is_empty() && call_expanded {
                         return DraftResult::Rollback;
                     }
-                    d.format_arguments(args, ctx);
+                    args.format(d, ctx);
                 }
                 if let Some(block) = &call.block {
                     if !block.is_empty() {
@@ -157,7 +157,7 @@ impl MethodChain {
                     if !idx_call.arguments.is_empty() && call_expanded {
                         return DraftResult::Rollback;
                     }
-                    d.format_arguments(&idx_call.arguments, ctx);
+                    idx_call.arguments.format(d, ctx);
                     if let Some(block) = &idx_call.block {
                         d.format_block(block, ctx);
                     }
@@ -179,13 +179,13 @@ impl MethodChain {
                 }
                 o.push_str(&call.name);
                 if let Some(args) = &call.arguments {
-                    o.format_arguments(args, ctx);
+                    args.format(o, ctx);
                 }
                 if let Some(block) = &call.block {
                     o.format_block(block, ctx);
                 }
                 for idx_call in &call.index_calls {
-                    o.format_arguments(&idx_call.arguments, ctx);
+                    idx_call.arguments.format(o, ctx);
                     if let Some(block) = &idx_call.block {
                         o.format_block(block, ctx);
                     }
