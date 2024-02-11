@@ -127,8 +127,8 @@ impl Output {
             Kind::Assoc(assoc) => assoc.format(self, ctx),
             Kind::Begin(begin) => begin.format(self, ctx),
             Kind::Def(def) => def.format(self, ctx),
-            Kind::ClassLike(class) => self.format_class_like(class, ctx),
-            Kind::SingletonClass(class) => self.format_singleton_class(class, ctx),
+            Kind::ClassLike(class) => class.format(self, ctx),
+            Kind::SingletonClass(class) => class.format(self, ctx),
             Kind::RangeLike(range) => self.format_range_like(range, ctx),
             Kind::PrePostExec(exec) => self.format_pre_post_exec(exec, ctx),
             Kind::Alias(alias) => self.format_alias(alias, ctx),
@@ -627,72 +627,6 @@ impl Output {
             self.push_str(&params.closing);
             self.write_trailing_comment(&params.closing_trailing);
         }
-    }
-
-    pub(super) fn format_class_like(&mut self, class: &ClassLike, ctx: &FormatContext) {
-        self.push_str(&class.keyword);
-        self.push(' ');
-        self.push_str(&class.name);
-        if let Some(superclass) = &class.superclass {
-            self.push_str(" <");
-            if superclass.shape.fits_in_one_line(self.remaining_width) || superclass.is_diagonal() {
-                self.push(' ');
-                self.format(superclass, ctx);
-                self.write_trailing_comment(&superclass.trailing_trivia);
-            } else {
-                self.indent();
-                self.break_line(ctx);
-                self.write_leading_trivia(
-                    &superclass.leading_trivia,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: true,
-                        end: true,
-                    },
-                );
-                self.format(superclass, ctx);
-                self.write_trailing_comment(&superclass.trailing_trivia);
-                self.dedent();
-            }
-        } else {
-            self.write_trailing_comment(&class.head_trailing);
-        }
-        self.format_block_body(&class.body, ctx, true);
-        self.break_line(ctx);
-        self.push_str("end");
-    }
-
-    pub(super) fn format_singleton_class(&mut self, class: &SingletonClass, ctx: &FormatContext) {
-        self.push_str("class <<");
-        if class
-            .expression
-            .shape
-            .fits_in_one_line(self.remaining_width)
-            || class.expression.is_diagonal()
-        {
-            self.push(' ');
-            self.format(&class.expression, ctx);
-            self.write_trailing_comment(&class.expression.trailing_trivia);
-        } else {
-            self.indent();
-            self.indent();
-            self.break_line(ctx);
-            self.write_leading_trivia(
-                &class.expression.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: false,
-                    end: false,
-                },
-            );
-            self.format(&class.expression, ctx);
-            self.write_trailing_comment(&class.expression.trailing_trivia);
-            self.dedent();
-            self.dedent();
-        }
-        self.format_block_body(&class.body, ctx, true);
-        self.break_line(ctx);
-        self.push_str("end");
     }
 
     pub(super) fn format_range_like(&mut self, range: &RangeLike, ctx: &FormatContext) {
