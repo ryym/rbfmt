@@ -1,4 +1,7 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+};
 
 use super::Node;
 
@@ -19,6 +22,13 @@ impl Prefix {
             shape,
             operator,
             expression: expression.map(Box::new),
+        }
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        o.push_str(&self.operator);
+        if let Some(expr) = &self.expression {
+            o.format(expr, ctx);
         }
     }
 }

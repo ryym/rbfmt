@@ -121,7 +121,7 @@ impl Output {
             Kind::InfixChain(chain) => chain.format(self, ctx),
             Kind::Assign(assign) => assign.format(self, ctx),
             Kind::MultiAssignTarget(multi) => multi.format(self, ctx),
-            Kind::Prefix(prefix) => self.format_prefix(prefix, ctx),
+            Kind::Prefix(prefix) => prefix.format(self, ctx),
             Kind::Array(array) => self.format_array(array, ctx),
             Kind::Hash(hash) => self.format_hash(hash, ctx),
             Kind::Assoc(assoc) => self.format_assoc(assoc, ctx),
@@ -364,13 +364,6 @@ impl Output {
             }
             self.break_line(ctx);
             self.push_str(&block.closing);
-        }
-    }
-
-    pub(super) fn format_prefix(&mut self, prefix: &Prefix, ctx: &FormatContext) {
-        self.push_str(&prefix.operator);
-        if let Some(expr) = &prefix.expression {
-            self.format(expr, ctx);
         }
     }
 
