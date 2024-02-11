@@ -25,20 +25,20 @@ impl ClassLike {
         o.push_str(&self.keyword);
         o.push(' ');
         o.push_str(&self.name);
-        if let Some(superself) = &self.superclass {
+        if let Some(superclass) = &self.superclass {
             o.push_str(" <");
-            if superself.shape.fits_in_one_line(o.remaining_width) || superself.is_diagonal() {
+            if superclass.shape.fits_in_one_line(o.remaining_width) || superclass.is_diagonal() {
                 o.push(' ');
-                superself.format(o, ctx);
-                superself.trailing_trivia.format(o);
+                superclass.format(o, ctx);
+                superclass.trailing_trivia.format(o);
             } else {
                 o.indent();
                 o.break_line(ctx);
-                superself
+                superclass
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::trim());
-                superself.format(o, ctx);
-                superself.trailing_trivia.format(o);
+                superclass.format(o, ctx);
+                superclass.trailing_trivia.format(o);
                 o.dedent();
             }
         } else {
