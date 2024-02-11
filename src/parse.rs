@@ -1250,7 +1250,8 @@ impl FmtNodeBuilder<'_> {
             prism::Node::ImplicitRestNode { .. } => {
                 let leading = fmt::LeadingTrivia::new();
                 let trailing = self.take_trailing_comment(next_loc_start);
-                fmt::Node::new(leading, fmt::Kind::Atom("".to_string()), trailing)
+                let atom = fmt::Atom("".to_string());
+                fmt::Node::new(leading, fmt::Kind::Atom(atom), trailing)
             }
 
             prism::Node::SplatNode { .. } => {
@@ -1362,7 +1363,7 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::Assoc(assoc), trailing)
             }
             prism::Node::ImplicitNode { .. } => {
-                fmt::Node::without_trivia(fmt::Kind::Atom("".to_string()))
+                fmt::Node::without_trivia(fmt::Kind::Atom(fmt::Atom("".to_string())))
             }
 
             prism::Node::ParenthesesNode { .. } => {
@@ -1405,7 +1406,7 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_optional_keyword_parameter_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
                 let name = Self::source_lossy_at(&node.name_loc());
-                let name = fmt::Node::without_trivia(fmt::Kind::Atom(name));
+                let name = fmt::Node::without_trivia(fmt::Kind::Atom(fmt::Atom(name)));
                 let value = node.value();
                 let value_loc = value.location();
                 let value = self.visit(value, value_loc.end_offset());
@@ -1583,7 +1584,7 @@ impl FmtNodeBuilder<'_> {
         let leading = self.take_leading_trivia(loc.start_offset());
         let value = Self::source_lossy_at(&loc);
         let trailing = self.take_trailing_comment(next_loc_start);
-        fmt::Node::new(leading, fmt::Kind::Atom(value), trailing)
+        fmt::Node::new(leading, fmt::Kind::Atom(fmt::Atom(value)), trailing)
     }
 
     fn visit_constant_path(
@@ -2658,7 +2659,7 @@ impl FmtNodeBuilder<'_> {
         let value_end = value.location().end_offset();
         let value = self.visit(value, value_end);
         let trailing = self.take_trailing_comment(next_loc_start);
-        let target = fmt::Node::without_trivia(fmt::Kind::Atom(name));
+        let target = fmt::Node::without_trivia(fmt::Kind::Atom(fmt::Atom(name)));
         (leading, fmt::Assign::new(target, operator, value), trailing)
     }
 
