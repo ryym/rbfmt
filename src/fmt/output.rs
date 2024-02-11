@@ -129,7 +129,7 @@ impl Output {
             Kind::Def(def) => def.format(self, ctx),
             Kind::ClassLike(class) => class.format(self, ctx),
             Kind::SingletonClass(class) => class.format(self, ctx),
-            Kind::RangeLike(range) => self.format_range_like(range, ctx),
+            Kind::RangeLike(range) => range.format(self, ctx),
             Kind::PrePostExec(exec) => self.format_pre_post_exec(exec, ctx),
             Kind::Alias(alias) => self.format_alias(alias, ctx),
         }
@@ -626,38 +626,6 @@ impl Output {
             self.break_line(ctx);
             self.push_str(&params.closing);
             self.write_trailing_comment(&params.closing_trailing);
-        }
-    }
-
-    pub(super) fn format_range_like(&mut self, range: &RangeLike, ctx: &FormatContext) {
-        if let Some(left) = &range.left {
-            self.format(left, ctx);
-        }
-        self.push_str(&range.operator);
-        if let Some(right) = &range.right {
-            if right.shape.fits_in_one_line(self.remaining_width) || right.is_diagonal() {
-                let need_space = match &right.kind {
-                    Kind::RangeLike(range) => range.left.is_none(),
-                    _ => false,
-                };
-                if need_space {
-                    self.push(' ');
-                }
-                self.format(right, ctx);
-            } else {
-                self.indent();
-                self.break_line(ctx);
-                self.write_leading_trivia(
-                    &right.leading_trivia,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: true,
-                        end: true,
-                    },
-                );
-                self.format(right, ctx);
-                self.dedent();
-            }
         }
     }
 

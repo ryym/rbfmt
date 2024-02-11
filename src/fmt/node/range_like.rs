@@ -1,6 +1,10 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+    trivia::EmptyLineHandling,
+};
 
-use super::Node;
+use super::{Kind, Node};
 
 #[derive(Debug)]
 pub(crate) struct RangeLike {
@@ -25,6 +29,38 @@ impl RangeLike {
             left: left.map(Box::new),
             operator,
             right: right.map(Box::new),
+        }
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        if let Some(left) = &self.left {
+            o.format(left, ctx);
+        }
+        o.push_str(&self.operator);
+        if let Some(right) = &self.right {
+            if right.shape.fits_in_one_line(o.remaining_width) || right.is_diagonal() {
+                let need_space = match &right.kind {
+                    Kind::RangeLike(range) => range.left.is_none(),
+                    _ => false,
+                };
+                if need_space {
+                    o.push(' ');
+                }
+                o.format(right, ctx);
+            } else {
+                o.indent();
+                o.break_line(ctx);
+                o.write_leading_trivia(
+                    &right.leading_trivia,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: true,
+                        end: true,
+                    },
+                );
+                o.format(right, ctx);
+                o.dedent();
+            }
         }
     }
 }
