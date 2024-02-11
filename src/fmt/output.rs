@@ -142,42 +142,7 @@ impl Output {
         trim_start: bool,
     ) {
         if let Some(end) = end {
-            let mut trailing_empty_lines = 0;
-            let leading_lines = &end.leading_trivia.lines();
-            for trivia in leading_lines.iter().rev() {
-                match trivia {
-                    LineTrivia::EmptyLine => {
-                        trailing_empty_lines += 1;
-                    }
-                    LineTrivia::Comment(_) => {
-                        break;
-                    }
-                }
-            }
-            if trailing_empty_lines == leading_lines.len() {
-                return;
-            }
-
-            if break_first {
-                self.break_line(ctx);
-            }
-            let target_len = leading_lines.len() - trailing_empty_lines;
-            let last_idx = target_len - 1;
-            for (i, trivia) in leading_lines.iter().take(target_len).enumerate() {
-                match trivia {
-                    LineTrivia::EmptyLine => {
-                        if !(trim_start && i == 0) || i == last_idx {
-                            self.break_line(ctx);
-                        }
-                    }
-                    LineTrivia::Comment(comment) => {
-                        self.push_str(&comment.value);
-                        if i < last_idx {
-                            self.break_line(ctx);
-                        }
-                    }
-                }
-            }
+            end.format(self, ctx, break_first, trim_start);
         }
     }
 
