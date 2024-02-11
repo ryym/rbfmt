@@ -112,8 +112,8 @@ impl Output {
             Kind::If(ifexpr) => ifexpr.format(self, ctx),
             Kind::Ternary(ternary) => ternary.format(self, ctx),
             Kind::Case(case) => case.format(self, ctx),
-            Kind::While(whle) => self.format_while(whle, ctx),
-            Kind::For(expr) => self.format_for(expr, ctx),
+            Kind::While(whle) => whle.format(self, ctx),
+            Kind::For(expr) => expr.format(self, ctx),
             Kind::Postmodifier(modifier) => self.format_postmodifier(modifier, ctx),
             Kind::MethodChain(chain) => self.format_method_chain(chain, ctx),
             Kind::Lambda(lambda) => self.format_lambda(lambda, ctx),
@@ -208,73 +208,6 @@ impl Output {
                 }
             }
         }
-    }
-
-    pub(super) fn format_while(&mut self, expr: &While, ctx: &FormatContext) {
-        if expr.is_while {
-            self.push_str("while");
-        } else {
-            self.push_str("until");
-        }
-        expr.content.format(self, ctx);
-        if !expr.content.body.shape().is_empty() {
-            self.indent();
-            self.break_line(ctx);
-            expr.content.body.format(self, ctx, true);
-            self.dedent();
-        }
-        self.break_line(ctx);
-        self.push_str("end");
-    }
-
-    pub(super) fn format_for(&mut self, expr: &For, ctx: &FormatContext) {
-        self.push_str("for");
-        if expr.index.shape.fits_in_inline(self.remaining_width) || expr.index.is_diagonal() {
-            self.push(' ');
-            self.format(&expr.index, ctx);
-        } else {
-            self.indent();
-            self.break_line(ctx);
-            self.write_leading_trivia(
-                &expr.index.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
-            );
-            self.format(&expr.index, ctx);
-            self.dedent();
-        }
-        self.push_str(" in");
-        let collection = &expr.collection;
-        if collection.shape.fits_in_inline(self.remaining_width) || collection.is_diagonal() {
-            self.push(' ');
-            self.format(collection, ctx);
-            self.write_trailing_comment(&collection.trailing_trivia);
-        } else {
-            self.indent();
-            self.break_line(ctx);
-            self.write_leading_trivia(
-                &collection.leading_trivia,
-                ctx,
-                EmptyLineHandling::Trim {
-                    start: true,
-                    end: true,
-                },
-            );
-            self.format(collection, ctx);
-            self.write_trailing_comment(&collection.trailing_trivia);
-            self.dedent();
-        }
-        if !expr.body.shape().is_empty() {
-            self.indent();
-            self.break_line(ctx);
-            expr.body.format(self, ctx, true);
-            self.dedent();
-        }
-        self.break_line(ctx);
-        self.push_str("end");
     }
 
     pub(super) fn format_postmodifier(&mut self, modifier: &Postmodifier, ctx: &FormatContext) {
