@@ -118,7 +118,7 @@ impl Output {
             Kind::MethodChain(chain) => chain.format(self, ctx),
             Kind::Lambda(lambda) => lambda.format(self, ctx),
             Kind::CallLike(call) => call.format(self, ctx),
-            Kind::InfixChain(chain) => self.format_infix_chain(chain, ctx),
+            Kind::InfixChain(chain) => chain.format(self, ctx),
             Kind::Assign(assign) => self.format_assign(assign, ctx),
             Kind::MultiAssignTarget(multi) => self.format_multi_assign_target(multi, ctx),
             Kind::Prefix(prefix) => self.format_prefix(prefix, ctx),
@@ -364,35 +364,6 @@ impl Output {
             }
             self.break_line(ctx);
             self.push_str(&block.closing);
-        }
-    }
-
-    pub(super) fn format_infix_chain(&mut self, chain: &InfixChain, ctx: &FormatContext) {
-        self.format(&chain.left, ctx);
-        if chain.rights_shape.fits_in_one_line(self.remaining_width) {
-            for right in &chain.rights {
-                self.push(' ');
-                self.push_str(&right.operator);
-                self.push(' ');
-                self.format(&right.value, ctx);
-            }
-        } else {
-            for right in &chain.rights {
-                self.push(' ');
-                self.push_str(&right.operator);
-                self.indent();
-                self.break_line(ctx);
-                self.write_leading_trivia(
-                    &right.value.leading_trivia,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: false,
-                        end: false,
-                    },
-                );
-                self.format(&right.value, ctx);
-                self.dedent();
-            }
         }
     }
 

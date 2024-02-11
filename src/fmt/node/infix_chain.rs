@@ -1,4 +1,8 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+    trivia::EmptyLineHandling,
+};
 
 use super::Node;
 
@@ -31,6 +35,35 @@ impl InfixChain {
         self.shape.append(&right.shape);
         self.rights_shape.append(&right.shape);
         self.rights.push(right);
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        o.format(&self.left, ctx);
+        if self.rights_shape.fits_in_one_line(o.remaining_width) {
+            for right in &self.rights {
+                o.push(' ');
+                o.push_str(&right.operator);
+                o.push(' ');
+                o.format(&right.value, ctx);
+            }
+        } else {
+            for right in &self.rights {
+                o.push(' ');
+                o.push_str(&right.operator);
+                o.indent();
+                o.break_line(ctx);
+                o.write_leading_trivia(
+                    &right.value.leading_trivia,
+                    ctx,
+                    EmptyLineHandling::Trim {
+                        start: false,
+                        end: false,
+                    },
+                );
+                o.format(&right.value, ctx);
+                o.dedent();
+            }
+        }
     }
 }
 
