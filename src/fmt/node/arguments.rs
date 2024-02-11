@@ -117,7 +117,7 @@ impl Arguments {
                     if i < last_idx || self.last_comma_allowed {
                         o.push(',');
                     }
-                    o.write_trailing_comment(&arg.trailing_trivia);
+                    arg.trailing_trivia.format(o);
                 }
             }
             o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, self.nodes.is_empty());
@@ -132,7 +132,7 @@ impl Arguments {
             if self.nodes.len() > 1 {
                 o.push(',');
             }
-            o.write_trailing_comment(&self.nodes[0].trailing_trivia);
+            self.nodes[0].trailing_trivia.format(o);
             match self.nodes.len() {
                 1 => {}
                 2 if self.nodes[0].trailing_trivia.is_none()
@@ -158,7 +158,7 @@ impl Arguments {
                         if i < last_idx {
                             o.push(',');
                         }
-                        o.write_trailing_comment(&arg.trailing_trivia);
+                        arg.trailing_trivia.format(o);
                     }
                     o.dedent();
                 }

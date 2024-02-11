@@ -59,7 +59,7 @@ impl If {
         if let Some(if_last) = &self.if_last {
             o.break_line(ctx);
             o.push_str("else");
-            o.write_trailing_comment(&if_last.keyword_trailing);
+            if_last.keyword_trailing.format(o);
             if !if_last.body.shape.is_empty() {
                 o.indent();
                 o.break_line(ctx);
@@ -95,7 +95,7 @@ impl Conditional {
             o.push(' ');
             o.indent();
             o.format(&self.predicate, ctx);
-            o.write_trailing_comment(&self.predicate.trailing_trivia);
+            self.predicate.trailing_trivia.format(o);
             o.dedent();
         } else {
             o.indent();
@@ -105,7 +105,7 @@ impl Conditional {
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
             o.format(&self.predicate, ctx);
-            o.write_trailing_comment(&self.predicate.trailing_trivia);
+            self.predicate.trailing_trivia.format(o);
             o.dedent();
             o.dedent();
         }

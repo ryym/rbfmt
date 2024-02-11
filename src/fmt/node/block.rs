@@ -80,7 +80,7 @@ impl Block {
         } else {
             o.push(' ');
             o.push_str(&self.opening);
-            o.write_trailing_comment(&self.opening_trailing);
+            self.opening_trailing.format(o);
             if let Some(params) = &self.parameters {
                 if self.opening_trailing.is_none() {
                     o.push(' ');
@@ -177,7 +177,7 @@ impl BlockParameters {
                 }
             }
             o.push_str(&self.closing);
-            o.write_trailing_comment(&self.closing_trailing);
+            self.closing_trailing.format(o);
         } else {
             o.push_str(&self.opening);
             o.indent();
@@ -185,7 +185,7 @@ impl BlockParameters {
                 let last_idx = self.params.len() - 1;
                 for (i, n) in self.params.iter().enumerate() {
                     if n.shape.is_empty() {
-                        o.write_trailing_comment(&n.trailing_trivia);
+                        n.trailing_trivia.format(o);
                         continue;
                     }
                     o.break_line(ctx);
@@ -201,7 +201,7 @@ impl BlockParameters {
                     if i < last_idx {
                         o.push(',');
                     }
-                    o.write_trailing_comment(&n.trailing_trivia);
+                    n.trailing_trivia.format(o);
                 }
             }
             if !self.locals.is_empty() {
@@ -215,14 +215,14 @@ impl BlockParameters {
                     if i < last_idx {
                         o.push(',');
                     }
-                    o.write_trailing_comment(&n.trailing_trivia);
+                    n.trailing_trivia.format(o);
                 }
             }
             o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, self.params.is_empty());
             o.dedent();
             o.break_line(ctx);
             o.push_str(&self.closing);
-            o.write_trailing_comment(&self.closing_trailing);
+            self.closing_trailing.format(o);
         }
     }
 }
@@ -287,7 +287,7 @@ impl BlockBody {
         if let Some(rescue_else) = &self.rescue_else {
             o.break_line(ctx);
             o.push_str("else");
-            o.write_trailing_comment(&rescue_else.keyword_trailing);
+            rescue_else.keyword_trailing.format(o);
             if !rescue_else.body.shape().is_empty() {
                 o.indent();
                 o.break_line(ctx);
@@ -298,7 +298,7 @@ impl BlockBody {
         if let Some(ensure) = &self.ensure {
             o.break_line(ctx);
             o.push_str("ensure");
-            o.write_trailing_comment(&ensure.keyword_trailing);
+            ensure.keyword_trailing.format(o);
             if !ensure.body.shape().is_empty() {
                 o.indent();
                 o.break_line(ctx);
@@ -356,7 +356,7 @@ impl Rescue {
                         o.push_str(", ");
                     }
                     o.format(exception, ctx);
-                    o.write_trailing_comment(&exception.trailing_trivia);
+                    exception.trailing_trivia.format(o);
                 }
             } else {
                 o.push(' ');
@@ -364,7 +364,7 @@ impl Rescue {
                 if self.exceptions.len() > 1 {
                     o.push(',');
                 }
-                o.write_trailing_comment(&self.exceptions[0].trailing_trivia);
+                self.exceptions[0].trailing_trivia.format(o);
                 if self.exceptions.len() > 1 {
                     o.indent();
                     let last_idx = self.exceptions.len() - 1;
@@ -377,7 +377,7 @@ impl Rescue {
                         if i < last_idx {
                             o.push(',');
                         }
-                        o.write_trailing_comment(&exception.trailing_trivia);
+                        exception.trailing_trivia.format(o);
                     }
                     o.dedent();
                 }
@@ -388,7 +388,7 @@ impl Rescue {
             if reference.shape.fits_in_one_line(o.remaining_width) || reference.is_diagonal() {
                 o.push(' ');
                 o.format(reference, ctx);
-                o.write_trailing_comment(&reference.trailing_trivia);
+                reference.trailing_trivia.format(o);
             } else {
                 o.indent();
                 o.break_line(ctx);
@@ -396,11 +396,11 @@ impl Rescue {
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::trim());
                 o.format(reference, ctx);
-                o.write_trailing_comment(&reference.trailing_trivia);
+                reference.trailing_trivia.format(o);
                 o.dedent();
             }
         }
-        o.write_trailing_comment(&self.head_trailing);
+        self.head_trailing.format(o);
         if !self.statements.shape().is_empty() {
             o.indent();
             o.break_line(ctx);

@@ -77,7 +77,7 @@ impl Hash {
                 );
                 o.format(element, ctx);
                 o.push(',');
-                o.write_trailing_comment(&element.trailing_trivia);
+                element.trailing_trivia.format(o);
             }
             o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, self.elements.is_empty());
             o.dedent();

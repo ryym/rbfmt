@@ -63,7 +63,7 @@ impl Def {
                     params.format(o, ctx);
                 }
             } else {
-                o.write_trailing_comment(&receiver.trailing_trivia);
+                receiver.trailing_trivia.format(o);
                 o.indent();
                 o.break_line(ctx);
                 o.push_str(&self.name);
@@ -86,14 +86,14 @@ impl Def {
                 if body.shape.fits_in_one_line(o.remaining_width) || body.is_diagonal() {
                     o.push(' ');
                     o.format(body, ctx);
-                    o.write_trailing_comment(&body.trailing_trivia);
+                    body.trailing_trivia.format(o);
                 } else {
                     o.indent();
                     o.break_line(ctx);
                     body.leading_trivia
                         .format(o, ctx, EmptyLineHandling::trim());
                     o.format(body, ctx);
-                    o.write_trailing_comment(&body.trailing_trivia);
+                    body.trailing_trivia.format(o);
                     o.dedent();
                 }
             }
@@ -102,7 +102,7 @@ impl Def {
                 head_trailing,
                 body,
             } => {
-                o.write_trailing_comment(head_trailing);
+                head_trailing.format(o);
                 body.format(o, ctx, true);
                 o.break_line(ctx);
                 o.push_str("end");
@@ -201,7 +201,7 @@ impl MethodParameters {
                     if i < last_idx {
                         o.push(',');
                     }
-                    o.write_trailing_comment(&n.trailing_trivia);
+                    n.trailing_trivia.format(o);
                 }
             }
             o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, self.params.is_empty());

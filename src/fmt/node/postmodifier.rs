@@ -32,7 +32,7 @@ impl Postmodifier {
         if cond.predicate.is_diagonal() {
             o.push(' ');
             o.format(&cond.predicate, ctx);
-            o.write_trailing_comment(&cond.predicate.trailing_trivia);
+            cond.predicate.trailing_trivia.format(o);
         } else {
             o.indent();
             o.break_line(ctx);
@@ -40,7 +40,7 @@ impl Postmodifier {
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
             o.format(&cond.predicate, ctx);
-            o.write_trailing_comment(&cond.predicate.trailing_trivia);
+            cond.predicate.trailing_trivia.format(o);
             o.dedent();
         }
     }

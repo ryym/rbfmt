@@ -24,7 +24,7 @@ impl SingletonClass {
         {
             o.push(' ');
             o.format(&self.expression, ctx);
-            o.write_trailing_comment(&self.expression.trailing_trivia);
+            self.expression.trailing_trivia.format(o);
         } else {
             o.indent();
             o.indent();
@@ -33,7 +33,7 @@ impl SingletonClass {
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::none());
             o.format(&self.expression, ctx);
-            o.write_trailing_comment(&self.expression.trailing_trivia);
+            self.expression.trailing_trivia.format(o);
             o.dedent();
             o.dedent();
         }

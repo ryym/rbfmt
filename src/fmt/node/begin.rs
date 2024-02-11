@@ -19,7 +19,7 @@ impl Begin {
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         o.push_str("begin");
-        o.write_trailing_comment(&self.keyword_trailing);
+        self.keyword_trailing.format(o);
         self.body.format(o, ctx, true);
         o.break_line(ctx);
         o.push_str("end");

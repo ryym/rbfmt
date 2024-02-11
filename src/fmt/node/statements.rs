@@ -66,7 +66,7 @@ impl Statements {
                 },
             );
             o.format(n, ctx);
-            o.write_trailing_comment(&n.trailing_trivia);
+            n.trailing_trivia.format(o);
         }
         o.write_trivia_at_virtual_end(
             ctx,

@@ -49,16 +49,16 @@ impl Ternary {
         {
             o.push(' ');
             o.format(&self.then, ctx);
-            o.write_trailing_comment(&self.then.trailing_trivia);
+            self.then.trailing_trivia.format(o);
         } else {
-            o.write_trailing_comment(&self.predicate_trailing);
+            self.predicate_trailing.format(o);
             o.indent();
             o.break_line(ctx);
             self.then
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
             o.format(&self.then, ctx);
-            o.write_trailing_comment(&self.then.trailing_trivia);
+            self.then.trailing_trivia.format(o);
             o.dedent();
         }
 
@@ -69,7 +69,7 @@ impl Ternary {
         {
             o.push_str(" : ");
             o.format(&self.otherwise, ctx);
-            o.write_trailing_comment(&self.otherwise.trailing_trivia);
+            self.otherwise.trailing_trivia.format(o);
         } else {
             o.break_line(ctx);
             o.push(':');
@@ -78,7 +78,7 @@ impl Ternary {
             {
                 o.push(' ');
                 o.format(&self.otherwise, ctx);
-                o.write_trailing_comment(&self.otherwise.trailing_trivia);
+                self.otherwise.trailing_trivia.format(o);
             } else {
                 o.indent();
                 o.break_line(ctx);
@@ -86,7 +86,7 @@ impl Ternary {
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::trim());
                 o.format(&self.otherwise, ctx);
-                o.write_trailing_comment(&self.otherwise.trailing_trivia);
+                self.otherwise.trailing_trivia.format(o);
                 o.dedent();
             }
         }

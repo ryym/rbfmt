@@ -37,7 +37,7 @@ impl For {
         if collection.shape.fits_in_inline(o.remaining_width) || collection.is_diagonal() {
             o.push(' ');
             o.format(collection, ctx);
-            o.write_trailing_comment(&collection.trailing_trivia);
+            collection.trailing_trivia.format(o);
         } else {
             o.indent();
             o.break_line(ctx);
@@ -45,7 +45,7 @@ impl For {
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
             o.format(collection, ctx);
-            o.write_trailing_comment(&collection.trailing_trivia);
+            collection.trailing_trivia.format(o);
             o.dedent();
         }
         if !self.body.shape().is_empty() {

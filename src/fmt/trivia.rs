@@ -102,6 +102,13 @@ impl TrailingTrivia {
     pub(crate) fn is_none(&self) -> bool {
         self.comment.is_none()
     }
+
+    pub(crate) fn format(&self, o: &mut Output) {
+        if let Some(comment) = &self.comment() {
+            o.push(' ');
+            o.buffer.push_str(&comment.value);
+        }
+    }
 }
 
 #[derive(Debug)]

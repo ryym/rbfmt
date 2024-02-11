@@ -30,7 +30,7 @@ impl ClassLike {
             if superself.shape.fits_in_one_line(o.remaining_width) || superself.is_diagonal() {
                 o.push(' ');
                 o.format(superself, ctx);
-                o.write_trailing_comment(&superself.trailing_trivia);
+                superself.trailing_trivia.format(o);
             } else {
                 o.indent();
                 o.break_line(ctx);
@@ -38,11 +38,11 @@ impl ClassLike {
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::trim());
                 o.format(superself, ctx);
-                o.write_trailing_comment(&superself.trailing_trivia);
+                superself.trailing_trivia.format(o);
                 o.dedent();
             }
         } else {
-            o.write_trailing_comment(&self.head_trailing);
+            self.head_trailing.format(o);
         }
         self.body.format(o, ctx, true);
         o.break_line(ctx);

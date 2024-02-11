@@ -76,7 +76,7 @@ impl MethodChain {
         match &self.head {
             MethodChainHead::Receiver(receiver) => {
                 o.format(&receiver.node, ctx);
-                o.write_trailing_comment(&receiver.node.trailing_trivia);
+                receiver.node.trailing_trivia.format(o);
                 for idx_call in &receiver.index_calls {
                     idx_call.arguments.format(o, ctx);
                     if let Some(block) = &idx_call.block {
@@ -98,7 +98,7 @@ impl MethodChain {
                         block.format(o, ctx);
                     }
                 }
-                o.write_trailing_comment(&call.trailing_trivia);
+                call.trailing_trivia.format(o);
             }
         }
         if self.calls.is_empty() {
@@ -190,7 +190,7 @@ impl MethodChain {
                         block.format(o, ctx);
                     }
                 }
-                o.write_trailing_comment(&call.trailing_trivia);
+                call.trailing_trivia.format(o);
             }
             o.dedent();
         }

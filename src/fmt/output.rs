@@ -1,4 +1,4 @@
-use super::{node::*, trivia::TrailingTrivia, FormatConfig};
+use super::{node::*, FormatConfig};
 use std::{
     collections::{HashMap, VecDeque},
     mem,
@@ -139,13 +139,6 @@ impl Output {
     ) {
         if let Some(end) = end {
             end.format(self, ctx, break_first, trim_start);
-        }
-    }
-
-    pub(super) fn write_trailing_comment(&mut self, trivia: &TrailingTrivia) {
-        if let Some(comment) = &trivia.comment() {
-            self.push(' ');
-            self.buffer.push_str(&comment.value);
         }
     }
 

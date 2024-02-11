@@ -86,7 +86,7 @@ impl MultiAssignTarget {
                 if i < last_idx || self.with_implicit_rest {
                     o.push(',');
                 }
-                o.write_trailing_comment(&target.trailing_trivia);
+                target.trailing_trivia.format(o);
             }
             o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, false);
             o.dedent();

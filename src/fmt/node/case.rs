@@ -28,19 +28,19 @@ impl Case {
                 if pred.shape.fits_in_one_line(o.remaining_width) || pred.is_diagonal() {
                     o.push(' ');
                     o.format(pred, ctx);
-                    o.write_trailing_comment(&pred.trailing_trivia);
+                    pred.trailing_trivia.format(o);
                 } else {
                     o.indent();
                     o.break_line(ctx);
                     pred.leading_trivia
                         .format(o, ctx, EmptyLineHandling::trim());
                     o.format(pred, ctx);
-                    o.write_trailing_comment(&pred.trailing_trivia);
+                    pred.trailing_trivia.format(o);
                     o.dedent();
                 }
             }
             None => {
-                o.write_trailing_comment(&self.case_trailing);
+                self.case_trailing.format(o);
             }
         }
         if self.first_branch_leading.is_empty() {
@@ -61,7 +61,7 @@ impl Case {
         if let Some(otherwise) = &self.otherwise {
             o.break_line(ctx);
             o.push_str("else");
-            o.write_trailing_comment(&otherwise.keyword_trailing);
+            otherwise.keyword_trailing.format(o);
             if !otherwise.body.shape.is_empty() {
                 o.indent();
                 o.break_line(ctx);
@@ -117,7 +117,7 @@ impl CaseWhen {
                     o.push_str(", ");
                 }
                 o.format(cond, ctx);
-                o.write_trailing_comment(&cond.trailing_trivia);
+                cond.trailing_trivia.format(o);
             }
             if !self.body.shape.is_empty() {
                 o.push_str(" then ");
@@ -132,7 +132,7 @@ impl CaseWhen {
                         o.push_str(", ");
                     }
                     o.format(cond, ctx);
-                    o.write_trailing_comment(&cond.trailing_trivia);
+                    cond.trailing_trivia.format(o);
                 }
             } else {
                 if self.conditions[0].is_diagonal() {
@@ -150,7 +150,7 @@ impl CaseWhen {
                 if self.conditions.len() > 1 {
                     o.push(',');
                 }
-                o.write_trailing_comment(&self.conditions[0].trailing_trivia);
+                self.conditions[0].trailing_trivia.format(o);
                 if self.conditions.len() > 1 {
                     o.indent();
                     let last_idx = self.conditions.len() - 1;
@@ -162,7 +162,7 @@ impl CaseWhen {
                         if i < last_idx {
                             o.push(',');
                         }
-                        o.write_trailing_comment(&cond.trailing_trivia);
+                        cond.trailing_trivia.format(o);
                     }
                     o.dedent();
                 }
