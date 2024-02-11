@@ -1,4 +1,7 @@
-use super::{node::*, FormatConfig};
+use super::{
+    node::{Heredoc, Pos, VirtualEnd},
+    FormatConfig,
+};
 use std::{
     collections::{HashMap, VecDeque},
     mem,
