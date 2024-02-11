@@ -1,4 +1,7 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+};
 
 use super::{Block, BlockParameters};
 
@@ -22,5 +25,13 @@ impl Lambda {
             parameters: params,
             block,
         }
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        o.push_str("->");
+        if let Some(params) = &self.parameters {
+            o.format_block_parameters(params, ctx);
+        }
+        o.format_block(&self.block, ctx);
     }
 }

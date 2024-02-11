@@ -116,8 +116,8 @@ impl Output {
             Kind::For(expr) => expr.format(self, ctx),
             Kind::Postmodifier(modifier) => modifier.format(self, ctx),
             Kind::MethodChain(chain) => chain.format(self, ctx),
-            Kind::Lambda(lambda) => self.format_lambda(lambda, ctx),
-            Kind::CallLike(call) => self.format_call_like(call, ctx),
+            Kind::Lambda(lambda) => lambda.format(self, ctx),
+            Kind::CallLike(call) => call.format(self, ctx),
             Kind::InfixChain(chain) => self.format_infix_chain(chain, ctx),
             Kind::Assign(assign) => self.format_assign(assign, ctx),
             Kind::MultiAssignTarget(multi) => self.format_multi_assign_target(multi, ctx),
@@ -207,13 +207,6 @@ impl Output {
                     }
                 }
             }
-        }
-    }
-
-    pub(super) fn format_call_like(&mut self, call: &CallLike, ctx: &FormatContext) {
-        self.push_str(&call.name);
-        if let Some(args) = &call.arguments {
-            self.format_arguments(args, ctx);
         }
     }
 
@@ -372,14 +365,6 @@ impl Output {
             self.break_line(ctx);
             self.push_str(&block.closing);
         }
-    }
-
-    pub(super) fn format_lambda(&mut self, lambda: &Lambda, ctx: &FormatContext) {
-        self.push_str("->");
-        if let Some(params) = &lambda.parameters {
-            self.format_block_parameters(params, ctx);
-        }
-        self.format_block(&lambda.block, ctx);
     }
 
     pub(super) fn format_infix_chain(&mut self, chain: &InfixChain, ctx: &FormatContext) {

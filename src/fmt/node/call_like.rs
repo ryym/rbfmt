@@ -1,4 +1,7 @@
-use crate::fmt::shape::Shape;
+use crate::fmt::{
+    output::{FormatContext, Output},
+    shape::Shape,
+};
 
 use super::Arguments;
 
@@ -21,5 +24,12 @@ impl CallLike {
     pub(crate) fn set_arguments(&mut self, args: Arguments) {
         self.shape.append(&args.shape);
         self.arguments = Some(args);
+    }
+
+    pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        o.push_str(&self.name);
+        if let Some(args) = &self.arguments {
+            o.format_arguments(args, ctx);
+        }
     }
 }
