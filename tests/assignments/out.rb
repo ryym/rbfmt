@@ -18,6 +18,18 @@ foo =
   # a
   1 # b
 
+foo = if bar
+  2
+else
+  3
+end
+
+foo = begin
+  abc
+rescue
+  xyz
+end
+
 a &&= 1
 b ||= "2"
 c += three(3)

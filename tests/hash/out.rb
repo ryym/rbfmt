@@ -41,10 +41,9 @@
     .baz do
       :baz
     end,
-  b:
-    if true
-      1
-    end,
+  b: if true
+    1
+  end,
 }
 
 { a: 1, b => 2, **c }

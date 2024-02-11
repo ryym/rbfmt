@@ -111,6 +111,8 @@ if true
   } if 2
 end
 
+if if if true then 1 end then 2 end then 3 end
+
 # --- unless ---
 
 unless true
