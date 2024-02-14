@@ -1724,6 +1724,39 @@ impl FmtNodeBuilder<'_> {
         let open = opening_loc.unwrap().as_slice();
         let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
         let opening_id = String::from_utf8_lossy(id).to_string();
+
+        // I don't know why but ruby-prism ignores spaces before an interpolation in some cases.
+        // It is confusing so we parse all spaces before interpolation.
+        fn parse_spaces_before_interpolation(
+            last_str_end: Option<usize>,
+            embedded_start: usize,
+            src: &[u8],
+            parts: &mut Vec<fmt::HeredocPart>,
+        ) {
+            let str = if let Some(last_str_end) = last_str_end {
+                if last_str_end < embedded_start {
+                    let value = src[last_str_end..embedded_start].to_vec();
+                    Some(fmt::StringLike::new(None, value, None))
+                } else {
+                    None
+                }
+            } else {
+                let mut i = embedded_start - 1;
+                while src[i] != b'\n' {
+                    i -= 1;
+                }
+                if i + 1 < embedded_start {
+                    let value = src[(i + 1)..embedded_start].to_vec();
+                    Some(fmt::StringLike::new(None, value, None))
+                } else {
+                    None
+                }
+            };
+            if let Some(str) = str {
+                parts.push(fmt::HeredocPart::Str(str));
+            }
+        }
+
         let mut parts = vec![];
         let mut last_str_end: Option<usize> = None;
         for part in content_parts.iter() {
@@ -1743,14 +1776,12 @@ impl FmtNodeBuilder<'_> {
                 prism::Node::EmbeddedStatementsNode { .. } => {
                     let node = part.as_embedded_statements_node().unwrap();
                     let loc = node.location();
-                    if let Some(last_str_end) = last_str_end {
-                        // I don't know why but ruby-prism ignores spaces before an interpolation in some cases.
-                        if last_str_end < loc.start_offset() {
-                            let value = self.src[last_str_end..loc.start_offset()].to_vec();
-                            let str = fmt::StringLike::new(None, value, None);
-                            parts.push(fmt::HeredocPart::Str(str))
-                        }
-                    }
+                    parse_spaces_before_interpolation(
+                        last_str_end,
+                        loc.start_offset(),
+                        self.src,
+                        &mut parts,
+                    );
                     let statements = self.visit_statements(node.statements(), loc.end_offset());
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
@@ -1759,6 +1790,13 @@ impl FmtNodeBuilder<'_> {
                 }
                 prism::Node::EmbeddedVariableNode { .. } => {
                     let node = part.as_embedded_variable_node().unwrap();
+                    let loc = node.location();
+                    parse_spaces_before_interpolation(
+                        last_str_end,
+                        loc.start_offset(),
+                        self.src,
+                        &mut parts,
+                    );
                     let operator = Self::source_lossy_at(&node.operator_loc());
                     let variable = Self::source_lossy_at(&node.variable().location());
                     let embedded_var = fmt::EmbeddedVariable::new(operator, variable);

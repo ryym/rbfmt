@@ -95,6 +95,35 @@ HERE
 a#@b #@@c #$d #{@e}
 HERE
 
+<<~HERE
+  aa
+  #@b
+  cc
+HERE
+
+<<HH
+  #{1}
+HH
+<<-HH
+  #{1}
+HH
+<<~HH
+  #{1}
+HH
+<<~HH
+#{1}
+HH
+
+<<HH
+  #@a
+HH
+<<-HH
+  #@a
+HH
+<<~HH
+  #@a
+HH
+
 <<~H1
   aa
   #{
