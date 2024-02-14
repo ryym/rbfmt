@@ -173,3 +173,123 @@ foo(
 indentation is not adjusted if there are tabs.
 	123
 TABS
+
+foo.bar(aaa.bbb(<<~NEST).ddd, :eee)
+  nested heredoc is not so readable
+NEST
+foo.bar(aaa.bbb(<<~NEST).ddd, :eee)
+  nested heredoc is not so readable
+NEST
+foo.bar(aaa.bbb(<<~NEST).ddd, :eee)
+  nested heredoc is not so readable
+NEST
+
+expect(result).to eq(<<~EXPECT.chomp, 'some message')
+  expected result
+EXPECT
+expect(result).to eq(<<~EXPECT.chomp, 'some message')
+  expected result
+EXPECT
+
+do_something(<<~MSG + foo + bar, baz)
+  abc
+MSG
+
+m.class_eval <<~RUBY, __FILE__, __LINE__ + 1
+  def #{method_name}(...)
+    # ...
+  end
+RUBY
+
+abc ? <<~SQL : nil
+  select * from foo;
+SQL
+
+let(:foo) {
+  <<~CSV
+    a,b,c
+  CSV
+}
+let(:foo) {
+  <<~CSV
+    a,b,c
+  CSV
+}
+
+a if is? <<~TXT
+  text is here
+TXT
+
+<<~ABC if foo.bar?
+  123
+ABC
+<<~ABC if foo # foo
+  123
+ABC
+  .bar?
+
+if true
+  return SomeResult.new(false, <<~MSG.chomp)
+    successfully registered
+  MSG
+  return a, # a
+    b,
+    <<~ABC
+      123
+    ABC
+  p 1
+end
+
+if true
+  aaa + <<~H1 + <<~H2 + ccc
+    h1
+  H1
+    h2
+  H2
+  nil
+end
+if true
+  aaa +
+    # a
+    <<~H1 +
+      h1
+    H1
+    <<~H2 +
+      h2
+    H2
+    ccc
+  nil
+end
+
+p [a, b, <<~C, d]
+  ccc
+C
+p [a, b, <<~C, d]
+  ccc
+C
+
+hashes << { a: 1, b: 2, c: <<~C, d: 4 }
+  3
+C
+hashes <<
+  {
+    a: 1,
+    b: 2,
+    c: <<~C,
+      3
+    C
+    d: 4,
+  }
+
+"123#{
+  <<~ABC
+    abc
+    #{:abc}
+  ABC
+}456"
+"123#{
+  <<~ABC
+    abc
+    #{:abc}
+  ABC
+}456"
