@@ -128,7 +128,7 @@ HH
   aa
   #{
     <<~H2
-      not-formatted-well
+      content
     H2
   }
   bb
@@ -138,7 +138,7 @@ foo(<<~H1, <<~H2)
   111
   #{
     <<~H3
-      not-formatted-well
+      content
     H3
   }
 H1
@@ -147,7 +147,7 @@ H2
 
 if true
   <<~H1
-    not-formatted-well
+    content
   H1
 end
 
@@ -167,3 +167,8 @@ foo(
   c,
   d, # d
 )
+
+<<~TABS
+indentation is not adjusted if there are tabs.
+	123
+TABS

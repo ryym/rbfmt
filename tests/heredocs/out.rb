@@ -76,9 +76,9 @@ HERE
 <<~HERE
   aa
   #{
-  1
-  2
-}
+    1
+    2
+  }
   cc
 HERE
 
@@ -117,7 +117,7 @@ HH
   #{1}
 HH
 <<~HH
-#{1}
+  #{1}
 HH
 
 <<HH
@@ -133,32 +133,32 @@ HH
 <<~H1
   aa
   #{
-  <<~H2
-      not-formatted-well
-  H2
-}
+    <<~H2
+      content
+    H2
+  }
   bb
 H1
 
 foo(<<~H1, <<~H2)
   111
   #{
-  <<~H3
-      not-formatted-well
-  H3
-}
+    <<~H3
+      content
+    H3
+  }
 H1
   222
 H2
 
 if true
   <<~H1
-    not-formatted-well
+    content
   H1
 end
 
 foo(a, <<~B, c, d)
-    b
+  b
 B
 foo(
   a,
@@ -168,3 +168,8 @@ foo(
   c,
   d, # d
 )
+
+<<~TABS
+indentation is not adjusted if there are tabs.
+	123
+TABS
