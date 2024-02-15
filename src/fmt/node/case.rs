@@ -137,8 +137,11 @@ impl CaseWhen {
             } else {
                 if self.conditions[0].can_continue_line() {
                     o.push(' ');
+                    o.indent();
                     self.conditions[0].format(o, ctx);
+                    o.dedent();
                 } else {
+                    o.indent();
                     o.indent();
                     o.break_line(ctx);
                     self.conditions[0]
@@ -146,12 +149,14 @@ impl CaseWhen {
                         .format(o, ctx, EmptyLineHandling::trim());
                     self.conditions[0].format(o, ctx);
                     o.dedent();
+                    o.dedent();
                 }
                 if self.conditions.len() > 1 {
                     o.push(',');
                 }
                 self.conditions[0].trailing_trivia.format(o);
                 if self.conditions.len() > 1 {
+                    o.indent();
                     o.indent();
                     let last_idx = self.conditions.len() - 1;
                     for (i, cond) in self.conditions.iter().enumerate().skip(1) {
@@ -164,6 +169,7 @@ impl CaseWhen {
                         }
                         cond.trailing_trivia.format(o);
                     }
+                    o.dedent();
                     o.dedent();
                 }
             }

@@ -16,9 +16,9 @@ if true
     a # 3
     # 4
   when
-    # 5
-    # 6
-    b # 7
+      # 5
+      # 6
+      b # 7
     # 8
     :b # 9
     # 10
@@ -41,17 +41,17 @@ end
 
 case
 when a, # 0
-  # 1
-  b, # 2
-  # 3
-  c # 4
+    # 1
+    b, # 2
+    # 3
+    c # 4
   # 5
   :when1
 when d, e, f # g
 when [
-  a, # a
-],
-  b
+    a, # a
+  ],
+    b
   :when2
 else
   :else
