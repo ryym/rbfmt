@@ -638,6 +638,10 @@ impl FmtNodeBuilder<'_> {
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, kind, trailing)
             }
+            prism::Node::MatchWriteNode { .. } => {
+                let node = node.as_match_write_node().unwrap();
+                self.visit(node.call().as_node(), next_loc_start)
+            }
 
             prism::Node::IfNode { .. } => {
                 let node = node.as_if_node().unwrap();

@@ -46,3 +46,15 @@ if /ab
   /x
   true
 end
+
+## match writes
+
+/(?<foo>bar)/ =~ baz
+p foo
+
+# 0
+/(?<foo>bar)/ =~
+  # 1
+  # 2
+  baz # 3
+# 4
