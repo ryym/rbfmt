@@ -8,6 +8,7 @@ mod begin;
 mod block;
 mod call_like;
 mod case;
+mod case_match;
 mod class_like;
 mod constant_path;
 mod def;
@@ -34,10 +35,11 @@ mod whiles;
 
 pub(crate) use self::{
     alias::*, arguments::*, array::*, assign::*, assoc::*, atom::*, begin::*, block::*,
-    call_like::*, case::*, class_like::*, constant_path::*, def::*, dyn_string_like::*, fors::*,
-    hash::*, heredoc::*, ifs::*, infix_chain::*, lambda::*, method_chain::*,
-    multi_assign_target::*, parens::*, postmodifier::*, pre_post_exec::*, prefix::*, range_like::*,
-    singleton_class::*, statements::*, string_like::*, ternary::*, virtual_end::*, whiles::*,
+    call_like::*, case::*, case_match::*, class_like::*, constant_path::*, def::*,
+    dyn_string_like::*, fors::*, hash::*, heredoc::*, ifs::*, infix_chain::*, lambda::*,
+    method_chain::*, multi_assign_target::*, parens::*, postmodifier::*, pre_post_exec::*,
+    prefix::*, range_like::*, singleton_class::*, statements::*, string_like::*, ternary::*,
+    virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -105,6 +107,7 @@ pub(crate) enum Kind {
     If(If),
     Ternary(Ternary),
     Case(Case),
+    CaseMatch(CaseMatch),
     While(While),
     For(For),
     Postmodifier(Postmodifier),
@@ -140,6 +143,7 @@ impl Kind {
             Kind::If(ifexpr) => ifexpr.format(o, ctx),
             Kind::Ternary(ternary) => ternary.format(o, ctx),
             Kind::Case(case) => case.format(o, ctx),
+            Kind::CaseMatch(case) => case.format(o, ctx),
             Kind::While(whle) => whle.format(o, ctx),
             Kind::For(expr) => expr.format(o, ctx),
             Kind::Postmodifier(modifier) => modifier.format(o, ctx),
@@ -175,6 +179,7 @@ impl Kind {
             Self::If(_) => If::shape(),
             Self::Ternary(ternary) => ternary.shape,
             Self::Case(_) => Case::shape(),
+            Self::CaseMatch(_) => CaseMatch::shape(),
             Self::While(_) => While::shape(),
             Self::For(_) => For::shape(),
             Self::Postmodifier(pmod) => pmod.shape,
