@@ -19,6 +19,7 @@ mod heredoc;
 mod ifs;
 mod infix_chain;
 mod lambda;
+mod match_assign;
 mod method_chain;
 mod multi_assign_target;
 mod parens;
@@ -37,9 +38,9 @@ pub(crate) use self::{
     alias::*, arguments::*, array::*, assign::*, assoc::*, atom::*, begin::*, block::*,
     call_like::*, case::*, case_match::*, class_like::*, constant_path::*, def::*,
     dyn_string_like::*, fors::*, hash::*, heredoc::*, ifs::*, infix_chain::*, lambda::*,
-    method_chain::*, multi_assign_target::*, parens::*, postmodifier::*, pre_post_exec::*,
-    prefix::*, range_like::*, singleton_class::*, statements::*, string_like::*, ternary::*,
-    virtual_end::*, whiles::*,
+    match_assign::*, method_chain::*, multi_assign_target::*, parens::*, postmodifier::*,
+    pre_post_exec::*, prefix::*, range_like::*, singleton_class::*, statements::*, string_like::*,
+    ternary::*, virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -108,6 +109,7 @@ pub(crate) enum Kind {
     Ternary(Ternary),
     Case(Case),
     CaseMatch(CaseMatch),
+    MatchAssign(MatchAssign),
     While(While),
     For(For),
     Postmodifier(Postmodifier),
@@ -144,6 +146,7 @@ impl Kind {
             Kind::Ternary(ternary) => ternary.format(o, ctx),
             Kind::Case(case) => case.format(o, ctx),
             Kind::CaseMatch(case) => case.format(o, ctx),
+            Kind::MatchAssign(assign) => assign.format(o, ctx),
             Kind::While(whle) => whle.format(o, ctx),
             Kind::For(expr) => expr.format(o, ctx),
             Kind::Postmodifier(modifier) => modifier.format(o, ctx),
@@ -180,6 +183,7 @@ impl Kind {
             Self::Ternary(ternary) => ternary.shape,
             Self::Case(_) => Case::shape(),
             Self::CaseMatch(_) => CaseMatch::shape(),
+            Self::MatchAssign(assign) => *assign.shape(),
             Self::While(_) => While::shape(),
             Self::For(_) => For::shape(),
             Self::Postmodifier(pmod) => pmod.shape,

@@ -30,3 +30,17 @@ if true
   end # 15
   # 16
 end
+
+## Standalone matches (assignments)
+
+1 => a
+1 in a
+
+# 0
+[
+  a, # 1
+] in
+  # 2
+  # 3
+  b # 4
+# 5

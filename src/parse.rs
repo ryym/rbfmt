@@ -718,6 +718,23 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::CaseMatch(case), trailing)
             }
 
+            prism::Node::MatchPredicateNode { .. } => {
+                let node = node.as_match_predicate_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let match_assign =
+                    self.visit_match_assign(node.value(), node.operator_loc(), node.pattern());
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::MatchAssign(match_assign), trailing)
+            }
+            prism::Node::MatchRequiredNode { .. } => {
+                let node = node.as_match_required_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let match_assign =
+                    self.visit_match_assign(node.value(), node.operator_loc(), node.pattern());
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::MatchAssign(match_assign), trailing)
+            }
+
             prism::Node::WhileNode { .. } => {
                 let node = node.as_while_node().unwrap();
                 if let Some(closing_loc) = node.closing_loc() {
@@ -2089,6 +2106,19 @@ impl FmtNodeBuilder<'_> {
         let body = self.visit_statements(node.statements(), next_loc_start);
         case_in.set_body(body);
         case_in
+    }
+
+    fn visit_match_assign(
+        &mut self,
+        expression: prism::Node,
+        operator_loc: prism::Location,
+        pattern: prism::Node,
+    ) -> fmt::MatchAssign {
+        let expression = self.visit(expression, operator_loc.start_offset());
+        let pattern_end = pattern.location().end_offset();
+        let pattern = self.visit(pattern, pattern_end);
+        let operator = Self::source_lossy_at(&operator_loc);
+        fmt::MatchAssign::new(expression, operator, pattern)
     }
 
     fn visit_while_or_until(
