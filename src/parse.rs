@@ -1568,6 +1568,13 @@ impl FmtNodeBuilder<'_> {
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::ArrayPattern(array_pattern), trailing)
             }
+            prism::Node::FindPatternNode { .. } => {
+                let node = node.as_find_pattern_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let array_pattern = self.visit_find_pattern(node);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::ArrayPattern(array_pattern), trailing)
+            }
 
             prism::Node::PreExecutionNode { .. } => {
                 let node = node.as_pre_execution_node().unwrap();
@@ -3268,6 +3275,48 @@ impl FmtNodeBuilder<'_> {
             );
             array.last_comma_allowed = false;
         }
+
+        let end = self.take_end_trivia_as_virtual_end(closing_start);
+        array.set_virtual_end(end);
+
+        array
+    }
+
+    fn visit_find_pattern(&mut self, node: prism::FindPatternNode) -> fmt::ArrayPattern {
+        let constant = node.constant().map(|c| {
+            let const_end = c.location().end_offset();
+            self.visit(c, const_end)
+        });
+        let opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
+        let closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
+        let mut array = fmt::ArrayPattern::new(constant, opening, closing);
+        array.last_comma_allowed = false;
+
+        let requireds = node.requireds();
+        let right = node.right();
+
+        let left_next = requireds
+            .iter()
+            .next()
+            .map(|n| n.location().start_offset())
+            .unwrap_or(right.location().start_offset());
+        let left = self.visit(node.left(), left_next);
+        array.append_element(left);
+
+        Self::each_node_with_next_start(
+            node.requireds().iter(),
+            right.location().start_offset(),
+            |node, next_start| {
+                let element = self.visit(node, next_start);
+                array.append_element(element);
+            },
+        );
+
+        let closing_start = node.closing_loc().as_ref().map(|l| l.start_offset());
+
+        let right_next = closing_start.unwrap_or(right.location().start_offset());
+        let right = self.visit(right, right_next);
+        array.append_element(right);
 
         let end = self.take_end_trivia_as_virtual_end(closing_start);
         array.set_virtual_end(end);

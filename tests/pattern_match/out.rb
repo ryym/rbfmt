@@ -45,12 +45,16 @@ end
   b # 4
 # 5
 
+## Array patterns
+
 xs in [a, b, c]
 xs => a, b, c
 xs in a, b, *cs, d
 xs => Foo[a, b, c]
 xs => Foo(d, e, *f)
 xs => [a, *]
+xs => *, a
+xs => [*]
 
 xs =>
   # 0
@@ -91,3 +95,22 @@ xs => [
   *cs,
   d # no comma
 ]
+
+## Find patterns
+
+xs in [*, x, *]
+xs => *a, x, _y, z, *b
+
+xs =>
+  # 0
+  # 1
+  [
+    *a, # 2
+    # 3
+    b, # 4
+    # 5
+    c, # 6
+    # 7
+    *d
+  ] # 8
+# 9
