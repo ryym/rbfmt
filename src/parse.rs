@@ -710,30 +710,6 @@ impl FmtNodeBuilder<'_> {
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::Case(case), trailing)
             }
-            prism::Node::CaseMatchNode { .. } => {
-                let node = node.as_case_match_node().unwrap();
-                let leading = self.take_leading_trivia(node.location().start_offset());
-                let case = self.visit_case_match(node);
-                let trailing = self.take_trailing_comment(next_loc_start);
-                fmt::Node::new(leading, fmt::Kind::CaseMatch(case), trailing)
-            }
-
-            prism::Node::MatchPredicateNode { .. } => {
-                let node = node.as_match_predicate_node().unwrap();
-                let leading = self.take_leading_trivia(node.location().start_offset());
-                let match_assign =
-                    self.visit_match_assign(node.value(), node.operator_loc(), node.pattern());
-                let trailing = self.take_trailing_comment(next_loc_start);
-                fmt::Node::new(leading, fmt::Kind::MatchAssign(match_assign), trailing)
-            }
-            prism::Node::MatchRequiredNode { .. } => {
-                let node = node.as_match_required_node().unwrap();
-                let leading = self.take_leading_trivia(node.location().start_offset());
-                let match_assign =
-                    self.visit_match_assign(node.value(), node.operator_loc(), node.pattern());
-                let trailing = self.take_trailing_comment(next_loc_start);
-                fmt::Node::new(leading, fmt::Kind::MatchAssign(match_assign), trailing)
-            }
 
             prism::Node::WhileNode { .. } => {
                 let node = node.as_while_node().unwrap();
@@ -1559,6 +1535,30 @@ impl FmtNodeBuilder<'_> {
                 let trailing = self.take_trailing_comment(next_loc_start);
                 let flipflop = fmt::RangeLike::new(left, operator, right);
                 fmt::Node::new(leading, fmt::Kind::RangeLike(flipflop), trailing)
+            }
+
+            prism::Node::CaseMatchNode { .. } => {
+                let node = node.as_case_match_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let case = self.visit_case_match(node);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::CaseMatch(case), trailing)
+            }
+            prism::Node::MatchPredicateNode { .. } => {
+                let node = node.as_match_predicate_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let match_assign =
+                    self.visit_match_assign(node.value(), node.operator_loc(), node.pattern());
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::MatchAssign(match_assign), trailing)
+            }
+            prism::Node::MatchRequiredNode { .. } => {
+                let node = node.as_match_required_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let match_assign =
+                    self.visit_match_assign(node.value(), node.operator_loc(), node.pattern());
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::MatchAssign(match_assign), trailing)
             }
 
             prism::Node::PreExecutionNode { .. } => {

@@ -1,6 +1,7 @@
 mod alias;
 mod arguments;
 mod array;
+mod array_pattern;
 mod assign;
 mod assoc;
 mod atom;
@@ -108,8 +109,6 @@ pub(crate) enum Kind {
     If(If),
     Ternary(Ternary),
     Case(Case),
-    CaseMatch(CaseMatch),
-    MatchAssign(MatchAssign),
     While(While),
     For(For),
     Postmodifier(Postmodifier),
@@ -128,6 +127,8 @@ pub(crate) enum Kind {
     ClassLike(ClassLike),
     SingletonClass(SingletonClass),
     RangeLike(RangeLike),
+    CaseMatch(CaseMatch),
+    MatchAssign(MatchAssign),
     PrePostExec(PrePostExec),
     Alias(Alias),
 }
@@ -145,8 +146,6 @@ impl Kind {
             Kind::If(ifexpr) => ifexpr.format(o, ctx),
             Kind::Ternary(ternary) => ternary.format(o, ctx),
             Kind::Case(case) => case.format(o, ctx),
-            Kind::CaseMatch(case) => case.format(o, ctx),
-            Kind::MatchAssign(assign) => assign.format(o, ctx),
             Kind::While(whle) => whle.format(o, ctx),
             Kind::For(expr) => expr.format(o, ctx),
             Kind::Postmodifier(modifier) => modifier.format(o, ctx),
@@ -165,6 +164,8 @@ impl Kind {
             Kind::ClassLike(class) => class.format(o, ctx),
             Kind::SingletonClass(class) => class.format(o, ctx),
             Kind::RangeLike(range) => range.format(o, ctx),
+            Kind::CaseMatch(case) => case.format(o, ctx),
+            Kind::MatchAssign(assign) => assign.format(o, ctx),
             Kind::PrePostExec(exec) => exec.format(o, ctx),
             Kind::Alias(alias) => alias.format(o, ctx),
         }
@@ -182,8 +183,6 @@ impl Kind {
             Self::If(_) => If::shape(),
             Self::Ternary(ternary) => ternary.shape,
             Self::Case(_) => Case::shape(),
-            Self::CaseMatch(_) => CaseMatch::shape(),
-            Self::MatchAssign(assign) => *assign.shape(),
             Self::While(_) => While::shape(),
             Self::For(_) => For::shape(),
             Self::Postmodifier(pmod) => pmod.shape,
@@ -202,6 +201,8 @@ impl Kind {
             Self::ClassLike(_) => ClassLike::shape(),
             Self::SingletonClass(_) => SingletonClass::shape(),
             Self::RangeLike(range) => range.shape,
+            Self::CaseMatch(_) => CaseMatch::shape(),
+            Self::MatchAssign(assign) => *assign.shape(),
             Self::PrePostExec(exec) => exec.shape,
             Self::Alias(alias) => alias.shape,
         }
