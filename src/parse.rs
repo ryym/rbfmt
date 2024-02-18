@@ -1263,10 +1263,10 @@ impl FmtNodeBuilder<'_> {
                 let loc = node.location();
                 let leading = self.take_leading_trivia(loc.start_offset());
                 let operator = Self::source_lossy_at(&node.operator_loc());
-                // XXX: I cannot find the case where the expression is None.
-                let expr = node.expression().expect("SplatNode must have expression");
-                let expr = self.visit(expr, loc.end_offset());
-                let splat = fmt::Prefix::new(operator, Some(expr));
+                let expr = node
+                    .expression()
+                    .map(|expr| self.visit(expr, loc.end_offset()));
+                let splat = fmt::Prefix::new(operator, expr);
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::Prefix(splat), trailing)
             }
@@ -1275,7 +1275,7 @@ impl FmtNodeBuilder<'_> {
                 let loc = node.location();
                 let leading = self.take_leading_trivia(loc.start_offset());
                 let operator = Self::source_lossy_at(&node.operator_loc());
-                // XXX: I cannot find the case where the value is None.
+                // TODO: Handle non-value splat operator, which can be used in Hash pattern match.
                 let value = node.value().expect("AssocSplatNode must have value");
                 let value = self.visit(value, loc.end_offset());
                 let splat = fmt::Prefix::new(operator, Some(value));

@@ -47,6 +47,7 @@ xs => a, b, c
 xs in a, b, *cs, d
 xs => Foo[a, b, c]
 xs => Foo(d, e, *f)
+xs => [a, *]
 
 xs => # 0
   # 1
