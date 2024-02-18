@@ -149,7 +149,7 @@ hash =>
   } # 4
 # 5
 
-## Pinned expressions
+## Pinned expressions / variables
 
 v => ^(1 + 2)
 v in ^(nil)
@@ -165,3 +165,7 @@ v =>
     # 5 
   ) # 6
 # 7
+
+v => ^a
+v => [a, ^b, *c]
+v in ^a, ^@b, ^@@c, ^$d

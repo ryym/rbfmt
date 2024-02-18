@@ -1587,6 +1587,13 @@ impl FmtNodeBuilder<'_> {
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::Prefix(prefix), trailing)
             }
+            prism::Node::PinnedVariableNode { .. } => {
+                let node = node.as_pinned_variable_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let prefix = self.visit_pinned_variable(node);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Prefix(prefix), trailing)
+            }
 
             prism::Node::PreExecutionNode { .. } => {
                 let node = node.as_pre_execution_node().unwrap();
@@ -3399,6 +3406,13 @@ impl FmtNodeBuilder<'_> {
 
         let node = fmt::Node::without_trivia(fmt::Kind::Parens(parens));
         fmt::Prefix::new(operator, Some(node))
+    }
+
+    fn visit_pinned_variable(&mut self, node: prism::PinnedVariableNode) -> fmt::Prefix {
+        let operator = Self::source_lossy_at(&node.operator_loc());
+        let variable_end = node.variable().location().end_offset();
+        let variable = self.visit(node.variable(), variable_end);
+        fmt::Prefix::new(operator, Some(variable))
     }
 
     fn visit_pre_post_exec(
