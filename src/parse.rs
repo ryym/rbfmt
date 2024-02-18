@@ -1561,6 +1561,14 @@ impl FmtNodeBuilder<'_> {
                 fmt::Node::new(leading, fmt::Kind::MatchAssign(match_assign), trailing)
             }
 
+            prism::Node::ArrayPatternNode { .. } => {
+                let node = node.as_array_pattern_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let array_pattern = self.visit_array_pattern(node);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::ArrayPattern(array_pattern), trailing)
+            }
+
             prism::Node::PreExecutionNode { .. } => {
                 let node = node.as_pre_execution_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
@@ -3200,6 +3208,71 @@ impl FmtNodeBuilder<'_> {
             body,
         };
         (leading, class, trailing)
+    }
+
+    fn visit_array_pattern(&mut self, node: prism::ArrayPatternNode) -> fmt::ArrayPattern {
+        let constant = node.constant().map(|c| {
+            let const_end = c.location().end_offset();
+            self.visit(c, const_end)
+        });
+        let opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
+        let closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
+        let mut array = fmt::ArrayPattern::new(constant, opening, closing);
+
+        let rest = node.rest();
+        let posts = node.posts();
+        let posts_head = posts.iter().next();
+
+        let closing_start = node.closing_loc().as_ref().map(|c| c.start_offset());
+        let requireds_next = rest
+            .as_ref()
+            .map(|r| r.location().start_offset())
+            .or_else(|| posts_head.as_ref().map(|p| p.location().start_offset()))
+            .or(closing_start)
+            .unwrap_or(0);
+        Self::each_node_with_next_start(
+            node.requireds().iter(),
+            requireds_next,
+            |node, mut next_start| {
+                if next_start == 0 {
+                    next_start = node.location().end_offset();
+                }
+                let element = self.visit(node, next_start);
+                array.append_element(element);
+            },
+        );
+
+        if let Some(rest) = node.rest() {
+            let rest_next = posts_head
+                .as_ref()
+                .map(|p| p.location().start_offset())
+                .or(closing_start)
+                .unwrap_or(rest.location().end_offset());
+            let element = self.visit(rest, rest_next);
+            array.append_element(element);
+            array.last_comma_allowed = false;
+        }
+
+        if posts_head.is_some() {
+            let posts_next = closing_start.unwrap_or(0);
+            Self::each_node_with_next_start(
+                node.posts().iter(),
+                posts_next,
+                |node, mut next_start| {
+                    if next_start == 0 {
+                        next_start = node.location().end_offset();
+                    }
+                    let element = self.visit(node, next_start);
+                    array.append_element(element);
+                },
+            );
+            array.last_comma_allowed = false;
+        }
+
+        let end = self.take_end_trivia_as_virtual_end(closing_start);
+        array.set_virtual_end(end);
+
+        array
     }
 
     fn visit_pre_post_exec(

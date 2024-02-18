@@ -41,3 +41,44 @@ end
   # 3
   b # 4
 # 5
+
+xs in [a, b, c]
+xs => a, b, c
+xs in a, b, *cs, d
+xs => Foo[a, b, c]
+xs => Foo(d, e, *f)
+
+xs => # 0
+  # 1
+  Foo:: # 2
+    # 3
+    Bar[ # 4
+      # 5
+      a, # 6
+      # 7
+      b, # 8
+      # 9
+      *cs, # 10
+      # 11
+      d # 12
+      # 13
+    ] # 14
+# 15
+
+xs => a, # a
+  b, # b
+  c # c
+# d
+
+xs => [
+  a,
+  b,
+  *cs # no comma
+]
+
+xs => [
+  a, # a
+  b,
+  *cs,
+  d # no comma
+]

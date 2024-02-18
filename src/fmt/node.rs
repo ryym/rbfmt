@@ -36,8 +36,8 @@ mod virtual_end;
 mod whiles;
 
 pub(crate) use self::{
-    alias::*, arguments::*, array::*, assign::*, assoc::*, atom::*, begin::*, block::*,
-    call_like::*, case::*, case_match::*, class_like::*, constant_path::*, def::*,
+    alias::*, arguments::*, array::*, array_pattern::*, assign::*, assoc::*, atom::*, begin::*,
+    block::*, call_like::*, case::*, case_match::*, class_like::*, constant_path::*, def::*,
     dyn_string_like::*, fors::*, hash::*, heredoc::*, ifs::*, infix_chain::*, lambda::*,
     match_assign::*, method_chain::*, multi_assign_target::*, parens::*, postmodifier::*,
     pre_post_exec::*, prefix::*, range_like::*, singleton_class::*, statements::*, string_like::*,
@@ -129,6 +129,7 @@ pub(crate) enum Kind {
     RangeLike(RangeLike),
     CaseMatch(CaseMatch),
     MatchAssign(MatchAssign),
+    ArrayPattern(ArrayPattern),
     PrePostExec(PrePostExec),
     Alias(Alias),
 }
@@ -166,6 +167,7 @@ impl Kind {
             Kind::RangeLike(range) => range.format(o, ctx),
             Kind::CaseMatch(case) => case.format(o, ctx),
             Kind::MatchAssign(assign) => assign.format(o, ctx),
+            Kind::ArrayPattern(array) => array.format(o, ctx),
             Kind::PrePostExec(exec) => exec.format(o, ctx),
             Kind::Alias(alias) => alias.format(o, ctx),
         }
@@ -203,6 +205,7 @@ impl Kind {
             Self::RangeLike(range) => range.shape,
             Self::CaseMatch(_) => CaseMatch::shape(),
             Self::MatchAssign(assign) => *assign.shape(),
+            Self::ArrayPattern(array) => array.shape(),
             Self::PrePostExec(exec) => exec.shape,
             Self::Alias(alias) => alias.shape,
         }
