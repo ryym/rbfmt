@@ -148,3 +148,20 @@ hash =>
     **b
   } # 4
 # 5
+
+## Pinned expressions
+
+v => ^(1 + 2)
+v in ^(nil)
+v => { a: ^(!true), b: [*, ^(Foo.bar)] }
+
+v =>
+  # 0
+  # 1
+  ^(
+    # 2
+    # 3
+    a * (b + c) # 4
+    # 5 
+  ) # 6
+# 7

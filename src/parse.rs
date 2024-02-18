@@ -1580,6 +1580,13 @@ impl FmtNodeBuilder<'_> {
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::HashPattern(hash_pattern), trailing)
             }
+            prism::Node::PinnedExpressionNode { .. } => {
+                let node = node.as_pinned_expression_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let prefix = self.visit_pinned_expression(node);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Prefix(prefix), trailing)
+            }
 
             prism::Node::PreExecutionNode { .. } => {
                 let node = node.as_pre_execution_node().unwrap();
@@ -3378,6 +3385,20 @@ impl FmtNodeBuilder<'_> {
         hash.set_virtual_end(end);
 
         hash
+    }
+
+    fn visit_pinned_expression(&mut self, node: prism::PinnedExpressionNode) -> fmt::Prefix {
+        let operator = Self::source_lossy_at(&node.operator_loc());
+        let rparen_start = node.rparen_loc().start_offset();
+        let expression = self.visit(node.expression(), rparen_start);
+
+        let mut stmts = fmt::Statements::new();
+        stmts.append_node(expression);
+        stmts.set_virtual_end(self.take_end_trivia_as_virtual_end(Some(rparen_start)));
+        let parens = fmt::Parens::new(stmts);
+
+        let node = fmt::Node::without_trivia(fmt::Kind::Parens(parens));
+        fmt::Prefix::new(operator, Some(node))
     }
 
     fn visit_pre_post_exec(
