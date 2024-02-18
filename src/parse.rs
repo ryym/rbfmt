@@ -1358,10 +1358,10 @@ impl FmtNodeBuilder<'_> {
                 let key_loc = key.location();
                 let key = self.visit(key, key_loc.end_offset());
                 let operator = node.operator_loc().map(|l| Self::source_lossy_at(&l));
-                // XXX: I cannot find the case where the value is None.
-                let value = node.value().expect("assoc node must have value");
-                let value_loc = value.location();
-                let value = self.visit(value, value_loc.end_offset());
+                let value = node.value().map(|value| {
+                    let value_loc = value.location();
+                    self.visit(value, value_loc.end_offset())
+                });
                 let trailing = self.take_trailing_comment(next_loc_start);
                 let assoc = fmt::Assoc::new(key, operator, value);
                 fmt::Node::new(leading, fmt::Kind::Assoc(assoc), trailing)
@@ -1415,7 +1415,7 @@ impl FmtNodeBuilder<'_> {
                 let value_loc = value.location();
                 let value = self.visit(value, value_loc.end_offset());
                 let trailing = self.take_trailing_comment(next_loc_start);
-                let assoc = fmt::Assoc::new(name, None, value);
+                let assoc = fmt::Assoc::new(name, None, Some(value));
                 fmt::Node::new(leading, fmt::Kind::Assoc(assoc), trailing)
             }
 

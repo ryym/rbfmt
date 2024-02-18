@@ -271,13 +271,18 @@ impl Kind {
             Self::Hash(hash) => ArgumentStyle::Horizontal {
                 min_first_line_len: hash.opening.len(),
             },
-            Self::Assoc(assoc) => match assoc.value.argument_style() {
-                ArgumentStyle::Vertical => ArgumentStyle::Vertical,
-                ArgumentStyle::Horizontal {
-                    min_first_line_len: value_len,
-                } => assoc.key.argument_style().add(ArgumentStyle::Horizontal {
-                    min_first_line_len: ": ".len() + value_len,
-                }),
+            Self::Assoc(assoc) => match &assoc.value {
+                Some(value) => match value.argument_style() {
+                    ArgumentStyle::Vertical => ArgumentStyle::Vertical,
+                    ArgumentStyle::Horizontal {
+                        min_first_line_len: value_len,
+                    } => assoc.key.argument_style().add(ArgumentStyle::Horizontal {
+                        min_first_line_len: ": ".len() + value_len,
+                    }),
+                },
+                None => ArgumentStyle::Horizontal {
+                    min_first_line_len: ": ".len(),
+                },
             },
             _ => ArgumentStyle::Vertical,
         }
