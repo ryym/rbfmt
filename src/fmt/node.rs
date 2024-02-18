@@ -16,6 +16,7 @@ mod def;
 mod dyn_string_like;
 mod fors;
 mod hash;
+mod hash_pattern;
 mod heredoc;
 mod ifs;
 mod infix_chain;
@@ -38,10 +39,10 @@ mod whiles;
 pub(crate) use self::{
     alias::*, arguments::*, array::*, array_pattern::*, assign::*, assoc::*, atom::*, begin::*,
     block::*, call_like::*, case::*, case_match::*, class_like::*, constant_path::*, def::*,
-    dyn_string_like::*, fors::*, hash::*, heredoc::*, ifs::*, infix_chain::*, lambda::*,
-    match_assign::*, method_chain::*, multi_assign_target::*, parens::*, postmodifier::*,
-    pre_post_exec::*, prefix::*, range_like::*, singleton_class::*, statements::*, string_like::*,
-    ternary::*, virtual_end::*, whiles::*,
+    dyn_string_like::*, fors::*, hash::*, hash_pattern::*, heredoc::*, ifs::*, infix_chain::*,
+    lambda::*, match_assign::*, method_chain::*, multi_assign_target::*, parens::*,
+    postmodifier::*, pre_post_exec::*, prefix::*, range_like::*, singleton_class::*, statements::*,
+    string_like::*, ternary::*, virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -130,6 +131,7 @@ pub(crate) enum Kind {
     CaseMatch(CaseMatch),
     MatchAssign(MatchAssign),
     ArrayPattern(ArrayPattern),
+    HashPattern(HashPattern),
     PrePostExec(PrePostExec),
     Alias(Alias),
 }
@@ -168,6 +170,7 @@ impl Kind {
             Kind::CaseMatch(case) => case.format(o, ctx),
             Kind::MatchAssign(assign) => assign.format(o, ctx),
             Kind::ArrayPattern(array) => array.format(o, ctx),
+            Kind::HashPattern(hash) => hash.format(o, ctx),
             Kind::PrePostExec(exec) => exec.format(o, ctx),
             Kind::Alias(alias) => alias.format(o, ctx),
         }
@@ -206,6 +209,7 @@ impl Kind {
             Self::CaseMatch(_) => CaseMatch::shape(),
             Self::MatchAssign(assign) => *assign.shape(),
             Self::ArrayPattern(array) => array.shape(),
+            Self::HashPattern(hash) => hash.shape(),
             Self::PrePostExec(exec) => exec.shape,
             Self::Alias(alias) => alias.shape,
         }

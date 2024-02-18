@@ -103,3 +103,31 @@ xs => # 0
   # 7
   *d # 8
 # 9
+
+## Hash patterns
+
+hash => { a:, b: { c: } }
+hash in a:, b: { c: }
+hash => { a: 1, b: [c, *], d: }
+hash in { a:, **b }
+hash => { a:, ** }
+hash in { ** }
+hash => **all
+
+hash => # 0
+  # 1
+  { # 2
+    # 3
+    a: # 4
+      # 5
+      :b, # 6
+    # 7
+  } # 8
+# 9
+
+hash => # 0
+  # 1
+  a:, # 2
+  # 3
+  **b # 4
+# 5

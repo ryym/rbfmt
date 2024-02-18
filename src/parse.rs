@@ -1275,10 +1275,8 @@ impl FmtNodeBuilder<'_> {
                 let loc = node.location();
                 let leading = self.take_leading_trivia(loc.start_offset());
                 let operator = Self::source_lossy_at(&node.operator_loc());
-                // TODO: Handle non-value splat operator, which can be used in Hash pattern match.
-                let value = node.value().expect("AssocSplatNode must have value");
-                let value = self.visit(value, loc.end_offset());
-                let splat = fmt::Prefix::new(operator, Some(value));
+                let value = node.value().map(|v| self.visit(v, loc.end_offset()));
+                let splat = fmt::Prefix::new(operator, value);
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::Prefix(splat), trailing)
             }
@@ -1574,6 +1572,13 @@ impl FmtNodeBuilder<'_> {
                 let array_pattern = self.visit_find_pattern(node);
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::ArrayPattern(array_pattern), trailing)
+            }
+            prism::Node::HashPatternNode { .. } => {
+                let node = node.as_hash_pattern_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let hash_pattern = self.visit_hash_pattern(node);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::HashPattern(hash_pattern), trailing)
             }
 
             prism::Node::PreExecutionNode { .. } => {
@@ -3322,6 +3327,57 @@ impl FmtNodeBuilder<'_> {
         array.set_virtual_end(end);
 
         array
+    }
+
+    fn visit_hash_pattern(&mut self, node: prism::HashPatternNode) -> fmt::HashPattern {
+        let constant = node.constant().map(|c| {
+            let const_end = c.location().end_offset();
+            self.visit(c, const_end)
+        });
+        let opening_loc = node.opening_loc();
+        let closing_loc = node.closing_loc();
+        let opening = opening_loc.as_ref().map(Self::source_lossy_at);
+        let closing = closing_loc.as_ref().map(Self::source_lossy_at);
+        let should_be_inline = match (opening_loc.as_ref(), node.elements().iter().next()) {
+            (Some(opening_loc), Some(first_element)) => !self.does_line_break_exist_in(
+                opening_loc.start_offset(),
+                first_element.location().start_offset(),
+            ),
+            _ => true,
+        };
+        let mut hash = fmt::HashPattern::new(constant, opening, closing, should_be_inline);
+
+        let rest = node.rest();
+        let closing_start = closing_loc.as_ref().map(|c| c.start_offset());
+
+        let elements_next = rest
+            .as_ref()
+            .map(|r| r.location().start_offset())
+            .or(closing_start)
+            .unwrap_or(0);
+        Self::each_node_with_next_start(
+            node.elements().iter(),
+            elements_next,
+            |node, mut next_start| {
+                if next_start == 0 {
+                    next_start = node.location().end_offset();
+                }
+                let element = self.visit(node, next_start);
+                hash.append_element(element);
+            },
+        );
+
+        if let Some(rest) = node.rest() {
+            let rest_next = closing_start.unwrap_or(rest.location().end_offset());
+            let rest = self.visit(rest, rest_next);
+            hash.append_element(rest);
+            hash.last_comma_allowed = false;
+        }
+
+        let end = self.take_end_trivia_as_virtual_end(closing_start);
+        hash.set_virtual_end(end);
+
+        hash
     }
 
     fn visit_pre_post_exec(
