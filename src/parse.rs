@@ -3409,7 +3409,8 @@ impl FmtNodeBuilder<'_> {
         let mut stmts = fmt::Statements::new();
         stmts.append_node(expression);
         stmts.set_virtual_end(self.take_end_trivia_as_virtual_end(Some(rparen_start)));
-        let parens = fmt::Parens::new(stmts);
+        let mut parens = fmt::Parens::new(stmts);
+        parens.closing_break_allowed = false;
 
         let node = fmt::Node::without_trivia(fmt::Kind::Parens(parens));
         fmt::Prefix::new(operator, Some(node))

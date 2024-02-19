@@ -9,13 +9,18 @@ use super::Statements;
 pub(crate) struct Parens {
     pub shape: Shape,
     pub body: Statements,
+    pub closing_break_allowed: bool,
 }
 
 impl Parens {
     pub(crate) fn new(body: Statements) -> Self {
         let mut shape = Shape::inline("()".len());
         shape.insert(&body.shape);
-        Self { shape, body }
+        Self {
+            shape,
+            body,
+            closing_break_allowed: true,
+        }
     }
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
@@ -30,7 +35,9 @@ impl Parens {
                 o.break_line(ctx);
                 self.body.format(o, ctx, true);
                 o.dedent();
-                o.break_line(ctx);
+                if self.closing_break_allowed {
+                    o.break_line(ctx);
+                }
             }
             o.push(')');
         }
