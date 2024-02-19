@@ -150,3 +150,16 @@ v => # 0
 v => ^a
 v => [a, ^b, *c]
 v in ^a, ^@b, ^@@c, ^$d
+
+## Captures
+
+xs in [Integer => a, String]
+xs => Integer => b, *rest
+hash => {
+  a:,
+  b: Foo::Bar => # 0
+    # 1
+    baz, # 2
+  # 3
+  c: [d],
+}

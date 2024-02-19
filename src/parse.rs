@@ -1594,6 +1594,13 @@ impl FmtNodeBuilder<'_> {
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::Prefix(prefix), trailing)
             }
+            prism::Node::CapturePatternNode { .. } => {
+                let node = node.as_capture_pattern_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let assoc = self.visit_capture_pattern(node);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::Assoc(assoc), trailing)
+            }
 
             prism::Node::PreExecutionNode { .. } => {
                 let node = node.as_pre_execution_node().unwrap();
@@ -3413,6 +3420,13 @@ impl FmtNodeBuilder<'_> {
         let variable_end = node.variable().location().end_offset();
         let variable = self.visit(node.variable(), variable_end);
         fmt::Prefix::new(operator, Some(variable))
+    }
+
+    fn visit_capture_pattern(&mut self, node: prism::CapturePatternNode) -> fmt::Assoc {
+        let value = self.visit(node.value(), node.operator_loc().start_offset());
+        let operator = Self::source_lossy_at(&node.operator_loc());
+        let target = self.visit(node.target(), node.target().location().end_offset());
+        fmt::Assoc::new(value, Some(operator), Some(target))
     }
 
     fn visit_pre_post_exec(
