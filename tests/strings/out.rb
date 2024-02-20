@@ -15,6 +15,10 @@
 %|foo bar baz|
 %:foo bar baz:
 
+?a
+?b # b 
+?😀
+
 "a#{1.foo} b #{2}c#{"d#{3}"}" 'ee' "#{4}f"
 
 "a#{}b"
