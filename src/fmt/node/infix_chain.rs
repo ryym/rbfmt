@@ -67,7 +67,7 @@ impl InfixChain {
 pub(crate) struct InfixRight {
     pub shape: Shape,
     pub operator: String,
-    pub value: Box<Node>,
+    pub value: Node,
 }
 
 impl InfixRight {
@@ -76,7 +76,7 @@ impl InfixRight {
         Self {
             shape,
             operator,
-            value: Box::new(value),
+            value,
         }
     }
 }
