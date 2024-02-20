@@ -181,3 +181,25 @@ hash => {
   # 3
   c: [d],
 }
+
+## Alternation patterns
+
+v => a | b
+v => a | b | c | d | e
+
+# Prism's bug? This is a valid syntax but the patterns before the parentheses are ignored.
+v => b | c | d
+
+v => [a, :b] | c, d | [*, e, *] | { f: Integer | Nil, g:, ** } | ^(h.i(j)) | ^@k | [String] => l
+
+v =>
+  # 0
+  # 1
+  a |
+    # 2
+    # 3
+    [b | c] |
+    # 4
+    # 5
+    { d: } # 6
+# 7

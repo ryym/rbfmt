@@ -1601,6 +1601,13 @@ impl FmtNodeBuilder<'_> {
                 let trailing = self.take_trailing_comment(next_loc_start);
                 fmt::Node::new(leading, fmt::Kind::Assoc(assoc), trailing)
             }
+            prism::Node::AlternationPatternNode { .. } => {
+                let node = node.as_alternation_pattern_node().unwrap();
+                let leading = self.take_leading_trivia(node.location().start_offset());
+                let chain = self.visit_alternation_pattern(node);
+                let trailing = self.take_trailing_comment(next_loc_start);
+                fmt::Node::new(leading, fmt::Kind::AltPatternChain(chain), trailing)
+            }
 
             prism::Node::PreExecutionNode { .. } => {
                 let node = node.as_pre_execution_node().unwrap();
@@ -3428,6 +3435,23 @@ impl FmtNodeBuilder<'_> {
         let operator = Self::source_lossy_at(&node.operator_loc());
         let target = self.visit(node.target(), node.target().location().end_offset());
         fmt::Assoc::new(value, Some(operator), Some(target))
+    }
+
+    fn visit_alternation_pattern(
+        &mut self,
+        node: prism::AlternationPatternNode,
+    ) -> fmt::AltPatternChain {
+        let operator_loc = node.operator_loc();
+        let left = self.visit(node.left(), operator_loc.start_offset());
+        let mut chain = match left.kind {
+            fmt::Kind::AltPatternChain(chain) => chain,
+            _ => fmt::AltPatternChain::new(left),
+        };
+        let right = node.right();
+        let right_end = right.location().end_offset();
+        let right = self.visit(right, right_end);
+        chain.append_right(right);
+        chain
     }
 
     fn visit_pre_post_exec(

@@ -1,4 +1,5 @@
 mod alias;
+mod alt_pattern_chain;
 mod arguments;
 mod array;
 mod array_pattern;
@@ -37,12 +38,12 @@ mod virtual_end;
 mod whiles;
 
 pub(crate) use self::{
-    alias::*, arguments::*, array::*, array_pattern::*, assign::*, assoc::*, atom::*, begin::*,
-    block::*, call_like::*, case::*, case_match::*, class_like::*, constant_path::*, def::*,
-    dyn_string_like::*, fors::*, hash::*, hash_pattern::*, heredoc::*, ifs::*, infix_chain::*,
-    lambda::*, match_assign::*, method_chain::*, multi_assign_target::*, parens::*,
-    postmodifier::*, pre_post_exec::*, prefix::*, range_like::*, singleton_class::*, statements::*,
-    string_like::*, ternary::*, virtual_end::*, whiles::*,
+    alias::*, alt_pattern_chain::*, arguments::*, array::*, array_pattern::*, assign::*, assoc::*,
+    atom::*, begin::*, block::*, call_like::*, case::*, case_match::*, class_like::*,
+    constant_path::*, def::*, dyn_string_like::*, fors::*, hash::*, hash_pattern::*, heredoc::*,
+    ifs::*, infix_chain::*, lambda::*, match_assign::*, method_chain::*, multi_assign_target::*,
+    parens::*, postmodifier::*, pre_post_exec::*, prefix::*, range_like::*, singleton_class::*,
+    statements::*, string_like::*, ternary::*, virtual_end::*, whiles::*,
 };
 
 use super::{
@@ -132,6 +133,7 @@ pub(crate) enum Kind {
     MatchAssign(MatchAssign),
     ArrayPattern(ArrayPattern),
     HashPattern(HashPattern),
+    AltPatternChain(AltPatternChain),
     PrePostExec(PrePostExec),
     Alias(Alias),
 }
@@ -171,6 +173,7 @@ impl Kind {
             Kind::MatchAssign(assign) => assign.format(o, ctx),
             Kind::ArrayPattern(array) => array.format(o, ctx),
             Kind::HashPattern(hash) => hash.format(o, ctx),
+            Kind::AltPatternChain(chain) => chain.format(o, ctx),
             Kind::PrePostExec(exec) => exec.format(o, ctx),
             Kind::Alias(alias) => alias.format(o, ctx),
         }
@@ -210,6 +213,7 @@ impl Kind {
             Self::MatchAssign(assign) => *assign.shape(),
             Self::ArrayPattern(array) => array.shape(),
             Self::HashPattern(hash) => hash.shape(),
+            Self::AltPatternChain(chain) => chain.shape(),
             Self::PrePostExec(exec) => exec.shape,
             Self::Alias(alias) => alias.shape,
         }
