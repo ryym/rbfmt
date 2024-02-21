@@ -203,3 +203,30 @@ v =>
     # 5
     { d: } # 6
 # 7
+
+## Mixed with case-in
+
+case foo.bar
+in 1, 2, a, *rest
+  1
+in [*, :a, a, *] | [:b, b, *]
+  2
+in {
+    a: {
+      x: Integer => y,
+      b: {
+        c: [^d, e],
+      },
+    },
+  }
+  3
+in ^(aa.bb(1).cc[2]&.dd) | nil | true | false
+  4
+else
+  case bar.baz
+  in *a
+    5
+  else
+    6
+  end
+end
