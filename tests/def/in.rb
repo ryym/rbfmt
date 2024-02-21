@@ -6,6 +6,9 @@ def foo; end
 
 def foo; 1; 2; end
 
+def foo # bar
+end
+
 def
   # foo
   foo
@@ -168,6 +171,10 @@ end
 def foo
 rescue
   # rescue
+end
+
+def foo # bar
+rescue # baz
 end
 
 def self.foo()

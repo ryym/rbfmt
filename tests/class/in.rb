@@ -58,6 +58,10 @@ class Foo < foo(1, 2)
   true
 end
 
+class Foo # a
+rescue # b
+end
+
 class << self
 end
 
@@ -104,3 +108,6 @@ ensure
   4
 end
 
+class << self # a
+rescue # b
+end

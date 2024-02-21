@@ -10,6 +10,9 @@ def foo
   2
 end
 
+def foo # bar
+end
+
 # foo
 def foo
 end
@@ -181,6 +184,10 @@ end
 def foo
 rescue
   # rescue
+end
+
+def foo # bar
+rescue # baz
 end
 
 def self.foo

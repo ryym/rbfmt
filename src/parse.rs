@@ -1490,10 +1490,13 @@ impl FmtNodeBuilder<'_> {
                 let leading = self.take_leading_trivia(node.operator_loc().start_offset());
                 let body = node.body();
                 let end_loc = node.end_keyword_loc();
-                let expr_next = body
-                    .as_ref()
-                    .map(|b| b.location().start_offset())
-                    .unwrap_or(end_loc.start_offset());
+                let body_start = body.as_ref().and_then(|b| match b {
+                    prism::Node::BeginNode { .. } => {
+                        Self::start_of_begin_block_content(b.as_begin_node().unwrap())
+                    }
+                    _ => Some(b.location().start_offset()),
+                });
+                let expr_next = body_start.unwrap_or(end_loc.start_offset());
                 let expr = self.visit(node.expression(), expr_next);
                 let body = self.parse_block_body(body, end_loc.start_offset());
                 let trailing = self.take_trailing_comment(next_loc_start);
@@ -2527,7 +2530,12 @@ impl FmtNodeBuilder<'_> {
         let mut method_block = fmt::Block::new(was_flat, opening, closing);
 
         let body = node.body();
-        let body_start = body.as_ref().map(|b| b.location().start_offset());
+        let body_start = body.as_ref().and_then(|b| match b {
+            prism::Node::BeginNode { .. } => {
+                Self::start_of_begin_block_content(b.as_begin_node().unwrap())
+            }
+            _ => Some(b.location().start_offset()),
+        });
         let params = node.parameters();
         let params_start = params.as_ref().map(|p| p.location().start_offset());
         let closing_loc = node.closing_loc();
@@ -2556,6 +2564,17 @@ impl FmtNodeBuilder<'_> {
         method_block.set_body(body);
 
         method_block
+    }
+
+    fn start_of_begin_block_content(begin: prism::BeginNode) -> Option<usize> {
+        let loc = begin
+            .statements()
+            .map(|n| n.location())
+            .or_else(|| begin.rescue_clause().map(|n| n.location()))
+            .or_else(|| begin.else_clause().map(|n| n.location()))
+            .or_else(|| begin.ensure_clause().map(|n| n.location()))
+            .or(begin.end_keyword_loc());
+        loc.map(|l| l.start_offset())
     }
 
     fn detect_method_type(call: &prism::CallNode) -> MethodType {
@@ -3023,10 +3042,13 @@ impl FmtNodeBuilder<'_> {
         } else {
             let end_loc = node.end_keyword_loc().expect("block def must have end");
             let body = node.body();
-            let head_next = body
-                .as_ref()
-                .map(|b| b.location().start_offset())
-                .unwrap_or(end_loc.start_offset());
+            let body_start = body.as_ref().and_then(|b| match b {
+                prism::Node::BeginNode { .. } => {
+                    Self::start_of_begin_block_content(b.as_begin_node().unwrap())
+                }
+                _ => Some(b.location().start_offset()),
+            });
+            let head_next = body_start.unwrap_or(end_loc.start_offset());
             let head_trailing = self.take_trailing_comment(head_next);
             let block_body = self.parse_block_body(body, end_loc.start_offset());
             def.set_body(fmt::DefBody::Block {
@@ -3226,10 +3248,13 @@ impl FmtNodeBuilder<'_> {
         let leading = self.take_leading_trivia(name_loc.start_offset());
         let name = Self::source_lossy_at(&name_loc);
 
-        let head_next = body
-            .as_ref()
-            .map(|b| b.location().start_offset())
-            .unwrap_or(end_loc.start_offset());
+        let body_start = body.as_ref().and_then(|b| match b {
+            prism::Node::BeginNode { .. } => {
+                Self::start_of_begin_block_content(b.as_begin_node().unwrap())
+            }
+            _ => Some(b.location().start_offset()),
+        });
+        let head_next = body_start.unwrap_or(end_loc.start_offset());
         let (superclass, head_trailing) = if let Some(superclass) = superclass {
             let fmt_node = self.visit(superclass, head_next);
             (Some(fmt_node), fmt::TrailingTrivia::none())
