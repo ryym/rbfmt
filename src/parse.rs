@@ -1359,7 +1359,7 @@ impl FmtNodeBuilder<'_> {
                 let value_loc = node.value().location();
                 let value = self.visit(node.value(), value_loc.end_offset());
                 let trailing = self.take_trailing_comment(next_loc_start);
-                let assoc = fmt::Assoc::new(key, operator, Some(value));
+                let assoc = fmt::Assoc::new(key, operator, value);
                 fmt::Node::new(leading, fmt::Kind::Assoc(assoc), trailing)
             }
             prism::Node::ImplicitNode { .. } => {
@@ -1411,7 +1411,7 @@ impl FmtNodeBuilder<'_> {
                 let value_loc = value.location();
                 let value = self.visit(value, value_loc.end_offset());
                 let trailing = self.take_trailing_comment(next_loc_start);
-                let assoc = fmt::Assoc::new(name, None, Some(value));
+                let assoc = fmt::Assoc::new(name, None, value);
                 fmt::Node::new(leading, fmt::Kind::Assoc(assoc), trailing)
             }
 
@@ -3457,7 +3457,7 @@ impl FmtNodeBuilder<'_> {
         let value = self.visit(node.value(), node.operator_loc().start_offset());
         let operator = Self::source_lossy_at(&node.operator_loc());
         let target = self.visit(node.target(), node.target().location().end_offset());
-        fmt::Assoc::new(value, Some(operator), Some(target))
+        fmt::Assoc::new(value, Some(operator), target)
     }
 
     fn visit_alternation_pattern(
