@@ -1356,12 +1356,10 @@ impl FmtNodeBuilder<'_> {
                 let key_loc = key.location();
                 let key = self.visit(key, key_loc.end_offset());
                 let operator = node.operator_loc().map(|l| Self::source_lossy_at(&l));
-                let value = node.value().map(|value| {
-                    let value_loc = value.location();
-                    self.visit(value, value_loc.end_offset())
-                });
+                let value_loc = node.value().location();
+                let value = self.visit(node.value(), value_loc.end_offset());
                 let trailing = self.take_trailing_comment(next_loc_start);
-                let assoc = fmt::Assoc::new(key, operator, value);
+                let assoc = fmt::Assoc::new(key, operator, Some(value));
                 fmt::Node::new(leading, fmt::Kind::Assoc(assoc), trailing)
             }
             prism::Node::ImplicitNode { .. } => {
