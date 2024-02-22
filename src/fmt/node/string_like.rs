@@ -10,14 +10,26 @@ pub(crate) struct StringLike {
 
 impl StringLike {
     pub(crate) fn new(opening: Option<String>, value: Vec<u8>, closing: Option<String>) -> Self {
-        let opening_len = opening.as_ref().map_or(0, |s| s.len());
-        let closing_len = closing.as_ref().map_or(0, |s| s.len());
-        let len = value.len() + opening_len + closing_len;
-        let shape = if value.iter().any(|b| *b == b'\n') {
+        let opening_shape = opening.as_ref().map_or(Shape::inline(0), |s| {
+            if s.chars().any(|c| c == '\n') {
+                Shape::Multilines
+            } else {
+                Shape::inline(s.len())
+            }
+        });
+        let closing_shape = closing.as_ref().map_or(Shape::inline(0), |s| {
+            if s.chars().any(|c| c == '\n') {
+                Shape::Multilines
+            } else {
+                Shape::inline(s.len())
+            }
+        });
+        let value_shape = if value.iter().any(|b| *b == b'\n') {
             Shape::Multilines
         } else {
-            Shape::inline(len)
+            Shape::inline(value.len())
         };
+        let shape = opening_shape.add(&value_shape).add(&closing_shape);
         Self {
             shape,
             opening,

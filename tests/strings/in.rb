@@ -76,6 +76,28 @@ foo(
   2,
 )
 
+# % literal that uses \n as a delimiter.
+%
+abc
+
+%
+abc#{1+1}
+
+'1' + %
+  bb
++ '2'
+
+'1' + %
+  bb#{1+1}
++ '2'
+
+'1' + "bb
+  bb" + '2'
+
+# % literal that uses space or tab as a delimiter.
+[] << % a  << ''
+[] << %	a	 << ''
+
 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa bbbbbbbbbbbbbbbbbbbb #{cccccccccccc(ddddddddddd, eeeeeeeeeee, ffffffffff, gggg)}"
 
 "aaa#{

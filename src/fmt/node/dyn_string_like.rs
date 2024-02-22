@@ -15,10 +15,22 @@ pub(crate) struct DynStringLike {
 
 impl DynStringLike {
     pub(crate) fn new(opening: Option<String>, closing: Option<String>) -> Self {
-        let opening_len = opening.as_ref().map_or(0, |s| s.len());
-        let closing_len = closing.as_ref().map_or(0, |s| s.len());
+        let opening_shape = opening.as_ref().map_or(Shape::inline(0), |s| {
+            if s.chars().any(|c| c == '\n') {
+                Shape::Multilines
+            } else {
+                Shape::inline(s.len())
+            }
+        });
+        let closing_shape = closing.as_ref().map_or(Shape::inline(0), |s| {
+            if s.chars().any(|c| c == '\n') {
+                Shape::Multilines
+            } else {
+                Shape::inline(s.len())
+            }
+        });
         Self {
-            shape: Shape::inline(opening_len + closing_len),
+            shape: opening_shape.add(&closing_shape),
             opening,
             parts: vec![],
             closing,
