@@ -44,6 +44,7 @@ end
 
 ## Array patterns
 
+xs => []
 xs in [a, b, c]
 xs => a, b, c
 xs in a, b, *cs, d
@@ -106,6 +107,7 @@ xs => # 0
 
 ## Hash patterns
 
+hash in {}
 hash => { a:, b: { c: } }
 hash in a:, b: { c: }
 hash => { a: 1, b: [c, *], d: }

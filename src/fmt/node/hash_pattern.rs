@@ -68,21 +68,23 @@ impl HashPattern {
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         if self.hash_shape.fits_in_one_line(o.remaining_width) {
-            if !self.elements.is_empty() {
-                if let Some(opening) = &self.opening {
-                    o.push_str(opening);
+            if let Some(opening) = &self.opening {
+                o.push_str(opening);
+                if !self.elements.is_empty() {
                     o.push(' ');
                 }
-                for (i, n) in self.elements.iter().enumerate() {
-                    if i > 0 {
-                        o.push_str(", ");
-                    }
-                    n.format(o, ctx);
+            }
+            for (i, n) in self.elements.iter().enumerate() {
+                if i > 0 {
+                    o.push_str(", ");
                 }
-                if let Some(closing) = &self.closing {
+                n.format(o, ctx);
+            }
+            if let Some(closing) = &self.closing {
+                if !self.elements.is_empty() {
                     o.push(' ');
-                    o.push_str(closing);
                 }
+                o.push_str(closing);
             }
         } else {
             o.push_str(self.opening.as_deref().unwrap_or("{"));
