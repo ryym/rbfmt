@@ -232,3 +232,20 @@ else
     6
   end
 end
+
+case v
+in [] | {}
+  nil
+in [:a] if a
+  aa
+in {
+    a: Integer,
+    b: String => s,
+  }
+  bb
+in {
+    a: Integer,
+    b: { c: c, d: d, ** },
+  } if foo(v).bar?
+  cc
+end
