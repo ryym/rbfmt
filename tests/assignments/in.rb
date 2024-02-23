@@ -83,6 +83,8 @@ foo[
 
 a, b, c = xs
 a, b, c, = xs
+ys = xs
+a, = xs
 (a, b), c, (@d, (e, ($f, g), @@h)), i = xs(ys, 1, 2, 3)
 
 ( # 0
