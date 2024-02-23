@@ -24,3 +24,18 @@ for a in b
     break
   end
 end
+
+for a, b, c in xss
+  p [c, b, a]
+end
+for a,
+    # b
+    b, c in xss
+  nil
+end
+for *, a in xss
+  p a
+end
+for * in xss
+  true
+end
