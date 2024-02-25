@@ -417,13 +417,14 @@ impl FmtNodeBuilder<'_> {
 
     fn each_node_with_next_start<'a>(
         mut nodes: impl Iterator<Item = prism::Node<'a>>,
-        next_loc_start: usize,
-        mut f: impl FnMut(prism::Node<'a>, usize),
+        next_loc_start: Option<usize>,
+        mut f: impl FnMut(prism::Node<'a>, Option<usize>),
     ) {
         if let Some(node) = nodes.next() {
             let mut prev = node;
             for next in nodes {
-                f(prev, next.location().start_offset());
+                let next_start = next.location().start_offset();
+                f(prev, Some(next_start));
                 prev = next;
             }
             f(prev, next_loc_start);
@@ -1297,7 +1298,7 @@ impl FmtNodeBuilder<'_> {
                 let closing_start = closing_loc.map(|l| l.start_offset());
                 Self::each_node_with_next_start(
                     node.elements().iter(),
-                    closing_start.unwrap_or(next_loc_start),
+                    closing_start,
                     |node, next_start| match node {
                         prism::Node::KeywordHashNode { .. } => {
                             let node = node.as_keyword_hash_node().unwrap();
@@ -1306,6 +1307,7 @@ impl FmtNodeBuilder<'_> {
                             });
                         }
                         _ => {
+                            let next_start = next_start.unwrap_or(node.location().end_offset());
                             let element = self.visit(node, next_start);
                             array.append_element(element);
                         }
@@ -1338,9 +1340,9 @@ impl FmtNodeBuilder<'_> {
                 let closing_start = closing_loc.start_offset();
                 Self::each_node_with_next_start(
                     node.elements().iter(),
-                    closing_start,
+                    Some(closing_start),
                     |node, next_start| {
-                        let element = self.visit(node, next_start);
+                        let element = self.visit(node, next_start.unwrap());
                         hash.append_element(element);
                     },
                 );
@@ -1904,8 +1906,8 @@ impl FmtNodeBuilder<'_> {
     ) -> fmt::Statements {
         let mut statements = fmt::Statements::new();
         if let Some(node) = node {
-            Self::each_node_with_next_start(node.body().iter(), end, |prev, next_start| {
-                let fmt_node = self.visit(prev, next_start);
+            Self::each_node_with_next_start(node.body().iter(), Some(end), |prev, next_start| {
+                let fmt_node = self.visit(prev, next_start.unwrap());
                 statements.append_node(fmt_node);
             });
         }
@@ -2043,16 +2045,20 @@ impl FmtNodeBuilder<'_> {
             .as_ref()
             .map(|c| c.location().start_offset())
             .unwrap_or(end_loc.start_offset());
-        Self::each_node_with_next_start(conditions.iter(), conditions_next, |node, next_start| {
-            let condition = match node {
-                prism::Node::WhenNode { .. } => {
-                    let node = node.as_when_node().unwrap();
-                    self.visit_case_when(node, next_start)
-                }
-                _ => panic!("unexpected case expression branch: {:?}", node),
-            };
-            branches.push(condition);
-        });
+        Self::each_node_with_next_start(
+            conditions.iter(),
+            Some(conditions_next),
+            |node, next_start| {
+                let condition = match node {
+                    prism::Node::WhenNode { .. } => {
+                        let node = node.as_when_node().unwrap();
+                        self.visit_case_when(node, next_start.unwrap())
+                    }
+                    _ => panic!("unexpected case expression branch: {:?}", node),
+                };
+                branches.push(condition);
+            },
+        );
 
         let otherwise = consequent.map(|node| self.visit_else(node, end_loc.start_offset()));
 
@@ -2077,9 +2083,9 @@ impl FmtNodeBuilder<'_> {
             .unwrap_or(next_loc_start);
         Self::each_node_with_next_start(
             node.conditions().iter(),
-            conditions_next,
+            Some(conditions_next),
             |node, next_start| {
-                let cond = self.visit(node, next_start);
+                let cond = self.visit(node, next_start.unwrap());
                 when.append_condition(cond);
             },
         );
@@ -2118,16 +2124,20 @@ impl FmtNodeBuilder<'_> {
             .as_ref()
             .map(|c| c.location().start_offset())
             .unwrap_or(end_loc.start_offset());
-        Self::each_node_with_next_start(conditions.iter(), conditions_next, |node, next_start| {
-            let condition = match node {
-                prism::Node::InNode { .. } => {
-                    let node = node.as_in_node().unwrap();
-                    self.visit_case_in(node, next_start)
-                }
-                _ => panic!("unexpected case expression branch: {:?}", node),
-            };
-            branches.push(condition);
-        });
+        Self::each_node_with_next_start(
+            conditions.iter(),
+            Some(conditions_next),
+            |node, next_start| {
+                let condition = match node {
+                    prism::Node::InNode { .. } => {
+                        let node = node.as_in_node().unwrap();
+                        self.visit_case_in(node, next_start.unwrap())
+                    }
+                    _ => panic!("unexpected case expression branch: {:?}", node),
+                };
+                branches.push(condition);
+            },
+        );
 
         let otherwise = consequent.map(|node| self.visit_else(node, end_loc.start_offset()));
 
@@ -2443,42 +2453,43 @@ impl FmtNodeBuilder<'_> {
                 }
             }
             Some(args_node) => {
-                let has_closing = closing.is_some();
                 let mut args = fmt::Arguments::new(opening, closing);
-                let next_loc_start = closing_start.unwrap_or(closing_next_start);
                 let mut nodes = args_node.arguments().iter().collect::<Vec<_>>();
                 if let Some(block_arg) = block_arg {
                     nodes.push(block_arg.as_node());
                 }
+                let mut idx = 0;
+                let last_idx = nodes.len() - 1;
                 Self::each_node_with_next_start(
                     nodes.into_iter(),
-                    next_loc_start,
+                    closing_start,
                     |node, next_start| {
-                        let is_last = next_start == next_loc_start;
-                        if is_last {
+                        if idx == last_idx {
                             args.last_comma_allowed = !matches!(
                                 node,
                                 prism::Node::ForwardingArgumentsNode { .. }
                                     | prism::Node::BlockArgumentNode { .. }
                             );
                         }
-                        let next_start = if is_last && !has_closing {
-                            node.location().end_offset()
-                        } else {
-                            next_start
-                        };
+                        let next_start = next_start.unwrap_or(node.location().end_offset());
                         match node {
                             prism::Node::KeywordHashNode { .. } => {
                                 let node = node.as_keyword_hash_node().unwrap();
-                                self.each_keyword_hash_element(node, next_start, |fmt_node| {
-                                    args.append_node(fmt_node);
-                                });
+                                self.each_keyword_hash_element(
+                                    node,
+                                    Some(next_start),
+                                    |fmt_node| {
+                                        args.append_node(fmt_node);
+                                    },
+                                );
                             }
                             _ => {
                                 let fmt_node = self.visit(node, next_start);
                                 args.append_node(fmt_node);
                             }
                         }
+
+                        idx += 1;
                     },
                 );
                 let virtual_end = self.take_end_trivia_as_virtual_end(closing_start);
@@ -2491,13 +2502,14 @@ impl FmtNodeBuilder<'_> {
     fn each_keyword_hash_element(
         &mut self,
         node: prism::KeywordHashNode,
-        next_loc_start: usize,
+        next_loc_start: Option<usize>,
         mut f: impl FnMut(fmt::Node),
     ) {
         Self::each_node_with_next_start(
             node.elements().iter(),
             next_loc_start,
             |node, next_start| {
+                let next_start = next_start.unwrap_or(node.location().end_offset());
                 let element = self.visit(node, next_start);
                 f(element);
             },
@@ -2701,10 +2713,14 @@ impl FmtNodeBuilder<'_> {
         }
 
         if let Some(closing_start) = closing_start {
-            Self::each_node_with_next_start(locals.iter(), closing_start, |node, next_start| {
-                let fmt_node = self.visit(node, next_start);
-                block_params.append_local(fmt_node);
-            });
+            Self::each_node_with_next_start(
+                locals.iter(),
+                Some(closing_start),
+                |node, next_start| {
+                    let fmt_node = self.visit(node, next_start.unwrap());
+                    block_params.append_local(fmt_node);
+                },
+            );
             let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
             block_params.set_virtual_end(virtual_end);
         }
@@ -2818,10 +2834,8 @@ impl FmtNodeBuilder<'_> {
 
     fn visit_undef(&mut self, undef: prism::UndefNode) -> fmt::CallLike {
         let mut args = fmt::Arguments::new(None, None);
-        Self::each_node_with_next_start(undef.names().iter(), 0, |node, mut next_start| {
-            if next_start == 0 {
-                next_start = node.location().start_offset();
-            }
+        Self::each_node_with_next_start(undef.names().iter(), None, |node, next_start| {
+            let next_start = next_start.unwrap_or(node.location().start_offset());
             let node = self.visit(node, next_start);
             args.append_node(node);
         });
@@ -2955,11 +2969,9 @@ impl FmtNodeBuilder<'_> {
         let rights_first_start = rights.iter().next().map(|n| n.location().start_offset());
         let rparen_start = rparen_loc.as_ref().map(|l| l.start_offset());
 
-        let left_next_start = rest_start
-            .or(rights_first_start)
-            .or(rparen_start)
-            .unwrap_or(next_loc_start);
+        let left_next_start = rest_start.or(rights_first_start).or(rparen_start);
         Self::each_node_with_next_start(lefts.iter(), left_next_start, |node, next_start| {
+            let next_start = next_start.unwrap_or(node.location().end_offset());
             let target = self.visit(node, next_start);
             multi.append_target(target);
         });
@@ -2974,8 +2986,8 @@ impl FmtNodeBuilder<'_> {
             }
         }
 
-        let right_next_start = rparen_start.unwrap_or(next_loc_start);
-        Self::each_node_with_next_start(rights.iter(), right_next_start, |node, next_start| {
+        Self::each_node_with_next_start(rights.iter(), rparen_start, |node, next_start| {
+            let next_start = next_start.unwrap_or(node.location().end_offset());
             let target = self.visit(node, next_start);
             multi.append_target(target);
         });
@@ -3171,10 +3183,14 @@ impl FmtNodeBuilder<'_> {
             .or(statements_start)
             .or(consequent_start)
             .unwrap_or(final_next);
-        Self::each_node_with_next_start(node.exceptions().iter(), head_next, |node, next_start| {
-            let fmt_node = self.visit(node, next_start);
-            rescue.append_exception(fmt_node);
-        });
+        Self::each_node_with_next_start(
+            node.exceptions().iter(),
+            Some(head_next),
+            |node, next_start| {
+                let fmt_node = self.visit(node, next_start.unwrap());
+                rescue.append_exception(fmt_node);
+            },
+        );
 
         if let Some(reference) = reference {
             let reference_next = statements_start.or(consequent_start).unwrap_or(final_next);
@@ -3224,11 +3240,8 @@ impl FmtNodeBuilder<'_> {
         if let Some(block) = params.block() {
             nodes.push(block.as_node());
         }
-        let final_next = next_loc_start.unwrap_or(0);
-        Self::each_node_with_next_start(nodes.into_iter(), final_next, |node, mut next_start| {
-            if next_start == 0 {
-                next_start = node.location().end_offset();
-            }
+        Self::each_node_with_next_start(nodes.into_iter(), next_loc_start, |node, next_start| {
+            let next_start = next_start.unwrap_or(node.location().end_offset());
             let fmt_node = self.visit(node, next_start);
             f(fmt_node);
         });
@@ -3291,15 +3304,12 @@ impl FmtNodeBuilder<'_> {
             .as_ref()
             .map(|r| r.location().start_offset())
             .or_else(|| posts_head.as_ref().map(|p| p.location().start_offset()))
-            .or(closing_start)
-            .unwrap_or(0);
+            .or(closing_start);
         Self::each_node_with_next_start(
             node.requireds().iter(),
             requireds_next,
-            |node, mut next_start| {
-                if next_start == 0 {
-                    next_start = node.location().end_offset();
-                }
+            |node, next_start| {
+                let next_start = next_start.unwrap_or(node.location().end_offset());
                 let element = self.visit(node, next_start);
                 array.append_element(element);
             },
@@ -3317,14 +3327,11 @@ impl FmtNodeBuilder<'_> {
         }
 
         if posts_head.is_some() {
-            let posts_next = closing_start.unwrap_or(0);
             Self::each_node_with_next_start(
                 node.posts().iter(),
-                posts_next,
-                |node, mut next_start| {
-                    if next_start == 0 {
-                        next_start = node.location().end_offset();
-                    }
+                closing_start,
+                |node, next_start| {
+                    let next_start = next_start.unwrap_or(node.location().end_offset());
                     let element = self.visit(node, next_start);
                     array.append_element(element);
                 },
@@ -3361,9 +3368,9 @@ impl FmtNodeBuilder<'_> {
 
         Self::each_node_with_next_start(
             node.requireds().iter(),
-            right.location().start_offset(),
+            Some(right.location().start_offset()),
             |node, next_start| {
-                let element = self.visit(node, next_start);
+                let element = self.visit(node, next_start.unwrap());
                 array.append_element(element);
             },
         );
@@ -3404,15 +3411,12 @@ impl FmtNodeBuilder<'_> {
         let elements_next = rest
             .as_ref()
             .map(|r| r.location().start_offset())
-            .or(closing_start)
-            .unwrap_or(0);
+            .or(closing_start);
         Self::each_node_with_next_start(
             node.elements().iter(),
             elements_next,
-            |node, mut next_start| {
-                if next_start == 0 {
-                    next_start = node.location().end_offset();
-                }
+            |node, next_start| {
+                let next_start = next_start.unwrap_or(node.location().end_offset());
                 let element = self.visit(node, next_start);
                 hash.append_element(element);
             },
