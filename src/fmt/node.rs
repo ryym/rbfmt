@@ -61,25 +61,23 @@ pub(crate) struct Node {
 }
 
 impl Node {
-    pub(crate) fn new(
-        leading_trivia: LeadingTrivia,
-        kind: Kind,
-        trailing_trivia: TrailingTrivia,
-    ) -> Self {
-        let shape = leading_trivia
-            .shape()
-            .add(&kind.shape())
-            .add(trailing_trivia.shape());
+    pub(crate) fn new(leading_trivia: LeadingTrivia, kind: Kind) -> Self {
+        let shape = leading_trivia.shape().add(&kind.shape());
         Self {
             leading_trivia,
-            trailing_trivia,
+            trailing_trivia: TrailingTrivia::none(),
             kind,
             shape,
         }
     }
 
+    pub(crate) fn set_trailing_trivia(&mut self, trailing_trivia: TrailingTrivia) {
+        self.shape.append(trailing_trivia.shape());
+        self.trailing_trivia = trailing_trivia;
+    }
+
     pub(crate) fn without_trivia(kind: Kind) -> Self {
-        Self::new(LeadingTrivia::new(), kind, TrailingTrivia::none())
+        Self::new(LeadingTrivia::new(), kind)
     }
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
