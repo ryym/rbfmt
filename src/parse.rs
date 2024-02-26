@@ -403,7 +403,7 @@ struct FmtNodeBuilder<'src> {
 
 impl FmtNodeBuilder<'_> {
     fn build_fmt_node(&mut self, node: prism::Node) -> fmt::Node {
-        self.visit(node, self.src.len())
+        self.visit(node, Some(self.src.len()))
     }
 
     fn next_pos(&mut self) -> fmt::Pos {
@@ -431,7 +431,7 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn visit(&mut self, node: prism::Node, next_loc_start: usize) -> fmt::Node {
+    fn visit(&mut self, node: prism::Node, next_loc_start: Option<usize>) -> fmt::Node {
         let loc_end = node.location().end_offset();
         let mut node = match node {
             prism::Node::ProgramNode { .. } => {
@@ -630,8 +630,7 @@ impl FmtNodeBuilder<'_> {
             }
             prism::Node::MatchWriteNode { .. } => {
                 let node = node.as_match_write_node().unwrap();
-                let node_end = node.location().end_offset();
-                self.visit(node.call().as_node(), node_end)
+                self.visit(node.call().as_node(), None)
             }
 
             prism::Node::IfNode { .. } => {
@@ -650,16 +649,13 @@ impl FmtNodeBuilder<'_> {
                     let ternary = self.visit_ternary(node);
                     fmt::Node::new(leading, fmt::Kind::Ternary(ternary))
                 } else {
-                    self.visit_postmodifier(
-                        Postmodifier {
-                            keyword: "if".to_string(),
-                            loc: node.location(),
-                            keyword_loc: node.if_keyword_loc().expect("if modifier must have if"),
-                            predicate: node.predicate(),
-                            statements: node.statements(),
-                        },
-                        next_loc_start,
-                    )
+                    self.visit_postmodifier(Postmodifier {
+                        keyword: "if".to_string(),
+                        loc: node.location(),
+                        keyword_loc: node.if_keyword_loc().expect("if modifier must have if"),
+                        predicate: node.predicate(),
+                        statements: node.statements(),
+                    })
                 }
             }
             prism::Node::UnlessNode { .. } => {
@@ -674,16 +670,13 @@ impl FmtNodeBuilder<'_> {
                         end_loc: node.end_keyword_loc(),
                     })
                 } else {
-                    self.visit_postmodifier(
-                        Postmodifier {
-                            keyword: "unless".to_string(),
-                            loc: node.location(),
-                            keyword_loc: node.keyword_loc(),
-                            predicate: node.predicate(),
-                            statements: node.statements(),
-                        },
-                        next_loc_start,
-                    )
+                    self.visit_postmodifier(Postmodifier {
+                        keyword: "unless".to_string(),
+                        loc: node.location(),
+                        keyword_loc: node.keyword_loc(),
+                        predicate: node.predicate(),
+                        statements: node.statements(),
+                    })
                 }
             }
 
@@ -706,16 +699,13 @@ impl FmtNodeBuilder<'_> {
                     );
                     fmt::Node::new(leading, fmt::Kind::While(whle))
                 } else {
-                    self.visit_postmodifier(
-                        Postmodifier {
-                            keyword: "while".to_string(),
-                            loc: node.location(),
-                            keyword_loc: node.keyword_loc(),
-                            predicate: node.predicate(),
-                            statements: node.statements(),
-                        },
-                        next_loc_start,
-                    )
+                    self.visit_postmodifier(Postmodifier {
+                        keyword: "while".to_string(),
+                        loc: node.location(),
+                        keyword_loc: node.keyword_loc(),
+                        predicate: node.predicate(),
+                        statements: node.statements(),
+                    })
                 }
             }
             prism::Node::UntilNode { .. } => {
@@ -730,16 +720,13 @@ impl FmtNodeBuilder<'_> {
                     );
                     fmt::Node::new(leading, fmt::Kind::While(whle))
                 } else {
-                    self.visit_postmodifier(
-                        Postmodifier {
-                            keyword: "until".to_string(),
-                            loc: node.location(),
-                            keyword_loc: node.keyword_loc(),
-                            predicate: node.predicate(),
-                            statements: node.statements(),
-                        },
-                        next_loc_start,
-                    )
+                    self.visit_postmodifier(Postmodifier {
+                        keyword: "until".to_string(),
+                        loc: node.location(),
+                        keyword_loc: node.keyword_loc(),
+                        predicate: node.predicate(),
+                        statements: node.statements(),
+                    })
                 }
             }
 
@@ -764,7 +751,7 @@ impl FmtNodeBuilder<'_> {
 
                 let kind = match Self::detect_method_type(&node) {
                     MethodType::Normal => {
-                        let chain = self.visit_call_root(&node, next_loc_start);
+                        let chain = self.visit_call_root(&node);
                         fmt::Kind::MethodChain(chain)
                     }
                     MethodType::Not => {
@@ -793,41 +780,38 @@ impl FmtNodeBuilder<'_> {
             prism::Node::ForwardingSuperNode { .. } => {
                 let node = node.as_forwarding_super_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let chain = self.visit_call_root(&node, next_loc_start);
+                let chain = self.visit_call_root(&node);
                 fmt::Node::new(leading, fmt::Kind::MethodChain(chain))
             }
             prism::Node::SuperNode { .. } => {
                 let node = node.as_super_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let chain = self.visit_call_root(&node, next_loc_start);
+                let chain = self.visit_call_root(&node);
                 fmt::Node::new(leading, fmt::Kind::MethodChain(chain))
             }
             prism::Node::YieldNode { .. } => {
                 let node = node.as_yield_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let call_like = self.visit_yield(node, next_loc_start);
+                let call_like = self.visit_yield(node);
                 fmt::Node::new(leading, fmt::Kind::CallLike(call_like))
             }
 
             prism::Node::BreakNode { .. } => {
                 let node = node.as_break_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let call_like =
-                    self.parse_call_like(node.keyword_loc(), node.arguments(), next_loc_start);
+                let call_like = self.parse_call_like(node.keyword_loc(), node.arguments());
                 fmt::Node::new(leading, fmt::Kind::CallLike(call_like))
             }
             prism::Node::NextNode { .. } => {
                 let node = node.as_next_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let call_like =
-                    self.parse_call_like(node.keyword_loc(), node.arguments(), next_loc_start);
+                let call_like = self.parse_call_like(node.keyword_loc(), node.arguments());
                 fmt::Node::new(leading, fmt::Kind::CallLike(call_like))
             }
             prism::Node::ReturnNode { .. } => {
                 let node = node.as_return_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let call_like =
-                    self.parse_call_like(node.keyword_loc(), node.arguments(), next_loc_start);
+                let call_like = self.parse_call_like(node.keyword_loc(), node.arguments());
                 fmt::Node::new(leading, fmt::Kind::CallLike(call_like))
             }
 
@@ -1058,7 +1042,6 @@ impl FmtNodeBuilder<'_> {
                     node.target(),
                     node.operator_loc(),
                     node.value(),
-                    next_loc_start,
                 );
                 fmt::Node::new(leading, fmt::Kind::Assign(assign))
             }
@@ -1068,7 +1051,6 @@ impl FmtNodeBuilder<'_> {
                     node.target(),
                     node.operator_loc(),
                     node.value(),
-                    next_loc_start,
                 );
                 fmt::Node::new(leading, fmt::Kind::Assign(assign))
             }
@@ -1078,7 +1060,6 @@ impl FmtNodeBuilder<'_> {
                     node.target(),
                     node.operator_loc(),
                     node.value(),
-                    next_loc_start,
                 );
                 fmt::Node::new(leading, fmt::Kind::Assign(assign))
             }
@@ -1088,70 +1069,45 @@ impl FmtNodeBuilder<'_> {
                     node.target(),
                     node.operator_loc(),
                     node.value(),
-                    next_loc_start,
                 );
                 fmt::Node::new(leading, fmt::Kind::Assign(assign))
             }
 
             prism::Node::CallAndWriteNode { .. } => {
                 let node = node.as_call_and_write_node().unwrap();
-                let (leading, assign) = self.visit_call_assign(
-                    &node,
-                    node.operator_loc(),
-                    node.value(),
-                    next_loc_start,
-                );
+                let (leading, assign) =
+                    self.visit_call_assign(&node, node.operator_loc(), node.value());
                 fmt::Node::new(leading, fmt::Kind::Assign(assign))
             }
             prism::Node::CallOrWriteNode { .. } => {
                 let node = node.as_call_or_write_node().unwrap();
-                let (leading, assign) = self.visit_call_assign(
-                    &node,
-                    node.operator_loc(),
-                    node.value(),
-                    next_loc_start,
-                );
+                let (leading, assign) =
+                    self.visit_call_assign(&node, node.operator_loc(), node.value());
                 fmt::Node::new(leading, fmt::Kind::Assign(assign))
             }
             prism::Node::CallOperatorWriteNode { .. } => {
                 let node = node.as_call_operator_write_node().unwrap();
-                let (leading, assign) = self.visit_call_assign(
-                    &node,
-                    node.operator_loc(),
-                    node.value(),
-                    next_loc_start,
-                );
+                let (leading, assign) =
+                    self.visit_call_assign(&node, node.operator_loc(), node.value());
                 fmt::Node::new(leading, fmt::Kind::Assign(assign))
             }
 
             prism::Node::IndexAndWriteNode { .. } => {
                 let node = node.as_index_and_write_node().unwrap();
-                let (leading, assign) = self.visit_call_assign(
-                    &node,
-                    node.operator_loc(),
-                    node.value(),
-                    next_loc_start,
-                );
+                let (leading, assign) =
+                    self.visit_call_assign(&node, node.operator_loc(), node.value());
                 fmt::Node::new(leading, fmt::Kind::Assign(assign))
             }
             prism::Node::IndexOrWriteNode { .. } => {
                 let node = node.as_index_or_write_node().unwrap();
-                let (leading, assign) = self.visit_call_assign(
-                    &node,
-                    node.operator_loc(),
-                    node.value(),
-                    next_loc_start,
-                );
+                let (leading, assign) =
+                    self.visit_call_assign(&node, node.operator_loc(), node.value());
                 fmt::Node::new(leading, fmt::Kind::Assign(assign))
             }
             prism::Node::IndexOperatorWriteNode { .. } => {
                 let node = node.as_index_operator_write_node().unwrap();
-                let (leading, assign) = self.visit_call_assign(
-                    &node,
-                    node.operator_loc(),
-                    node.value(),
-                    next_loc_start,
-                );
+                let (leading, assign) =
+                    self.visit_call_assign(&node, node.operator_loc(), node.value());
                 fmt::Node::new(leading, fmt::Kind::Assign(assign))
             }
 
@@ -1169,19 +1125,19 @@ impl FmtNodeBuilder<'_> {
             prism::Node::CallTargetNode { .. } => {
                 let node = node.as_call_target_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let chain = self.visit_call_root(&node, next_loc_start);
+                let chain = self.visit_call_root(&node);
                 fmt::Node::new(leading, fmt::Kind::MethodChain(chain))
             }
             prism::Node::IndexTargetNode { .. } => {
                 let node = node.as_index_target_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
-                let chain = self.visit_call_root(&node, next_loc_start);
+                let chain = self.visit_call_root(&node);
                 fmt::Node::new(leading, fmt::Kind::MethodChain(chain))
             }
 
             prism::Node::MultiWriteNode { .. } => {
                 let node = node.as_multi_write_node().unwrap();
-                let (leading, assign) = self.visit_multi_assign(node, next_loc_start);
+                let (leading, assign) = self.visit_multi_assign(node);
                 fmt::Node::new(leading, fmt::Kind::Assign(assign))
             }
             prism::Node::MultiTargetNode { .. } => {
@@ -1193,7 +1149,6 @@ impl FmtNodeBuilder<'_> {
                     node.rights(),
                     node.lparen_loc(),
                     node.rparen_loc(),
-                    next_loc_start,
                 );
                 fmt::Node::new(leading, fmt::Kind::MultiAssignTarget(target))
             }
@@ -1208,9 +1163,7 @@ impl FmtNodeBuilder<'_> {
                 let loc = node.location();
                 let leading = self.take_leading_trivia(loc.start_offset());
                 let operator = Self::source_lossy_at(&node.operator_loc());
-                let expr = node
-                    .expression()
-                    .map(|expr| self.visit(expr, loc.end_offset()));
+                let expr = node.expression().map(|expr| self.visit(expr, None));
                 let splat = fmt::Prefix::new(operator, expr);
                 fmt::Node::new(leading, fmt::Kind::Prefix(splat))
             }
@@ -1219,7 +1172,7 @@ impl FmtNodeBuilder<'_> {
                 let loc = node.location();
                 let leading = self.take_leading_trivia(loc.start_offset());
                 let operator = Self::source_lossy_at(&node.operator_loc());
-                let value = node.value().map(|v| self.visit(v, loc.end_offset()));
+                let value = node.value().map(|v| self.visit(v, None));
                 let splat = fmt::Prefix::new(operator, value);
                 fmt::Node::new(leading, fmt::Kind::Prefix(splat))
             }
@@ -1249,7 +1202,6 @@ impl FmtNodeBuilder<'_> {
                             });
                         }
                         _ => {
-                            let next_start = next_start.unwrap_or(node.location().end_offset());
                             let element = self.visit(node, next_start);
                             array.append_element(element);
                         }
@@ -1283,7 +1235,7 @@ impl FmtNodeBuilder<'_> {
                     node.elements().iter(),
                     Some(closing_start),
                     |node, next_start| {
-                        let element = self.visit(node, next_start.unwrap());
+                        let element = self.visit(node, next_start);
                         hash.append_element(element);
                     },
                 );
@@ -1295,11 +1247,9 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_assoc_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
                 let key = node.key();
-                let key_loc = key.location();
-                let key = self.visit(key, key_loc.end_offset());
+                let key = self.visit(key, None);
                 let operator = node.operator_loc().map(|l| Self::source_lossy_at(&l));
-                let value_loc = node.value().location();
-                let value = self.visit(node.value(), value_loc.end_offset());
+                let value = self.visit(node.value(), None);
                 let assoc = fmt::Assoc::new(key, operator, value);
                 fmt::Node::new(leading, fmt::Kind::Assoc(assoc))
             }
@@ -1311,7 +1261,7 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_parentheses_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
                 let closing_start = node.closing_loc().start_offset();
-                let body = node.body().map(|b| self.visit(b, closing_start));
+                let body = node.body().map(|b| self.visit(b, Some(closing_start)));
                 let body = self.wrap_as_statements(body, closing_start);
                 let parens = fmt::Parens::new(body);
                 fmt::Node::new(leading, fmt::Kind::Parens(parens))
@@ -1345,8 +1295,7 @@ impl FmtNodeBuilder<'_> {
                 let name = Self::source_lossy_at(&node.name_loc());
                 let name = fmt::Node::without_trivia(fmt::Kind::Atom(fmt::Atom(name)));
                 let value = node.value();
-                let value_loc = value.location();
-                let value = self.visit(value, value_loc.end_offset());
+                let value = self.visit(value, None);
                 let assoc = fmt::Assoc::new(name, None, value);
                 fmt::Node::new(leading, fmt::Kind::Assoc(assoc))
             }
@@ -1425,7 +1374,7 @@ impl FmtNodeBuilder<'_> {
                     _ => Some(b.location().start_offset()),
                 });
                 let expr_next = body_start.unwrap_or(end_loc.start_offset());
-                let expr = self.visit(node.expression(), expr_next);
+                let expr = self.visit(node.expression(), Some(expr_next));
                 let body = self.parse_block_body(body, end_loc.start_offset());
                 let class = fmt::SingletonClass {
                     expression: Box::new(expr),
@@ -1438,13 +1387,10 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_range_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
                 let op_loc = node.operator_loc();
-                let left = node.left().map(|n| self.visit(n, op_loc.start_offset()));
+                let op_start = op_loc.start_offset();
+                let left = node.left().map(|n| self.visit(n, Some(op_start)));
                 let operator = Self::source_lossy_at(&op_loc);
-                let right = node.right().map(|n| {
-                    let loc = n.location();
-                    let n_end = loc.end_offset();
-                    self.visit(n, n_end)
-                });
+                let right = node.right().map(|n| self.visit(n, None));
                 let range = fmt::RangeLike::new(left, operator, right);
                 fmt::Node::new(leading, fmt::Kind::RangeLike(range))
             }
@@ -1452,13 +1398,10 @@ impl FmtNodeBuilder<'_> {
                 let node = node.as_flip_flop_node().unwrap();
                 let leading = self.take_leading_trivia(node.location().start_offset());
                 let op_loc = node.operator_loc();
-                let left = node.left().map(|n| self.visit(n, op_loc.start_offset()));
+                let op_start = op_loc.start_offset();
+                let left = node.left().map(|n| self.visit(n, Some(op_start)));
                 let operator = Self::source_lossy_at(&op_loc);
-                let right = node.right().map(|n| {
-                    let loc = n.location();
-                    let n_end = loc.end_offset();
-                    self.visit(n, n_end)
-                });
+                let right = node.right().map(|n| self.visit(n, None));
                 let flipflop = fmt::RangeLike::new(left, operator, right);
                 fmt::Node::new(leading, fmt::Kind::RangeLike(flipflop))
             }
@@ -1566,8 +1509,10 @@ impl FmtNodeBuilder<'_> {
 
         self.last_loc_end = loc_end;
 
-        let trailing = self.take_trailing_comment(next_loc_start);
-        node.set_trailing_trivia(trailing);
+        if let Some(next_loc_start) = next_loc_start {
+            let trailing = self.take_trailing_comment(next_loc_start);
+            node.set_trailing_trivia(trailing);
+        }
         node
     }
 
@@ -1585,8 +1530,7 @@ impl FmtNodeBuilder<'_> {
     ) -> fmt::ConstantPath {
         let mut const_path = match parent {
             Some(parent) => {
-                let parent_end = parent.location().start_offset();
-                let parent = self.visit(parent, parent_end);
+                let parent = self.visit(parent, None);
                 match parent.kind {
                     fmt::Kind::ConstantPath(const_path) => const_path,
                     _ => fmt::ConstantPath::new(Some(parent)),
@@ -1653,7 +1597,8 @@ impl FmtNodeBuilder<'_> {
                     let node = part.as_embedded_statements_node().unwrap();
                     let loc = node.location();
                     self.last_loc_end = node.opening_loc().end_offset();
-                    let statements = self.visit_statements(node.statements(), loc.end_offset());
+                    let statements =
+                        self.visit_statements(node.statements(), Some(loc.end_offset()));
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
                     let embedded_stmts = fmt::EmbeddedStatements::new(opening, statements, closing);
@@ -1773,7 +1718,8 @@ impl FmtNodeBuilder<'_> {
                         self.src,
                         &mut parts,
                     );
-                    let statements = self.visit_statements(node.statements(), loc.end_offset());
+                    let statements =
+                        self.visit_statements(node.statements(), Some(loc.end_offset()));
                     let opening = Self::source_lossy_at(&node.opening_loc());
                     let closing = Self::source_lossy_at(&node.closing_loc());
                     let embedded = fmt::EmbeddedStatements::new(opening, statements, closing);
@@ -1814,16 +1760,16 @@ impl FmtNodeBuilder<'_> {
     fn visit_statements(
         &mut self,
         node: Option<prism::StatementsNode>,
-        end: usize,
+        end: Option<usize>,
     ) -> fmt::Statements {
         let mut statements = fmt::Statements::new();
         if let Some(node) = node {
-            Self::each_node_with_next_start(node.body().iter(), Some(end), |prev, next_start| {
-                let fmt_node = self.visit(prev, next_start.unwrap());
+            Self::each_node_with_next_start(node.body().iter(), end, |prev, next_start| {
+                let fmt_node = self.visit(prev, next_start);
                 statements.append_node(fmt_node);
             });
         }
-        let virtual_end = self.take_end_trivia_as_virtual_end(Some(end));
+        let virtual_end = self.take_end_trivia_as_virtual_end(end);
         statements.set_virtual_end(virtual_end);
         statements
     }
@@ -1842,14 +1788,14 @@ impl FmtNodeBuilder<'_> {
             .or_else(|| conseq.as_ref().map(|c| c.location()))
             .map(|l| l.start_offset())
             .unwrap_or(end_loc.start_offset());
-        let predicate = self.visit(node.predicate, next_pred_loc_start);
+        let predicate = self.visit(node.predicate, Some(next_pred_loc_start));
 
         let ifexpr = match conseq {
             // if...(elsif...|else...)+end
             Some(conseq) => {
                 // take trailing of else/elsif
                 let else_start = conseq.location().start_offset();
-                let body = self.visit_statements(node.statements, else_start);
+                let body = self.visit_statements(node.statements, Some(else_start));
                 let if_first = fmt::Conditional::new(predicate, body);
                 let mut ifexpr = fmt::If::new(node.is_if, if_first);
                 self.visit_ifelse(conseq, &mut ifexpr);
@@ -1857,7 +1803,7 @@ impl FmtNodeBuilder<'_> {
             }
             // if...end
             None => {
-                let body = self.visit_statements(node.statements, end_start);
+                let body = self.visit_statements(node.statements, Some(end_start));
                 let if_first = fmt::Conditional::new(predicate, body);
                 fmt::If::new(node.is_if, if_first)
             }
@@ -1884,13 +1830,13 @@ impl FmtNodeBuilder<'_> {
                     .map(|s| s.location().start_offset())
                     .or_else(|| consequent.as_ref().map(|c| c.location().start_offset()))
                     .unwrap_or(end_loc.start_offset());
-                let predicate = self.visit(predicate, predicate_next);
+                let predicate = self.visit(predicate, Some(predicate_next));
 
                 let body_end_loc = consequent
                     .as_ref()
                     .map(|n| n.location().start_offset())
                     .unwrap_or(end_loc.start_offset());
-                let body = self.visit_statements(node.statements(), body_end_loc);
+                let body = self.visit_statements(node.statements(), Some(body_end_loc));
 
                 let conditional = fmt::Conditional::new(predicate, body);
                 ifexpr.elsifs.push(conditional);
@@ -1920,7 +1866,7 @@ impl FmtNodeBuilder<'_> {
             .map(|s| s.location().start_offset())
             .unwrap_or(next_loc_start);
         let keyword_trailing = self.take_trailing_comment(else_next_loc);
-        let body = self.visit_statements(node.statements(), next_loc_start);
+        let body = self.visit_statements(node.statements(), Some(next_loc_start));
         fmt::Else {
             keyword_trailing,
             body,
@@ -1939,7 +1885,7 @@ impl FmtNodeBuilder<'_> {
         let pred_next = first_branch_start
             .or(consequent.as_ref().map(|c| c.location().start_offset()))
             .unwrap_or(end_loc.start_offset());
-        let predicate = node.predicate().map(|n| self.visit(n, pred_next));
+        let predicate = node.predicate().map(|n| self.visit(n, Some(pred_next)));
         let case_trailing = if predicate.is_some() {
             fmt::TrailingTrivia::none()
         } else {
@@ -1963,7 +1909,7 @@ impl FmtNodeBuilder<'_> {
                 let condition = match node {
                     prism::Node::WhenNode { .. } => {
                         let node = node.as_when_node().unwrap();
-                        self.visit_case_when(node, next_start.unwrap())
+                        self.visit_case_when(node, next_start)
                     }
                     _ => panic!("unexpected case expression branch: {:?}", node),
                 };
@@ -1982,7 +1928,11 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn visit_case_when(&mut self, node: prism::WhenNode, next_loc_start: usize) -> fmt::CaseWhen {
+    fn visit_case_when(
+        &mut self,
+        node: prism::WhenNode,
+        next_loc_start: Option<usize>,
+    ) -> fmt::CaseWhen {
         let loc = node.location();
         let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
         let mut when = fmt::CaseWhen::new(was_flat);
@@ -1991,12 +1941,12 @@ impl FmtNodeBuilder<'_> {
             .statements()
             .as_ref()
             .map(|n| n.location().start_offset())
-            .unwrap_or(next_loc_start);
+            .or(next_loc_start);
         Self::each_node_with_next_start(
             node.conditions().iter(),
-            Some(conditions_next),
+            conditions_next,
             |node, next_start| {
-                let cond = self.visit(node, next_start.unwrap());
+                let cond = self.visit(node, next_start);
                 when.append_condition(cond);
             },
         );
@@ -2018,7 +1968,7 @@ impl FmtNodeBuilder<'_> {
         let pred_next = first_branch_start
             .or(consequent.as_ref().map(|c| c.location().start_offset()))
             .unwrap_or(end_loc.start_offset());
-        let predicate = node.predicate().map(|n| self.visit(n, pred_next));
+        let predicate = node.predicate().map(|n| self.visit(n, Some(pred_next)));
         let case_trailing = if predicate.is_some() {
             fmt::TrailingTrivia::none()
         } else {
@@ -2042,7 +1992,7 @@ impl FmtNodeBuilder<'_> {
                 let condition = match node {
                     prism::Node::InNode { .. } => {
                         let node = node.as_in_node().unwrap();
-                        self.visit_case_in(node, next_start.unwrap())
+                        self.visit_case_in(node, next_start)
                     }
                     _ => panic!("unexpected case expression branch: {:?}", node),
                 };
@@ -2061,15 +2011,14 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn visit_case_in(&mut self, node: prism::InNode, next_loc_start: usize) -> fmt::CaseIn {
+    fn visit_case_in(&mut self, node: prism::InNode, next_loc_start: Option<usize>) -> fmt::CaseIn {
         let loc = node.location();
         let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
 
         let pattern_next = node
             .statements()
             .as_ref()
-            .map(|n| n.location().start_offset())
-            .unwrap_or(next_loc_start);
+            .map(|n| n.location().start_offset());
         let pattern = self.visit(node.pattern(), pattern_next);
 
         let mut case_in = fmt::CaseIn::new(was_flat, pattern);
@@ -2084,9 +2033,8 @@ impl FmtNodeBuilder<'_> {
         operator_loc: prism::Location,
         pattern: prism::Node,
     ) -> fmt::MatchAssign {
-        let expression = self.visit(expression, operator_loc.start_offset());
-        let pattern_end = pattern.location().end_offset();
-        let pattern = self.visit(pattern, pattern_end);
+        let expression = self.visit(expression, Some(operator_loc.start_offset()));
+        let pattern = self.visit(pattern, None);
         let operator = Self::source_lossy_at(&operator_loc);
         fmt::MatchAssign::new(expression, operator, pattern)
     }
@@ -2102,8 +2050,8 @@ impl FmtNodeBuilder<'_> {
             .as_ref()
             .map(|b| b.location().start_offset())
             .unwrap_or(closing_loc.start_offset());
-        let predicate = self.visit(predicate, predicate_next);
-        let body = self.visit_statements(body, closing_loc.start_offset());
+        let predicate = self.visit(predicate, Some(predicate_next));
+        let body = self.visit_statements(body, Some(closing_loc.start_offset()));
         let content = fmt::Conditional::new(predicate, body);
         fmt::While { is_while, content }
     }
@@ -2112,13 +2060,13 @@ impl FmtNodeBuilder<'_> {
         let body = node.statements();
         let end_loc = node.end_keyword_loc();
 
-        let index = self.visit(node.index(), node.in_keyword_loc().start_offset());
+        let index = self.visit(node.index(), Some(node.in_keyword_loc().start_offset()));
         let collection_next = body
             .as_ref()
             .map(|b| b.location().start_offset())
             .unwrap_or(end_loc.start_offset());
-        let collection = self.visit(node.collection(), collection_next);
-        let body = self.visit_statements(body, end_loc.start_offset());
+        let collection = self.visit(node.collection(), Some(collection_next));
+        let body = self.visit_statements(body, Some(end_loc.start_offset()));
 
         fmt::For {
             index: Box::new(index),
@@ -2129,7 +2077,7 @@ impl FmtNodeBuilder<'_> {
 
     fn visit_ternary(&mut self, node: prism::IfNode) -> fmt::Ternary {
         let question_loc = node.then_keyword_loc().expect("ternary if must have ?");
-        let predicate = self.visit(node.predicate(), question_loc.start_offset());
+        let predicate = self.visit(node.predicate(), Some(question_loc.start_offset()));
         let then = node
             .statements()
             .and_then(|s| s.body().iter().next())
@@ -2144,8 +2092,8 @@ impl FmtNodeBuilder<'_> {
                         .expect("ternary if must have else statement");
                     let pred_trailing = self.take_trailing_comment(then.location().start_offset());
                     let loc = consequent.location();
-                    let then = self.visit(then, loc.start_offset());
-                    let otherwise = self.visit(otherwise, loc.end_offset());
+                    let then = self.visit(then, Some(loc.start_offset()));
+                    let otherwise = self.visit(otherwise, None);
                     fmt::Ternary::new(predicate, pred_trailing, then, otherwise)
                 }
                 _ => panic!("ternary if consequent must be ElseNode: {:?}", node),
@@ -2154,13 +2102,13 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn visit_postmodifier(&mut self, postmod: Postmodifier, next_loc_start: usize) -> fmt::Node {
+    fn visit_postmodifier(&mut self, postmod: Postmodifier) -> fmt::Node {
         let leading = self.take_leading_trivia(postmod.loc.start_offset());
 
         let kwd_loc = postmod.keyword_loc;
-        let statements = self.visit_statements(postmod.statements, kwd_loc.start_offset());
+        let statements = self.visit_statements(postmod.statements, Some(kwd_loc.start_offset()));
 
-        let predicate = self.visit(postmod.predicate, next_loc_start);
+        let predicate = self.visit(postmod.predicate, None);
 
         let postmod = fmt::Postmodifier::new(
             postmod.keyword,
@@ -2172,12 +2120,11 @@ impl FmtNodeBuilder<'_> {
 
     fn visit_rescue_modifier(&mut self, node: prism::RescueModifierNode) -> fmt::Postmodifier {
         let kwd_loc = node.keyword_loc();
-        let expr = self.visit(node.expression(), kwd_loc.start_offset());
+        let expr = self.visit(node.expression(), Some(kwd_loc.start_offset()));
         let statements = self.wrap_as_statements(Some(expr), kwd_loc.start_offset());
 
         let rescue_expr = node.rescue_expression();
-        let rescue_expr_loc = rescue_expr.location();
-        let rescue_expr = self.visit(rescue_expr, rescue_expr_loc.end_offset());
+        let rescue_expr = self.visit(rescue_expr, None);
 
         fmt::Postmodifier::new(
             "rescue".to_string(),
@@ -2185,19 +2132,14 @@ impl FmtNodeBuilder<'_> {
         )
     }
 
-    fn visit_call_root<C: CallRoot>(
-        &mut self,
-        call: &C,
-        next_loc_start: usize,
-    ) -> fmt::MethodChain {
+    fn visit_call_root<C: CallRoot>(&mut self, call: &C) -> fmt::MethodChain {
         let current_chain = call.receiver().map(|receiver| {
             let next_loc_start = call
                 .message_loc()
                 .or_else(|| call.opening_loc())
                 .or_else(|| call.arguments().map(|a| a.location()))
                 .or_else(|| call.block().map(|a| a.location()))
-                .map(|l| l.start_offset())
-                .unwrap_or(next_loc_start);
+                .map(|l| l.start_offset());
             let node = self.visit(receiver, next_loc_start);
             match node.kind {
                 fmt::Kind::MethodChain(chain) => (chain, node.trailing_trivia),
@@ -2219,21 +2161,11 @@ impl FmtNodeBuilder<'_> {
         let block = call.block();
         let opening_loc = call.opening_loc();
         let closing_loc = call.closing_loc();
-        let closing_next_start = block
-            .as_ref()
-            .map(|b| b.location().start_offset())
-            .unwrap_or(next_loc_start);
         let (args, block) = match block {
             Some(node) => match node {
                 // method call with block literal (e.g. "foo { a }", "foo(a) { b }")
                 prism::Node::BlockNode { .. } => {
-                    let args = self.visit_arguments(
-                        arguments,
-                        None,
-                        opening_loc,
-                        closing_loc,
-                        closing_next_start,
-                    );
+                    let args = self.visit_arguments(arguments, None, opening_loc, closing_loc);
                     let block = node.as_block_node().unwrap();
                     let block = self.visit_block(block);
                     (args, Some(block))
@@ -2241,26 +2173,15 @@ impl FmtNodeBuilder<'_> {
                 // method call with a block argument (e.g. "foo(&a)", "foo(a, &b)")
                 prism::Node::BlockArgumentNode { .. } => {
                     let block_arg = node.as_block_argument_node().unwrap();
-                    let args = self.visit_arguments(
-                        arguments,
-                        Some(block_arg),
-                        opening_loc,
-                        closing_loc,
-                        closing_next_start,
-                    );
+                    let args =
+                        self.visit_arguments(arguments, Some(block_arg), opening_loc, closing_loc);
                     (args, None)
                 }
                 _ => panic!("unexpected block node of call: {:?}", node),
             },
             // method call without block (e.g. "foo", "foo(a)")
             None => {
-                let args = self.visit_arguments(
-                    arguments,
-                    None,
-                    opening_loc,
-                    closing_loc,
-                    closing_next_start,
-                );
+                let args = self.visit_arguments(arguments, None, opening_loc, closing_loc);
                 (args, None)
             }
         };
@@ -2310,8 +2231,7 @@ impl FmtNodeBuilder<'_> {
         let mut args = fmt::Arguments::new(opening, closing);
 
         let closing_start = closing_loc.map(|l| l.start_offset());
-        let receiver_next = closing_start.unwrap_or(receiver.location().end_offset());
-        let receiver = self.visit(receiver, receiver_next);
+        let receiver = self.visit(receiver, closing_start);
         args.append_node(receiver);
         let virtual_end = self.take_end_trivia_as_virtual_end(closing_start);
         args.set_virtual_end(virtual_end);
@@ -2332,17 +2252,14 @@ impl FmtNodeBuilder<'_> {
         block_arg: Option<prism::BlockArgumentNode>,
         opening_loc: Option<prism::Location>,
         closing_loc: Option<prism::Location>,
-        closing_next_start: usize,
     ) -> Option<fmt::Arguments> {
         let opening = opening_loc.as_ref().map(Self::source_lossy_at);
         let closing = closing_loc.as_ref().map(Self::source_lossy_at);
         let closing_start = closing_loc.as_ref().map(|l| l.start_offset());
         match node {
             None => {
-                let block_arg = block_arg.map(|block_arg| {
-                    let next_start = closing_start.unwrap_or(closing_next_start);
-                    self.visit(block_arg.as_node(), next_start)
-                });
+                let block_arg =
+                    block_arg.map(|block_arg| self.visit(block_arg.as_node(), closing_start));
                 let virtual_end = closing_start.and_then(|closing_start| {
                     self.take_end_trivia_as_virtual_end(Some(closing_start))
                 });
@@ -2380,17 +2297,12 @@ impl FmtNodeBuilder<'_> {
                                     | prism::Node::BlockArgumentNode { .. }
                             );
                         }
-                        let next_start = next_start.unwrap_or(node.location().end_offset());
                         match node {
                             prism::Node::KeywordHashNode { .. } => {
                                 let node = node.as_keyword_hash_node().unwrap();
-                                self.each_keyword_hash_element(
-                                    node,
-                                    Some(next_start),
-                                    |fmt_node| {
-                                        args.append_node(fmt_node);
-                                    },
-                                );
+                                self.each_keyword_hash_element(node, next_start, |fmt_node| {
+                                    args.append_node(fmt_node);
+                                });
                             }
                             _ => {
                                 let fmt_node = self.visit(node, next_start);
@@ -2418,7 +2330,6 @@ impl FmtNodeBuilder<'_> {
             node.elements().iter(),
             next_loc_start,
             |node, next_start| {
-                let next_start = next_start.unwrap_or(node.location().end_offset());
                 let element = self.visit(node, next_start);
                 f(element);
             },
@@ -2431,10 +2342,7 @@ impl FmtNodeBuilder<'_> {
     ) -> (fmt::LeadingTrivia, fmt::Prefix) {
         let leading = self.take_leading_trivia(node.location().start_offset());
         let operator = Self::source_lossy_at(&node.operator_loc());
-        let expr = node.expression().map(|expr| {
-            let expr_end = expr.location().end_offset();
-            self.visit(expr, expr_end)
-        });
+        let expr = node.expression().map(|expr| self.visit(expr, None));
         let prefix = fmt::Prefix::new(operator, expr);
         (leading, prefix)
     }
@@ -2528,7 +2436,7 @@ impl FmtNodeBuilder<'_> {
     fn visit_write_call(&mut self, call: prism::CallNode) -> fmt::Assign {
         let msg_loc = call.message_loc().expect("call write must have message");
         let receiver = call.receiver().expect("call write must have receiver");
-        let receiver = self.visit(receiver, msg_loc.start_offset());
+        let receiver = self.visit(receiver, Some(msg_loc.start_offset()));
 
         let call_leading = self.take_leading_trivia(msg_loc.start_offset());
         let call_operator = call.call_operator_loc().as_ref().map(Self::source_lossy_at);
@@ -2547,8 +2455,7 @@ impl FmtNodeBuilder<'_> {
         );
 
         let left = fmt::Node::without_trivia(fmt::Kind::MethodChain(chain));
-        let arg_end = arg.location().end_offset();
-        let right = self.visit(arg, arg_end);
+        let right = self.visit(arg, None);
         let operator = "=".to_string();
         fmt::Assign::new(left, operator, right)
     }
@@ -2560,7 +2467,7 @@ impl FmtNodeBuilder<'_> {
         };
 
         let receiver = call.receiver().expect("index write must have receiver");
-        let receiver = self.visit(receiver, opening_loc.start_offset());
+        let receiver = self.visit(receiver, Some(opening_loc.start_offset()));
 
         let args = call.arguments().expect("index write must have arguments");
         let mut args_iter = args.arguments().iter();
@@ -2571,7 +2478,7 @@ impl FmtNodeBuilder<'_> {
 
         let mut left_args = fmt::Arguments::new(Some("[".to_string()), Some("]".to_string()));
         let closing_start = closing_loc.start_offset();
-        left_args.append_node(self.visit(arg1, closing_start));
+        left_args.append_node(self.visit(arg1, Some(closing_start)));
         let left_args_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
         left_args.set_virtual_end(left_args_end);
 
@@ -2579,8 +2486,7 @@ impl FmtNodeBuilder<'_> {
         chain.append_index_call(fmt::IndexCall::new(left_args, None));
 
         let left = fmt::Node::without_trivia(fmt::Kind::MethodChain(chain));
-        let arg2_end = arg2.location().end_offset();
-        let right = self.visit(arg2, arg2_end);
+        let right = self.visit(arg2, None);
         let operator = "=".to_string();
         fmt::Assign::new(left, operator, right)
     }
@@ -2624,7 +2530,7 @@ impl FmtNodeBuilder<'_> {
                 locals.iter(),
                 Some(closing_start),
                 |node, next_start| {
-                    let fmt_node = self.visit(node, next_start.unwrap());
+                    let fmt_node = self.visit(node, next_start);
                     block_params.append_local(fmt_node);
                 },
             );
@@ -2645,8 +2551,7 @@ impl FmtNodeBuilder<'_> {
         let receiver = call
             .receiver()
             .expect("prefix operation must have receiver");
-        let receiver_end = receiver.location().end_offset();
-        let receiver = self.visit(receiver, receiver_end);
+        let receiver = self.visit(receiver, None);
         fmt::Prefix::new(operator, Some(receiver))
     }
 
@@ -2668,15 +2573,14 @@ impl FmtNodeBuilder<'_> {
         operator_loc: prism::Location,
         right: prism::Node,
     ) -> fmt::InfixChain {
-        let left = self.visit(left, operator_loc.start_offset());
+        let left = self.visit(left, Some(operator_loc.start_offset()));
         let operator = Self::source_lossy_at(&operator_loc);
         let precedence = fmt::InfixPrecedence::from_operator(&operator);
         let mut chain = match left.kind {
             fmt::Kind::InfixChain(chain) if chain.precedence() == &precedence => chain,
             _ => fmt::InfixChain::new(left, precedence),
         };
-        let right_end = right.location().end_offset();
-        let right = self.visit(right, right_end);
+        let right = self.visit(right, None);
         chain.append_right(operator, right);
         chain
     }
@@ -2712,25 +2616,19 @@ impl FmtNodeBuilder<'_> {
         &mut self,
         name_loc: prism::Location,
         arguments: Option<prism::ArgumentsNode>,
-        next_loc_start: usize,
     ) -> fmt::CallLike {
         let name = Self::source_lossy_at(&name_loc);
         let mut call_like = fmt::CallLike::new(name);
-        let args = self.visit_arguments(arguments, None, None, None, next_loc_start);
+        let args = self.visit_arguments(arguments, None, None, None);
         if let Some(args) = args {
             call_like.set_arguments(args);
         }
         call_like
     }
 
-    fn visit_yield(&mut self, node: prism::YieldNode, next_loc_start: usize) -> fmt::CallLike {
-        let args = self.visit_arguments(
-            node.arguments(),
-            None,
-            node.lparen_loc(),
-            node.rparen_loc(),
-            next_loc_start,
-        );
+    fn visit_yield(&mut self, node: prism::YieldNode) -> fmt::CallLike {
+        let args =
+            self.visit_arguments(node.arguments(), None, node.lparen_loc(), node.rparen_loc());
         let mut call_like = fmt::CallLike::new("yield".to_string());
         if let Some(mut args) = args {
             args.last_comma_allowed = false;
@@ -2742,7 +2640,6 @@ impl FmtNodeBuilder<'_> {
     fn visit_undef(&mut self, undef: prism::UndefNode) -> fmt::CallLike {
         let mut args = fmt::Arguments::new(None, None);
         Self::each_node_with_next_start(undef.names().iter(), None, |node, next_start| {
-            let next_start = next_start.unwrap_or(node.location().start_offset());
             let node = self.visit(node, next_start);
             args.append_node(node);
         });
@@ -2756,10 +2653,7 @@ impl FmtNodeBuilder<'_> {
         let rparen_loc = defined.rparen_loc();
 
         let value = defined.value();
-        let value_next = rparen_loc
-            .as_ref()
-            .map(|l| l.start_offset())
-            .unwrap_or(value.location().end_offset());
+        let value_next = rparen_loc.as_ref().map(|l| l.start_offset());
         let value = self.visit(value, value_next);
 
         let lparen = lparen_loc.as_ref().map(Self::source_lossy_at);
@@ -2787,9 +2681,7 @@ impl FmtNodeBuilder<'_> {
         let leading = self.take_leading_trivia(node_loc.start_offset());
         let name = Self::source_lossy_at(&name_loc);
         let operator = Self::source_lossy_at(&operator_loc);
-        // Pass 0 to associate trailing trivia to the Assign kind, not the value.
-        let value_end = value.location().end_offset();
-        let value = self.visit(value, value_end);
+        let value = self.visit(value, None);
         let target = fmt::Node::without_trivia(fmt::Kind::Atom(fmt::Atom(name)));
         (leading, fmt::Assign::new(target, operator, value))
     }
@@ -2799,12 +2691,11 @@ impl FmtNodeBuilder<'_> {
         const_path: prism::ConstantPathNode,
         operator_loc: prism::Location,
         value: prism::Node,
-        next_loc_start: usize,
     ) -> (fmt::LeadingTrivia, fmt::Assign) {
         let leading = self.take_leading_trivia(const_path.location().start_offset());
         let const_path = self.visit_constant_path(const_path.parent(), const_path.child());
         let operator = Self::source_lossy_at(&operator_loc);
-        let value = self.visit(value, next_loc_start);
+        let value = self.visit(value, None);
         let target = fmt::Node::without_trivia(fmt::Kind::ConstantPath(const_path));
         (leading, fmt::Assign::new(target, operator, value))
     }
@@ -2814,12 +2705,11 @@ impl FmtNodeBuilder<'_> {
         call: &impl CallRoot,
         operator_loc: prism::Location,
         value: prism::Node,
-        next_loc_start: usize,
     ) -> (fmt::LeadingTrivia, fmt::Assign) {
         let leading = self.take_leading_trivia(call.location().start_offset());
-        let chain = self.visit_call_root(call, next_loc_start);
+        let chain = self.visit_call_root(call);
         let operator = Self::source_lossy_at(&operator_loc);
-        let value = self.visit(value, next_loc_start);
+        let value = self.visit(value, None);
         let target = fmt::Node::without_trivia(fmt::Kind::MethodChain(chain));
         (leading, fmt::Assign::new(target, operator, value))
     }
@@ -2827,7 +2717,6 @@ impl FmtNodeBuilder<'_> {
     fn visit_multi_assign(
         &mut self,
         node: prism::MultiWriteNode,
-        next_loc_start: usize,
     ) -> (fmt::LeadingTrivia, fmt::Assign) {
         let leading = self.take_leading_trivia(node.location().start_offset());
         let target = self.visit_multi_assign_target(
@@ -2836,10 +2725,9 @@ impl FmtNodeBuilder<'_> {
             node.rights(),
             node.lparen_loc(),
             node.rparen_loc(),
-            node.operator_loc().start_offset(),
         );
         let operator = Self::source_lossy_at(&node.operator_loc());
-        let value = self.visit(node.value(), next_loc_start);
+        let value = self.visit(node.value(), None);
 
         let target = fmt::Node::without_trivia(fmt::Kind::MultiAssignTarget(target));
         (leading, fmt::Assign::new(target, operator, value))
@@ -2852,7 +2740,6 @@ impl FmtNodeBuilder<'_> {
         rights: prism::NodeList,
         lparen_loc: Option<prism::Location>,
         rparen_loc: Option<prism::Location>,
-        next_loc_start: usize,
     ) -> fmt::MultiAssignTarget {
         let lparen = lparen_loc.as_ref().map(Self::source_lossy_at);
         let rparen = rparen_loc.as_ref().map(Self::source_lossy_at);
@@ -2873,23 +2760,19 @@ impl FmtNodeBuilder<'_> {
 
         let left_next_start = rest_start.or(rights_first_start).or(rparen_start);
         Self::each_node_with_next_start(lefts.iter(), left_next_start, |node, next_start| {
-            let next_start = next_start.unwrap_or(node.location().end_offset());
             let target = self.visit(node, next_start);
             multi.append_target(target);
         });
 
         if !implicit_rest {
             if let Some(rest) = rest {
-                let rest_next_start = rights_first_start
-                    .or(rparen_start)
-                    .unwrap_or(next_loc_start);
+                let rest_next_start = rights_first_start.or(rparen_start);
                 let target = self.visit(rest, rest_next_start);
                 multi.append_target(target);
             }
         }
 
         Self::each_node_with_next_start(rights.iter(), rparen_start, |node, next_start| {
-            let next_start = next_start.unwrap_or(node.location().end_offset());
             let target = self.visit(node, next_start);
             multi.append_target(target);
         });
@@ -2913,7 +2796,8 @@ impl FmtNodeBuilder<'_> {
             .unwrap_or_else(|| name_loc.start_offset());
         let leading = self.take_leading_trivia(leading_end);
 
-        let receiver = receiver.map(|r| self.visit(r, name_loc.end_offset()));
+        let name_end = name_loc.end_offset();
+        let receiver = receiver.map(|r| self.visit(r, Some(name_end)));
         let name = Self::source_lossy_at(&node.name_loc());
         let mut def = fmt::Def::new(receiver, name);
 
@@ -2943,7 +2827,7 @@ impl FmtNodeBuilder<'_> {
 
         if node.equal_loc().is_some() {
             let body = node.body().expect("shorthand def body must exist");
-            let body = self.visit(body, 0);
+            let body = self.visit(body, None);
             def.set_body(fmt::DefBody::Short {
                 body: Box::new(body),
             });
@@ -2977,7 +2861,7 @@ impl FmtNodeBuilder<'_> {
             Some(body) => match body {
                 prism::Node::StatementsNode { .. } => {
                     let stmts = body.as_statements_node().unwrap();
-                    let statements = self.visit_statements(Some(stmts), next_loc_start);
+                    let statements = self.visit_statements(Some(stmts), Some(next_loc_start));
                     fmt::BlockBody::new(statements)
                 }
                 prism::Node::BeginNode { .. } => {
@@ -3013,7 +2897,7 @@ impl FmtNodeBuilder<'_> {
             .or(else_start)
             .or(ensure_start)
             .unwrap_or(end_loc.start_offset());
-        let statements = self.visit_statements(node.statements(), statements_next);
+        let statements = self.visit_statements(node.statements(), Some(statements_next));
         let mut body = fmt::BlockBody::new(statements);
 
         if let Some(rescue_node) = node.rescue_clause() {
@@ -3034,7 +2918,7 @@ impl FmtNodeBuilder<'_> {
                 .unwrap_or(end_loc.start_offset());
             let else_trailing = self.take_trailing_comment(keyword_next);
             let else_next = ensure_start.unwrap_or(end_loc.start_offset());
-            let else_statements = self.visit_statements(statements, else_next);
+            let else_statements = self.visit_statements(statements, Some(else_next));
             body.set_rescue_else(fmt::Else {
                 keyword_trailing: else_trailing,
                 body: else_statements,
@@ -3048,7 +2932,7 @@ impl FmtNodeBuilder<'_> {
                 .map(|s| s.location().start_offset())
                 .unwrap_or(end_loc.start_offset());
             let ensure_trailing = self.take_trailing_comment(keyword_next);
-            let ensure_statements = self.visit_statements(statements, end_loc.start_offset());
+            let ensure_statements = self.visit_statements(statements, Some(end_loc.start_offset()));
             body.set_ensure(fmt::Else {
                 keyword_trailing: ensure_trailing,
                 body: ensure_statements,
@@ -3083,14 +2967,14 @@ impl FmtNodeBuilder<'_> {
             node.exceptions().iter(),
             Some(head_next),
             |node, next_start| {
-                let fmt_node = self.visit(node, next_start.unwrap());
+                let fmt_node = self.visit(node, next_start);
                 rescue.append_exception(fmt_node);
             },
         );
 
         if let Some(reference) = reference {
             let reference_next = statements_start.or(consequent_start).unwrap_or(final_next);
-            let reference = self.visit(reference, reference_next);
+            let reference = self.visit(reference, Some(reference_next));
             rescue.set_reference(reference);
         }
 
@@ -3099,7 +2983,7 @@ impl FmtNodeBuilder<'_> {
         rescue.set_head_trailing(head_trailing);
 
         let statements_next = consequent_start.unwrap_or(final_next);
-        let statements = self.visit_statements(statements, statements_next);
+        let statements = self.visit_statements(statements, Some(statements_next));
         rescue.set_statements(statements);
         rescues.push(rescue);
 
@@ -3137,7 +3021,6 @@ impl FmtNodeBuilder<'_> {
             nodes.push(block.as_node());
         }
         Self::each_node_with_next_start(nodes.into_iter(), next_loc_start, |node, next_start| {
-            let next_start = next_start.unwrap_or(node.location().end_offset());
             let fmt_node = self.visit(node, next_start);
             f(fmt_node);
         });
@@ -3162,7 +3045,7 @@ impl FmtNodeBuilder<'_> {
         });
         let head_next = body_start.unwrap_or(end_loc.start_offset());
         let (superclass, head_trailing) = if let Some(superclass) = superclass {
-            let fmt_node = self.visit(superclass, head_next);
+            let fmt_node = self.visit(superclass, Some(head_next));
             (Some(fmt_node), fmt::TrailingTrivia::none())
         } else {
             let head_trailing = self.take_trailing_comment(head_next);
@@ -3181,10 +3064,7 @@ impl FmtNodeBuilder<'_> {
     }
 
     fn visit_array_pattern(&mut self, node: prism::ArrayPatternNode) -> fmt::ArrayPattern {
-        let constant = node.constant().map(|c| {
-            let const_end = c.location().end_offset();
-            self.visit(c, const_end)
-        });
+        let constant = node.constant().map(|c| self.visit(c, None));
         let opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
         let closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
         let mut array = fmt::ArrayPattern::new(constant, opening, closing);
@@ -3203,7 +3083,6 @@ impl FmtNodeBuilder<'_> {
             node.requireds().iter(),
             requireds_next,
             |node, next_start| {
-                let next_start = next_start.unwrap_or(node.location().end_offset());
                 let element = self.visit(node, next_start);
                 array.append_element(element);
             },
@@ -3213,8 +3092,7 @@ impl FmtNodeBuilder<'_> {
             let rest_next = posts_head
                 .as_ref()
                 .map(|p| p.location().start_offset())
-                .or(closing_start)
-                .unwrap_or(rest.location().end_offset());
+                .or(closing_start);
             let element = self.visit(rest, rest_next);
             array.append_element(element);
             array.last_comma_allowed = false;
@@ -3225,7 +3103,6 @@ impl FmtNodeBuilder<'_> {
                 node.posts().iter(),
                 closing_start,
                 |node, next_start| {
-                    let next_start = next_start.unwrap_or(node.location().end_offset());
                     let element = self.visit(node, next_start);
                     array.append_element(element);
                 },
@@ -3240,10 +3117,7 @@ impl FmtNodeBuilder<'_> {
     }
 
     fn visit_find_pattern(&mut self, node: prism::FindPatternNode) -> fmt::ArrayPattern {
-        let constant = node.constant().map(|c| {
-            let const_end = c.location().end_offset();
-            self.visit(c, const_end)
-        });
+        let constant = node.constant().map(|c| self.visit(c, None));
         let opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
         let closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
         let mut array = fmt::ArrayPattern::new(constant, opening, closing);
@@ -3257,22 +3131,21 @@ impl FmtNodeBuilder<'_> {
             .next()
             .map(|n| n.location().start_offset())
             .unwrap_or(right.location().start_offset());
-        let left = self.visit(node.left(), left_next);
+        let left = self.visit(node.left(), Some(left_next));
         array.append_element(left);
 
         Self::each_node_with_next_start(
             node.requireds().iter(),
             Some(right.location().start_offset()),
             |node, next_start| {
-                let element = self.visit(node, next_start.unwrap());
+                let element = self.visit(node, next_start);
                 array.append_element(element);
             },
         );
 
         let closing_start = node.closing_loc().as_ref().map(|l| l.start_offset());
 
-        let right_next = closing_start.unwrap_or(right.location().start_offset());
-        let right = self.visit(right, right_next);
+        let right = self.visit(right, closing_start);
         array.append_element(right);
 
         let end = self.take_end_trivia_as_virtual_end(closing_start);
@@ -3282,10 +3155,7 @@ impl FmtNodeBuilder<'_> {
     }
 
     fn visit_hash_pattern(&mut self, node: prism::HashPatternNode) -> fmt::HashPattern {
-        let constant = node.constant().map(|c| {
-            let const_end = c.location().end_offset();
-            self.visit(c, const_end)
-        });
+        let constant = node.constant().map(|c| self.visit(c, None));
         let opening_loc = node.opening_loc();
         let closing_loc = node.closing_loc();
         let opening = opening_loc.as_ref().map(Self::source_lossy_at);
@@ -3310,15 +3180,13 @@ impl FmtNodeBuilder<'_> {
             node.elements().iter(),
             elements_next,
             |node, next_start| {
-                let next_start = next_start.unwrap_or(node.location().end_offset());
                 let element = self.visit(node, next_start);
                 hash.append_element(element);
             },
         );
 
         if let Some(rest) = node.rest() {
-            let rest_next = closing_start.unwrap_or(rest.location().end_offset());
-            let rest = self.visit(rest, rest_next);
+            let rest = self.visit(rest, closing_start);
             hash.append_element(rest);
             hash.last_comma_allowed = false;
         }
@@ -3332,7 +3200,7 @@ impl FmtNodeBuilder<'_> {
     fn visit_pinned_expression(&mut self, node: prism::PinnedExpressionNode) -> fmt::Prefix {
         let operator = Self::source_lossy_at(&node.operator_loc());
         let rparen_start = node.rparen_loc().start_offset();
-        let expression = self.visit(node.expression(), rparen_start);
+        let expression = self.visit(node.expression(), Some(rparen_start));
 
         let mut stmts = fmt::Statements::new();
         stmts.append_node(expression);
@@ -3346,15 +3214,14 @@ impl FmtNodeBuilder<'_> {
 
     fn visit_pinned_variable(&mut self, node: prism::PinnedVariableNode) -> fmt::Prefix {
         let operator = Self::source_lossy_at(&node.operator_loc());
-        let variable_end = node.variable().location().end_offset();
-        let variable = self.visit(node.variable(), variable_end);
+        let variable = self.visit(node.variable(), None);
         fmt::Prefix::new(operator, Some(variable))
     }
 
     fn visit_capture_pattern(&mut self, node: prism::CapturePatternNode) -> fmt::Assoc {
-        let value = self.visit(node.value(), node.operator_loc().start_offset());
+        let value = self.visit(node.value(), Some(node.operator_loc().start_offset()));
         let operator = Self::source_lossy_at(&node.operator_loc());
-        let target = self.visit(node.target(), node.target().location().end_offset());
+        let target = self.visit(node.target(), None);
         fmt::Assoc::new(value, Some(operator), target)
     }
 
@@ -3363,14 +3230,13 @@ impl FmtNodeBuilder<'_> {
         node: prism::AlternationPatternNode,
     ) -> fmt::AltPatternChain {
         let operator_loc = node.operator_loc();
-        let left = self.visit(node.left(), operator_loc.start_offset());
+        let left = self.visit(node.left(), Some(operator_loc.start_offset()));
         let mut chain = match left.kind {
             fmt::Kind::AltPatternChain(chain) => chain,
             _ => fmt::AltPatternChain::new(left),
         };
         let right = node.right();
-        let right_end = right.location().end_offset();
-        let right = self.visit(right, right_end);
+        let right = self.visit(right, None);
         chain.append_right(right);
         chain
     }
@@ -3385,7 +3251,7 @@ impl FmtNodeBuilder<'_> {
         let keyword = Self::source_lossy_at(&keyword_loc);
         let closing_start = closing_loc.start_offset();
         let was_flat = !self.does_line_break_exist_in(opening_loc.end_offset(), closing_start);
-        let statements = self.visit_statements(statements, closing_start);
+        let statements = self.visit_statements(statements, Some(closing_start));
         fmt::PrePostExec::new(keyword, statements, was_flat)
     }
 
@@ -3396,8 +3262,8 @@ impl FmtNodeBuilder<'_> {
     ) -> (fmt::LeadingTrivia, fmt::Alias) {
         let leading = self.take_leading_trivia(new_name.location().start_offset());
         let old_loc = old_name.location();
-        let new_name = self.visit(new_name, old_loc.start_offset());
-        let old_name = self.visit(old_name, old_loc.end_offset());
+        let new_name = self.visit(new_name, Some(old_loc.start_offset()));
+        let old_name = self.visit(old_name, None);
         let alias = fmt::Alias::new(new_name, old_name);
         (leading, alias)
     }
