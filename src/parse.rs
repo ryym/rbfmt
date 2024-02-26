@@ -1,5 +1,4 @@
 use crate::fmt;
-use ruby_prism as prism;
 use std::{collections::HashMap, iter::Peekable, ops::Range};
 
 pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
