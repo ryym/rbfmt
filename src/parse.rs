@@ -415,34 +415,34 @@ impl FmtNodeBuilder<'_> {
         String::from_utf8_lossy(loc.as_slice()).to_string()
     }
 
-    fn each_node_with_next_start<'a>(
+    fn each_node_with_trailing_end<'a>(
         mut nodes: impl Iterator<Item = prism::Node<'a>>,
-        next_loc_start: Option<usize>,
+        last_trailing_end: Option<usize>,
         mut f: impl FnMut(prism::Node<'a>, Option<usize>),
     ) {
         if let Some(node) = nodes.next() {
             let mut prev = node;
             for next in nodes {
-                let next_start = next.location().start_offset();
-                f(prev, Some(next_start));
+                let trailing_end = next.location().start_offset();
+                f(prev, Some(trailing_end));
                 prev = next;
             }
-            f(prev, next_loc_start);
+            f(prev, last_trailing_end);
         }
     }
 
-    fn visit(&mut self, node: prism::Node, next_loc_start: Option<usize>) -> fmt::Node {
+    fn visit(&mut self, node: prism::Node, trailing_end: Option<usize>) -> fmt::Node {
         let loc_end = node.location().end_offset();
         let mut node = match node {
             prism::Node::ProgramNode { .. } => {
                 let node = node.as_program_node().unwrap();
-                let statements = self.visit_statements(Some(node.statements()), next_loc_start);
+                let statements = self.visit_statements(Some(node.statements()), trailing_end);
                 let kind = fmt::Kind::Statements(statements);
                 fmt::Node::without_trivia(kind)
             }
             prism::Node::StatementsNode { .. } => {
                 let node = node.as_statements_node().unwrap();
-                let statements = self.visit_statements(Some(node), next_loc_start);
+                let statements = self.visit_statements(Some(node), trailing_end);
                 let kind = fmt::Kind::Statements(statements);
                 fmt::Node::without_trivia(kind)
             }
@@ -1191,18 +1191,18 @@ impl FmtNodeBuilder<'_> {
                 let closing = closing_loc.as_ref().map(Self::source_lossy_at);
                 let mut array = fmt::Array::new(opening, closing);
                 let closing_start = closing_loc.map(|l| l.start_offset());
-                Self::each_node_with_next_start(
+                Self::each_node_with_trailing_end(
                     node.elements().iter(),
                     closing_start,
-                    |node, next_start| match node {
+                    |node, trailing_end| match node {
                         prism::Node::KeywordHashNode { .. } => {
                             let node = node.as_keyword_hash_node().unwrap();
-                            self.each_keyword_hash_element(node, next_start, |element| {
+                            self.each_keyword_hash_element(node, trailing_end, |element| {
                                 array.append_element(element);
                             });
                         }
                         _ => {
-                            let element = self.visit(node, next_start);
+                            let element = self.visit(node, trailing_end);
                             array.append_element(element);
                         }
                     },
@@ -1231,11 +1231,11 @@ impl FmtNodeBuilder<'_> {
                 };
                 let mut hash = fmt::Hash::new(opening, closing, should_be_inline);
                 let closing_start = closing_loc.start_offset();
-                Self::each_node_with_next_start(
+                Self::each_node_with_trailing_end(
                     node.elements().iter(),
                     Some(closing_start),
-                    |node, next_start| {
-                        let element = self.visit(node, next_start);
+                    |node, trailing_end| {
+                        let element = self.visit(node, trailing_end);
                         hash.append_element(element);
                     },
                 );
@@ -1509,8 +1509,8 @@ impl FmtNodeBuilder<'_> {
 
         self.last_loc_end = loc_end;
 
-        if let Some(next_loc_start) = next_loc_start {
-            let trailing = self.take_trailing_comment(next_loc_start);
+        if let Some(trailing_end) = trailing_end {
+            let trailing = self.take_trailing_comment(trailing_end);
             node.set_trailing_trivia(trailing);
         }
         node
@@ -1764,8 +1764,8 @@ impl FmtNodeBuilder<'_> {
     ) -> fmt::Statements {
         let mut statements = fmt::Statements::new();
         if let Some(node) = node {
-            Self::each_node_with_next_start(node.body().iter(), end, |prev, next_start| {
-                let fmt_node = self.visit(prev, next_start);
+            Self::each_node_with_trailing_end(node.body().iter(), end, |node, trailing_end| {
+                let fmt_node = self.visit(node, trailing_end);
                 statements.append_node(fmt_node);
             });
         }
@@ -1859,14 +1859,14 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn visit_else(&mut self, node: prism::ElseNode, next_loc_start: usize) -> fmt::Else {
+    fn visit_else(&mut self, node: prism::ElseNode, else_end: usize) -> fmt::Else {
         let else_next_loc = node
             .statements()
             .as_ref()
             .map(|s| s.location().start_offset())
-            .unwrap_or(next_loc_start);
+            .unwrap_or(else_end);
         let keyword_trailing = self.take_trailing_comment(else_next_loc);
-        let body = self.visit_statements(node.statements(), Some(next_loc_start));
+        let body = self.visit_statements(node.statements(), Some(else_end));
         fmt::Else {
             keyword_trailing,
             body,
@@ -1902,14 +1902,14 @@ impl FmtNodeBuilder<'_> {
             .as_ref()
             .map(|c| c.location().start_offset())
             .unwrap_or(end_loc.start_offset());
-        Self::each_node_with_next_start(
+        Self::each_node_with_trailing_end(
             conditions.iter(),
             Some(conditions_next),
-            |node, next_start| {
+            |node, trailing_end| {
                 let condition = match node {
                     prism::Node::WhenNode { .. } => {
                         let node = node.as_when_node().unwrap();
-                        self.visit_case_when(node, next_start)
+                        self.visit_case_when(node, trailing_end)
                     }
                     _ => panic!("unexpected case expression branch: {:?}", node),
                 };
@@ -1928,11 +1928,7 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn visit_case_when(
-        &mut self,
-        node: prism::WhenNode,
-        next_loc_start: Option<usize>,
-    ) -> fmt::CaseWhen {
+    fn visit_case_when(&mut self, node: prism::WhenNode, body_end: Option<usize>) -> fmt::CaseWhen {
         let loc = node.location();
         let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
         let mut when = fmt::CaseWhen::new(was_flat);
@@ -1941,17 +1937,17 @@ impl FmtNodeBuilder<'_> {
             .statements()
             .as_ref()
             .map(|n| n.location().start_offset())
-            .or(next_loc_start);
-        Self::each_node_with_next_start(
+            .or(body_end);
+        Self::each_node_with_trailing_end(
             node.conditions().iter(),
             conditions_next,
-            |node, next_start| {
-                let cond = self.visit(node, next_start);
+            |node, trailing_end| {
+                let cond = self.visit(node, trailing_end);
                 when.append_condition(cond);
             },
         );
 
-        let body = self.visit_statements(node.statements(), next_loc_start);
+        let body = self.visit_statements(node.statements(), body_end);
         when.set_body(body);
         when
     }
@@ -1985,14 +1981,14 @@ impl FmtNodeBuilder<'_> {
             .as_ref()
             .map(|c| c.location().start_offset())
             .unwrap_or(end_loc.start_offset());
-        Self::each_node_with_next_start(
+        Self::each_node_with_trailing_end(
             conditions.iter(),
             Some(conditions_next),
-            |node, next_start| {
+            |node, trailing_end| {
                 let condition = match node {
                     prism::Node::InNode { .. } => {
                         let node = node.as_in_node().unwrap();
-                        self.visit_case_in(node, next_start)
+                        self.visit_case_in(node, trailing_end)
                     }
                     _ => panic!("unexpected case expression branch: {:?}", node),
                 };
@@ -2011,7 +2007,7 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn visit_case_in(&mut self, node: prism::InNode, next_loc_start: Option<usize>) -> fmt::CaseIn {
+    fn visit_case_in(&mut self, node: prism::InNode, body_end: Option<usize>) -> fmt::CaseIn {
         let loc = node.location();
         let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
 
@@ -2022,7 +2018,7 @@ impl FmtNodeBuilder<'_> {
         let pattern = self.visit(node.pattern(), pattern_next);
 
         let mut case_in = fmt::CaseIn::new(was_flat, pattern);
-        let body = self.visit_statements(node.statements(), next_loc_start);
+        let body = self.visit_statements(node.statements(), body_end);
         case_in.set_body(body);
         case_in
     }
@@ -2134,13 +2130,13 @@ impl FmtNodeBuilder<'_> {
 
     fn visit_call_root<C: CallRoot>(&mut self, call: &C) -> fmt::MethodChain {
         let current_chain = call.receiver().map(|receiver| {
-            let next_loc_start = call
+            let receiver_trailing_end = call
                 .message_loc()
                 .or_else(|| call.opening_loc())
                 .or_else(|| call.arguments().map(|a| a.location()))
                 .or_else(|| call.block().map(|a| a.location()))
                 .map(|l| l.start_offset());
-            let node = self.visit(receiver, next_loc_start);
+            let node = self.visit(receiver, receiver_trailing_end);
             match node.kind {
                 fmt::Kind::MethodChain(chain) => (chain, node.trailing_trivia),
                 _ => (
@@ -2286,10 +2282,10 @@ impl FmtNodeBuilder<'_> {
                 }
                 let mut idx = 0;
                 let last_idx = nodes.len() - 1;
-                Self::each_node_with_next_start(
+                Self::each_node_with_trailing_end(
                     nodes.into_iter(),
                     closing_start,
-                    |node, next_start| {
+                    |node, trailing_end| {
                         if idx == last_idx {
                             args.last_comma_allowed = !matches!(
                                 node,
@@ -2300,12 +2296,12 @@ impl FmtNodeBuilder<'_> {
                         match node {
                             prism::Node::KeywordHashNode { .. } => {
                                 let node = node.as_keyword_hash_node().unwrap();
-                                self.each_keyword_hash_element(node, next_start, |fmt_node| {
+                                self.each_keyword_hash_element(node, trailing_end, |fmt_node| {
                                     args.append_node(fmt_node);
                                 });
                             }
                             _ => {
-                                let fmt_node = self.visit(node, next_start);
+                                let fmt_node = self.visit(node, trailing_end);
                                 args.append_node(fmt_node);
                             }
                         }
@@ -2323,14 +2319,14 @@ impl FmtNodeBuilder<'_> {
     fn each_keyword_hash_element(
         &mut self,
         node: prism::KeywordHashNode,
-        next_loc_start: Option<usize>,
+        trailing_end: Option<usize>,
         mut f: impl FnMut(fmt::Node),
     ) {
-        Self::each_node_with_next_start(
+        Self::each_node_with_trailing_end(
             node.elements().iter(),
-            next_loc_start,
-            |node, next_start| {
-                let element = self.visit(node, next_start);
+            trailing_end,
+            |node, trailing_end| {
+                let element = self.visit(node, trailing_end);
                 f(element);
             },
         );
@@ -2494,7 +2490,7 @@ impl FmtNodeBuilder<'_> {
     fn visit_block_parameters(
         &mut self,
         node: prism::BlockParametersNode,
-        next_loc_start: usize,
+        trailing_end: usize,
     ) -> fmt::BlockParameters {
         let opening_loc = node.opening_loc();
         let closing_loc = node.closing_loc();
@@ -2526,11 +2522,11 @@ impl FmtNodeBuilder<'_> {
         }
 
         if let Some(closing_start) = closing_start {
-            Self::each_node_with_next_start(
+            Self::each_node_with_trailing_end(
                 locals.iter(),
                 Some(closing_start),
-                |node, next_start| {
-                    let fmt_node = self.visit(node, next_start);
+                |node, trailing_end| {
+                    let fmt_node = self.visit(node, trailing_end);
                     block_params.append_local(fmt_node);
                 },
             );
@@ -2538,7 +2534,7 @@ impl FmtNodeBuilder<'_> {
             block_params.set_virtual_end(virtual_end);
         }
 
-        let trailing = self.take_trailing_comment(next_loc_start);
+        let trailing = self.take_trailing_comment(trailing_end);
         block_params.set_closing_trailing(trailing);
         block_params
     }
@@ -2639,8 +2635,8 @@ impl FmtNodeBuilder<'_> {
 
     fn visit_undef(&mut self, undef: prism::UndefNode) -> fmt::CallLike {
         let mut args = fmt::Arguments::new(None, None);
-        Self::each_node_with_next_start(undef.names().iter(), None, |node, next_start| {
-            let node = self.visit(node, next_start);
+        Self::each_node_with_trailing_end(undef.names().iter(), None, |node, trailing_end| {
+            let node = self.visit(node, trailing_end);
             args.append_node(node);
         });
         let mut call_like = fmt::CallLike::new("undef".to_string());
@@ -2758,22 +2754,22 @@ impl FmtNodeBuilder<'_> {
         let rights_first_start = rights.iter().next().map(|n| n.location().start_offset());
         let rparen_start = rparen_loc.as_ref().map(|l| l.start_offset());
 
-        let left_next_start = rest_start.or(rights_first_start).or(rparen_start);
-        Self::each_node_with_next_start(lefts.iter(), left_next_start, |node, next_start| {
-            let target = self.visit(node, next_start);
+        let left_trailing_end = rest_start.or(rights_first_start).or(rparen_start);
+        Self::each_node_with_trailing_end(lefts.iter(), left_trailing_end, |node, trailing_end| {
+            let target = self.visit(node, trailing_end);
             multi.append_target(target);
         });
 
         if !implicit_rest {
             if let Some(rest) = rest {
-                let rest_next_start = rights_first_start.or(rparen_start);
-                let target = self.visit(rest, rest_next_start);
+                let rest_trailing_end = rights_first_start.or(rparen_start);
+                let target = self.visit(rest, rest_trailing_end);
                 multi.append_target(target);
             }
         }
 
-        Self::each_node_with_next_start(rights.iter(), rparen_start, |node, next_start| {
-            let target = self.visit(node, next_start);
+        Self::each_node_with_trailing_end(rights.iter(), rparen_start, |node, trailing_end| {
+            let target = self.visit(node, trailing_end);
             multi.append_target(target);
         });
 
@@ -2855,13 +2851,13 @@ impl FmtNodeBuilder<'_> {
     fn parse_block_body(
         &mut self,
         body: Option<prism::Node>,
-        next_loc_start: usize,
+        trailing_end: usize,
     ) -> fmt::BlockBody {
         match body {
             Some(body) => match body {
                 prism::Node::StatementsNode { .. } => {
                     let stmts = body.as_statements_node().unwrap();
-                    let statements = self.visit_statements(Some(stmts), Some(next_loc_start));
+                    let statements = self.visit_statements(Some(stmts), Some(trailing_end));
                     fmt::BlockBody::new(statements)
                 }
                 prism::Node::BeginNode { .. } => {
@@ -2871,7 +2867,7 @@ impl FmtNodeBuilder<'_> {
                 _ => panic!("unexpected def body: {:?}", body),
             },
             None => {
-                let statements = self.wrap_as_statements(None, next_loc_start);
+                let statements = self.wrap_as_statements(None, trailing_end);
                 fmt::BlockBody::new(statements)
             }
         }
@@ -2963,11 +2959,11 @@ impl FmtNodeBuilder<'_> {
             .or(statements_start)
             .or(consequent_start)
             .unwrap_or(final_next);
-        Self::each_node_with_next_start(
+        Self::each_node_with_trailing_end(
             node.exceptions().iter(),
             Some(head_next),
-            |node, next_start| {
-                let fmt_node = self.visit(node, next_start);
+            |node, trailing_end| {
+                let fmt_node = self.visit(node, trailing_end);
                 rescue.append_exception(fmt_node);
             },
         );
@@ -2995,7 +2991,7 @@ impl FmtNodeBuilder<'_> {
     fn visit_parameter_nodes(
         &mut self,
         params: prism::ParametersNode,
-        next_loc_start: Option<usize>,
+        trailing_end: Option<usize>,
         mut f: impl FnMut(fmt::Node),
     ) {
         let mut nodes = vec![];
@@ -3020,8 +3016,8 @@ impl FmtNodeBuilder<'_> {
         if let Some(block) = params.block() {
             nodes.push(block.as_node());
         }
-        Self::each_node_with_next_start(nodes.into_iter(), next_loc_start, |node, next_start| {
-            let fmt_node = self.visit(node, next_start);
+        Self::each_node_with_trailing_end(nodes.into_iter(), trailing_end, |node, trailing_end| {
+            let fmt_node = self.visit(node, trailing_end);
             f(fmt_node);
         });
     }
@@ -3079,11 +3075,11 @@ impl FmtNodeBuilder<'_> {
             .map(|r| r.location().start_offset())
             .or_else(|| posts_head.as_ref().map(|p| p.location().start_offset()))
             .or(closing_start);
-        Self::each_node_with_next_start(
+        Self::each_node_with_trailing_end(
             node.requireds().iter(),
             requireds_next,
-            |node, next_start| {
-                let element = self.visit(node, next_start);
+            |node, trailing_end| {
+                let element = self.visit(node, trailing_end);
                 array.append_element(element);
             },
         );
@@ -3099,11 +3095,11 @@ impl FmtNodeBuilder<'_> {
         }
 
         if posts_head.is_some() {
-            Self::each_node_with_next_start(
+            Self::each_node_with_trailing_end(
                 node.posts().iter(),
                 closing_start,
-                |node, next_start| {
-                    let element = self.visit(node, next_start);
+                |node, trailing_end| {
+                    let element = self.visit(node, trailing_end);
                     array.append_element(element);
                 },
             );
@@ -3134,11 +3130,11 @@ impl FmtNodeBuilder<'_> {
         let left = self.visit(node.left(), Some(left_next));
         array.append_element(left);
 
-        Self::each_node_with_next_start(
+        Self::each_node_with_trailing_end(
             node.requireds().iter(),
             Some(right.location().start_offset()),
-            |node, next_start| {
-                let element = self.visit(node, next_start);
+            |node, trailing_end| {
+                let element = self.visit(node, trailing_end);
                 array.append_element(element);
             },
         );
@@ -3176,11 +3172,11 @@ impl FmtNodeBuilder<'_> {
             .as_ref()
             .map(|r| r.location().start_offset())
             .or(closing_start);
-        Self::each_node_with_next_start(
+        Self::each_node_with_trailing_end(
             node.elements().iter(),
             elements_next,
-            |node, next_start| {
-                let element = self.visit(node, next_start);
+            |node, trailing_end| {
+                let element = self.visit(node, trailing_end);
                 hash.append_element(element);
             },
         );
@@ -3328,10 +3324,10 @@ impl FmtNodeBuilder<'_> {
         }
     }
 
-    fn take_trailing_comment(&mut self, next_loc_start: usize) -> fmt::TrailingTrivia {
+    fn take_trailing_comment(&mut self, end: usize) -> fmt::TrailingTrivia {
         if let Some(comment) = self.comments.peek() {
             let loc = comment.location();
-            if (self.last_loc_end..=next_loc_start).contains(&loc.start_offset())
+            if (self.last_loc_end..=end).contains(&loc.start_offset())
                 && !self.is_at_line_start(loc.start_offset())
             {
                 self.last_loc_end = loc.end_offset() - 1;
