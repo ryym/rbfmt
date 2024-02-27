@@ -7,19 +7,19 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
     let comments = result.comments().peekable();
     let heredoc_map = HashMap::new();
 
-    let mut builder = FmtNodeBuilder {
+    let mut parser = Parser {
         src: &source,
         comments,
         heredoc_map,
         position_gen: 0,
         last_loc_end: 0,
     };
-    let fmt_node = builder.build_fmt_node(result.node());
+    let fmt_node = parser.parse_from_prism_node(result.node());
     // dbg!(&fmt_node);
     // dbg!(&builder.heredoc_map);
     Some(ParserResult {
         node: fmt_node,
-        heredoc_map: builder.heredoc_map,
+        heredoc_map: parser.heredoc_map,
     })
 }
 
@@ -391,7 +391,7 @@ enum MethodType {
     IndexAssign, // a[b] = c
 }
 
-struct FmtNodeBuilder<'src> {
+struct Parser<'src> {
     src: &'src [u8],
     comments: Peekable<prism::Comments<'src>>,
     heredoc_map: fmt::HeredocMap,
@@ -399,8 +399,8 @@ struct FmtNodeBuilder<'src> {
     last_loc_end: usize,
 }
 
-impl FmtNodeBuilder<'_> {
-    fn build_fmt_node(&mut self, node: prism::Node) -> fmt::Node {
+impl Parser<'_> {
+    fn parse_from_prism_node(&mut self, node: prism::Node) -> fmt::Node {
         self.visit(node, Some(self.src.len()))
     }
 
