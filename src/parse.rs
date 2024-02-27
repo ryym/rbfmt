@@ -1,3 +1,6 @@
+mod src;
+mod strings;
+
 use crate::fmt;
 use std::{collections::HashMap, iter::Peekable, ops::Range};
 
@@ -498,100 +501,59 @@ impl Parser<'_> {
 
             prism::Node::StringNode { .. } => {
                 let node = node.as_string_node().unwrap();
-                let kind = if Self::is_heredoc(node.opening_loc().as_ref()) {
-                    let heredoc_opening = self.visit_simple_heredoc(
-                        node.opening_loc(),
-                        node.content_loc(),
-                        node.closing_loc(),
-                    );
-                    fmt::Kind::HeredocOpening(heredoc_opening)
-                } else {
-                    let str = self.visit_string_like(
-                        node.opening_loc(),
-                        node.content_loc(),
-                        node.closing_loc(),
-                    );
-                    fmt::Kind::StringLike(str)
-                };
-                fmt::Node::new(kind)
+                self.parse_string_or_heredoc(
+                    node.opening_loc(),
+                    node.content_loc(),
+                    node.closing_loc(),
+                )
             }
             prism::Node::InterpolatedStringNode { .. } => {
                 let node = node.as_interpolated_string_node().unwrap();
-                let kind = if Self::is_heredoc(node.opening_loc().as_ref()) {
-                    let heredoc_opening = self.visit_complex_heredoc(
-                        node.opening_loc(),
-                        node.parts(),
-                        node.closing_loc(),
-                    );
-                    fmt::Kind::HeredocOpening(heredoc_opening)
-                } else {
-                    let str = self.visit_interpolated(
-                        node.opening_loc(),
-                        node.parts(),
-                        node.closing_loc(),
-                    );
-                    fmt::Kind::DynStringLike(str)
-                };
-                fmt::Node::new(kind)
+                self.parse_interpolated_string_or_heredoc(
+                    node.opening_loc(),
+                    node.parts(),
+                    node.closing_loc(),
+                )
             }
 
             prism::Node::XStringNode { .. } => {
                 let node = node.as_x_string_node().unwrap();
-                let kind = if Self::is_heredoc(Some(&node.opening_loc())) {
-                    let heredoc_opening = self.visit_simple_heredoc(
-                        Some(node.opening_loc()),
-                        node.content_loc(),
-                        Some(node.closing_loc()),
-                    );
-                    fmt::Kind::HeredocOpening(heredoc_opening)
-                } else {
-                    let str = self.visit_string_like(
-                        Some(node.opening_loc()),
-                        node.content_loc(),
-                        Some(node.closing_loc()),
-                    );
-                    fmt::Kind::StringLike(str)
-                };
-                fmt::Node::new(kind)
+                self.parse_string_or_heredoc(
+                    Some(node.opening_loc()),
+                    node.content_loc(),
+                    Some(node.closing_loc()),
+                )
             }
             prism::Node::InterpolatedXStringNode { .. } => {
                 let node = node.as_interpolated_x_string_node().unwrap();
-                let kind = if Self::is_heredoc(Some(&node.opening_loc())) {
-                    let heredoc_opening = self.visit_complex_heredoc(
-                        Some(node.opening_loc()),
-                        node.parts(),
-                        Some(node.closing_loc()),
-                    );
-                    fmt::Kind::HeredocOpening(heredoc_opening)
-                } else {
-                    let str = self.visit_interpolated(
-                        Some(node.opening_loc()),
-                        node.parts(),
-                        Some(node.closing_loc()),
-                    );
-                    fmt::Kind::DynStringLike(str)
-                };
-                fmt::Node::new(kind)
+                self.parse_interpolated_string_or_heredoc(
+                    Some(node.opening_loc()),
+                    node.parts(),
+                    Some(node.closing_loc()),
+                )
             }
 
             prism::Node::SymbolNode { .. } => {
                 let node = node.as_symbol_node().unwrap();
                 // XXX: I cannot find the case where the value_loc is None.
                 let value_loc = node.value_loc().expect("symbol value must exist");
-                let str = self.visit_string_like(node.opening_loc(), value_loc, node.closing_loc());
+                let str = self.parse_string(node.opening_loc(), value_loc, node.closing_loc());
                 fmt::Node::new(fmt::Kind::StringLike(str))
             }
             prism::Node::InterpolatedSymbolNode { .. } => {
                 let node = node.as_interpolated_symbol_node().unwrap();
-                let str =
-                    self.visit_interpolated(node.opening_loc(), node.parts(), node.closing_loc());
+                let str = self.parse_interpolated_string(
+                    node.opening_loc(),
+                    node.parts(),
+                    node.closing_loc(),
+                );
                 let kind = fmt::Kind::DynStringLike(str);
                 fmt::Node::new(kind)
             }
 
             prism::Node::RegularExpressionNode { .. } => {
                 let node = node.as_regular_expression_node().unwrap();
-                let str = self.visit_string_like(
+                let str = self.parse_string(
                     Some(node.opening_loc()),
                     node.content_loc(),
                     Some(node.closing_loc()),
@@ -600,7 +562,7 @@ impl Parser<'_> {
             }
             prism::Node::InterpolatedRegularExpressionNode { .. } => {
                 let node = node.as_interpolated_regular_expression_node().unwrap();
-                let str = self.visit_interpolated(
+                let str = self.parse_interpolated_string(
                     Some(node.opening_loc()),
                     node.parts(),
                     Some(node.closing_loc()),
@@ -610,7 +572,7 @@ impl Parser<'_> {
             }
             prism::Node::MatchLastLineNode { .. } => {
                 let node = node.as_match_last_line_node().unwrap();
-                let str = self.visit_string_like(
+                let str = self.parse_string(
                     Some(node.opening_loc()),
                     node.content_loc(),
                     Some(node.closing_loc()),
@@ -619,7 +581,7 @@ impl Parser<'_> {
             }
             prism::Node::InterpolatedMatchLastLineNode { .. } => {
                 let node = node.as_interpolated_match_last_line_node().unwrap();
-                let str = self.visit_interpolated(
+                let str = self.parse_interpolated_string(
                     Some(node.opening_loc()),
                     node.parts(),
                     Some(node.closing_loc()),
@@ -1396,215 +1358,6 @@ impl Parser<'_> {
         let path = Self::source_lossy_at(&child_loc);
         const_path.append_part(path_leading, path);
         const_path
-    }
-
-    fn visit_string_like(
-        &mut self,
-        opening_loc: Option<prism::Location>,
-        value_loc: prism::Location,
-        closing_loc: Option<prism::Location>,
-    ) -> fmt::StringLike {
-        let value = Self::source_lossy_at(&value_loc);
-        let opening = opening_loc.as_ref().map(Self::source_lossy_at);
-        let closing = closing_loc.as_ref().map(Self::source_lossy_at);
-        fmt::StringLike::new(opening, value.into(), closing)
-    }
-
-    fn visit_interpolated(
-        &mut self,
-        opening_loc: Option<prism::Location>,
-        parts: prism::NodeList,
-        closing_loc: Option<prism::Location>,
-    ) -> fmt::DynStringLike {
-        let opening = opening_loc.as_ref().map(Self::source_lossy_at);
-        let closing = closing_loc.as_ref().map(Self::source_lossy_at);
-        let mut dstr = fmt::DynStringLike::new(opening, closing);
-        for part in parts.iter() {
-            match part {
-                prism::Node::StringNode { .. } => {
-                    let node = part.as_string_node().unwrap();
-                    let node_end = node.location().end_offset();
-                    let str = self.visit_string_like(
-                        node.opening_loc(),
-                        node.content_loc(),
-                        node.closing_loc(),
-                    );
-                    dstr.append_part(fmt::DynStrPart::Str(str));
-                    self.last_loc_end = node_end;
-                }
-                prism::Node::InterpolatedStringNode { .. } => {
-                    let node = part.as_interpolated_string_node().unwrap();
-                    let node_end = node.location().end_offset();
-                    let str = self.visit_interpolated(
-                        node.opening_loc(),
-                        node.parts(),
-                        node.closing_loc(),
-                    );
-                    dstr.append_part(fmt::DynStrPart::DynStr(str));
-                    self.last_loc_end = node_end;
-                }
-                prism::Node::EmbeddedStatementsNode { .. } => {
-                    let node = part.as_embedded_statements_node().unwrap();
-                    let loc = node.location();
-                    self.last_loc_end = node.opening_loc().end_offset();
-                    let statements =
-                        self.visit_statements(node.statements(), Some(loc.end_offset()));
-                    let opening = Self::source_lossy_at(&node.opening_loc());
-                    let closing = Self::source_lossy_at(&node.closing_loc());
-                    let embedded_stmts = fmt::EmbeddedStatements::new(opening, statements, closing);
-                    dstr.append_part(fmt::DynStrPart::Statements(embedded_stmts));
-                }
-                prism::Node::EmbeddedVariableNode { .. } => {
-                    let node = part.as_embedded_variable_node().unwrap();
-                    let operator = Self::source_lossy_at(&node.operator_loc());
-                    let variable = Self::source_lossy_at(&node.variable().location());
-                    let embedded_var = fmt::EmbeddedVariable::new(operator, variable);
-                    dstr.append_part(fmt::DynStrPart::Variable(embedded_var));
-                }
-                _ => panic!("unexpected string interpolation node: {:?}", part),
-            }
-        }
-        dstr
-    }
-
-    fn is_heredoc(str_opening_loc: Option<&prism::Location>) -> bool {
-        if let Some(loc) = str_opening_loc {
-            let bytes = loc.as_slice();
-            bytes.len() > 2 && bytes[0] == b'<' && bytes[1] == b'<'
-        } else {
-            false
-        }
-    }
-
-    fn visit_simple_heredoc(
-        &mut self,
-        opening_loc: Option<prism::Location>,
-        content_loc: prism::Location,
-        closing_loc: Option<prism::Location>,
-    ) -> fmt::HeredocOpening {
-        let open = opening_loc.as_ref().unwrap().as_slice();
-        let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
-        let opening_id = String::from_utf8_lossy(id).to_string();
-        let closing_loc = closing_loc.expect("heredoc must have closing");
-        let closing_id = Self::source_lossy_at(&closing_loc)
-            .trim_start()
-            .trim_end_matches('\n')
-            .to_string();
-        let str = self.visit_string_like(None, content_loc, None);
-        let heredoc = fmt::Heredoc {
-            id: closing_id,
-            indent_mode,
-            parts: vec![fmt::HeredocPart::Str(str)],
-        };
-        let pos = self.next_pos();
-        self.heredoc_map.insert(pos, heredoc);
-        fmt::HeredocOpening::new(pos, opening_id, indent_mode)
-    }
-
-    fn visit_complex_heredoc(
-        &mut self,
-        opening_loc: Option<prism::Location>,
-        content_parts: prism::NodeList,
-        closing_loc: Option<prism::Location>,
-    ) -> fmt::HeredocOpening {
-        let open = opening_loc.unwrap().as_slice();
-        let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
-        let opening_id = String::from_utf8_lossy(id).to_string();
-
-        // I don't know why but ruby-prism ignores spaces before an interpolation in some cases.
-        // It is confusing so we parse all spaces before interpolation.
-        fn parse_spaces_before_interpolation(
-            last_str_end: Option<usize>,
-            embedded_start: usize,
-            src: &[u8],
-            parts: &mut Vec<fmt::HeredocPart>,
-        ) {
-            let str = if let Some(last_str_end) = last_str_end {
-                if last_str_end < embedded_start {
-                    let value = src[last_str_end..embedded_start].to_vec();
-                    Some(fmt::StringLike::new(None, value, None))
-                } else {
-                    None
-                }
-            } else {
-                let mut i = embedded_start - 1;
-                while src[i] != b'\n' {
-                    i -= 1;
-                }
-                if i + 1 < embedded_start {
-                    let value = src[(i + 1)..embedded_start].to_vec();
-                    Some(fmt::StringLike::new(None, value, None))
-                } else {
-                    None
-                }
-            };
-            if let Some(str) = str {
-                parts.push(fmt::HeredocPart::Str(str));
-            }
-        }
-
-        let mut parts = vec![];
-        let mut last_str_end: Option<usize> = None;
-        for part in content_parts.iter() {
-            match part {
-                prism::Node::StringNode { .. } => {
-                    let node = part.as_string_node().unwrap();
-                    let node_end = node.location().end_offset();
-                    let str = self.visit_string_like(
-                        node.opening_loc(),
-                        node.content_loc(),
-                        node.closing_loc(),
-                    );
-                    parts.push(fmt::HeredocPart::Str(str));
-                    self.last_loc_end = node_end;
-                    last_str_end = Some(node_end);
-                }
-                prism::Node::EmbeddedStatementsNode { .. } => {
-                    let node = part.as_embedded_statements_node().unwrap();
-                    let loc = node.location();
-                    parse_spaces_before_interpolation(
-                        last_str_end,
-                        loc.start_offset(),
-                        self.src,
-                        &mut parts,
-                    );
-                    let statements =
-                        self.visit_statements(node.statements(), Some(loc.end_offset()));
-                    let opening = Self::source_lossy_at(&node.opening_loc());
-                    let closing = Self::source_lossy_at(&node.closing_loc());
-                    let embedded = fmt::EmbeddedStatements::new(opening, statements, closing);
-                    parts.push(fmt::HeredocPart::Statements(embedded));
-                }
-                prism::Node::EmbeddedVariableNode { .. } => {
-                    let node = part.as_embedded_variable_node().unwrap();
-                    let loc = node.location();
-                    parse_spaces_before_interpolation(
-                        last_str_end,
-                        loc.start_offset(),
-                        self.src,
-                        &mut parts,
-                    );
-                    let operator = Self::source_lossy_at(&node.operator_loc());
-                    let variable = Self::source_lossy_at(&node.variable().location());
-                    let embedded_var = fmt::EmbeddedVariable::new(operator, variable);
-                    parts.push(fmt::HeredocPart::Variable(embedded_var));
-                }
-                _ => panic!("unexpected heredoc part: {:?}", part),
-            }
-        }
-        let closing_loc = closing_loc.expect("heredoc must have closing");
-        let closing_id = Self::source_lossy_at(&closing_loc)
-            .trim_start()
-            .trim_end_matches('\n')
-            .to_string();
-        let heredoc = fmt::Heredoc {
-            id: closing_id,
-            indent_mode,
-            parts,
-        };
-        let pos = self.next_pos();
-        self.heredoc_map.insert(pos, heredoc);
-        fmt::HeredocOpening::new(pos, opening_id, indent_mode)
     }
 
     fn visit_statements(
