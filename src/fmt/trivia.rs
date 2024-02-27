@@ -36,6 +36,12 @@ impl LeadingTrivia {
         self.lines.push(trivia);
     }
 
+    pub(crate) fn merge(&mut self, other: LeadingTrivia) {
+        for line in other.lines {
+            self.append_line(line);
+        }
+    }
+
     pub(crate) fn format(
         &self,
         o: &mut Output,

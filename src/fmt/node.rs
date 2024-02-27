@@ -37,6 +37,8 @@ mod ternary;
 mod virtual_end;
 mod whiles;
 
+use std::mem;
+
 pub(crate) use self::{
     alias::*, alt_pattern_chain::*, arguments::*, array::*, array_pattern::*, assign::*, assoc::*,
     atom::*, begin::*, block::*, call_like::*, case::*, case_match::*, class_like::*,
@@ -61,7 +63,11 @@ pub(crate) struct Node {
 }
 
 impl Node {
-    pub(crate) fn new(leading_trivia: LeadingTrivia, kind: Kind) -> Self {
+    pub(crate) fn new(kind: Kind) -> Self {
+        Self::with_leading_trivia(LeadingTrivia::new(), kind)
+    }
+
+    pub(crate) fn with_leading_trivia(leading_trivia: LeadingTrivia, kind: Kind) -> Self {
         let shape = leading_trivia.shape().add(&kind.shape());
         Self {
             leading_trivia,
@@ -71,13 +77,19 @@ impl Node {
         }
     }
 
+    pub(crate) fn prepend_leading_trivia(&mut self, leading_trivia: LeadingTrivia) {
+        self.shape.insert(leading_trivia.shape());
+        if self.leading_trivia.is_empty() {
+            self.leading_trivia = leading_trivia;
+        } else {
+            let current = mem::replace(&mut self.leading_trivia, leading_trivia);
+            self.leading_trivia.merge(current);
+        }
+    }
+
     pub(crate) fn set_trailing_trivia(&mut self, trailing_trivia: TrailingTrivia) {
         self.shape.append(trailing_trivia.shape());
         self.trailing_trivia = trailing_trivia;
-    }
-
-    pub(crate) fn without_trivia(kind: Kind) -> Self {
-        Self::new(LeadingTrivia::new(), kind)
     }
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
