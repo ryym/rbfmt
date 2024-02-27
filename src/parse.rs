@@ -439,8 +439,21 @@ impl FmtNodeBuilder<'_> {
             }
             _ => self.take_leading_trivia(loc.start_offset()),
         };
+        let mut node = self.parse_node(node, trailing_end);
+        node.prepend_leading_trivia(leading);
 
-        let mut node = match node {
+        self.last_loc_end = loc_end;
+
+        if let Some(trailing_end) = trailing_end {
+            let trailing = self.take_trailing_comment(trailing_end);
+            node.set_trailing_trivia(trailing);
+        }
+
+        node
+    }
+
+    fn parse_node(&mut self, node: prism::Node, trailing_end: Option<usize>) -> fmt::Node {
+        match node {
             prism::Node::ProgramNode { .. } => {
                 let node = node.as_program_node().unwrap();
                 let statements = self.visit_statements(Some(node.statements()), trailing_end);
@@ -1351,16 +1364,7 @@ impl FmtNodeBuilder<'_> {
             }
 
             _ => todo!("parse {:?}", node),
-        };
-        node.prepend_leading_trivia(leading);
-
-        self.last_loc_end = loc_end;
-
-        if let Some(trailing_end) = trailing_end {
-            let trailing = self.take_trailing_comment(trailing_end);
-            node.set_trailing_trivia(trailing);
         }
-        node
     }
 
     fn parse_atom(&mut self, node: prism::Node) -> fmt::Node {
