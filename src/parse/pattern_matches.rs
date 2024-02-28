@@ -45,7 +45,7 @@ impl<'src> super::Parser<'src> {
             },
         );
 
-        let otherwise = consequent.map(|node| self.visit_else(node, end_loc.start_offset()));
+        let otherwise = consequent.map(|node| self.parse_else(node, end_loc.start_offset()));
 
         let case_match = fmt::CaseMatch {
             case_trailing,

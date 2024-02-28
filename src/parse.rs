@@ -2,9 +2,11 @@ mod arrays;
 mod assigns;
 mod atoms;
 mod begins;
+mod blocks;
 mod cases;
 mod classes;
 mod consts;
+mod elses;
 mod hashes;
 mod ifs;
 mod loops;
@@ -635,20 +637,6 @@ impl Parser<'_> {
         }
     }
 
-    fn visit_else(&mut self, node: prism::ElseNode, else_end: usize) -> fmt::Else {
-        let else_next_loc = node
-            .statements()
-            .as_ref()
-            .map(|s| s.location().start_offset())
-            .unwrap_or(else_end);
-        let keyword_trailing = self.take_trailing_comment(else_next_loc);
-        let body = self.parse_statements_body(node.statements(), Some(else_end));
-        fmt::Else {
-            keyword_trailing,
-            body,
-        }
-    }
-
     fn each_keyword_hash_element(
         &mut self,
         node: prism::KeywordHashNode,
@@ -663,31 +651,6 @@ impl Parser<'_> {
                 f(element);
             },
         );
-    }
-
-    fn parse_block_body(
-        &mut self,
-        body: Option<prism::Node>,
-        trailing_end: usize,
-    ) -> fmt::BlockBody {
-        match body {
-            Some(body) => match body {
-                prism::Node::StatementsNode { .. } => {
-                    let stmts = body.as_statements_node().unwrap();
-                    let statements = self.parse_statements_body(Some(stmts), Some(trailing_end));
-                    fmt::BlockBody::new(statements)
-                }
-                prism::Node::BeginNode { .. } => {
-                    let node = body.as_begin_node().unwrap();
-                    self.parse_begin_body(node)
-                }
-                _ => panic!("unexpected def body: {:?}", body),
-            },
-            None => {
-                let statements = self.wrap_as_statements(None, trailing_end);
-                fmt::BlockBody::new(statements)
-            }
-        }
     }
 
     fn take_end_trivia_as_virtual_end(&mut self, end: Option<usize>) -> Option<fmt::VirtualEnd> {

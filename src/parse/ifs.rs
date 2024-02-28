@@ -133,7 +133,7 @@ impl<'src> super::Parser<'src> {
                 let end_loc = node
                     .end_keyword_loc()
                     .expect("if/unless expression must have end");
-                let if_last = self.visit_else(node, end_loc.start_offset());
+                let if_last = self.parse_else(node, end_loc.start_offset());
                 ifexpr.if_last = Some(if_last);
             }
             _ => {
