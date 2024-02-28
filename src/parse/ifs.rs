@@ -76,7 +76,7 @@ impl<'src> super::Parser<'src> {
             Some(conseq) => {
                 // take trailing of else/elsif
                 let else_start = conseq.location().start_offset();
-                let body = self.visit_statements(node.statements, Some(else_start));
+                let body = self.parse_statements_body(node.statements, Some(else_start));
                 let if_first = fmt::Conditional::new(predicate, body);
                 let mut ifexpr = fmt::If::new(node.is_if, if_first);
                 self.parse_ifelse(conseq, &mut ifexpr);
@@ -84,7 +84,7 @@ impl<'src> super::Parser<'src> {
             }
             // if...end
             None => {
-                let body = self.visit_statements(node.statements, Some(end_start));
+                let body = self.parse_statements_body(node.statements, Some(end_start));
                 let if_first = fmt::Conditional::new(predicate, body);
                 fmt::If::new(node.is_if, if_first)
             }
@@ -119,7 +119,7 @@ impl<'src> super::Parser<'src> {
                     .as_ref()
                     .map(|n| n.location().start_offset())
                     .unwrap_or(end_loc.start_offset());
-                let body = self.visit_statements(node.statements(), Some(body_end_loc));
+                let body = self.parse_statements_body(node.statements(), Some(body_end_loc));
 
                 let conditional = fmt::Conditional::new(predicate, body);
                 ifexpr.elsifs.push(conditional);

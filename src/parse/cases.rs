@@ -76,7 +76,7 @@ impl<'src> super::Parser<'src> {
             },
         );
 
-        let body = self.visit_statements(node.statements(), body_end);
+        let body = self.parse_statements_body(node.statements(), body_end);
         when.set_body(body);
         when
     }

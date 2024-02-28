@@ -68,7 +68,7 @@ impl<'src> super::Parser<'src> {
         let pattern = self.visit(node.pattern(), pattern_next);
 
         let mut case_in = fmt::CaseIn::new(was_flat, pattern);
-        let body = self.visit_statements(node.statements(), body_end);
+        let body = self.parse_statements_body(node.statements(), body_end);
         case_in.set_body(body);
         case_in
     }

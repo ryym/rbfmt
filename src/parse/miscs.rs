@@ -45,7 +45,7 @@ impl<'src> super::Parser<'src> {
         let keyword = Self::source_lossy_at(&keyword_loc);
         let closing_start = closing_loc.start_offset();
         let was_flat = !self.does_line_break_exist_in(opening_loc.end_offset(), closing_start);
-        let statements = self.visit_statements(statements, Some(closing_start));
+        let statements = self.parse_statements_body(statements, Some(closing_start));
         let exec = fmt::PrePostExec::new(keyword, statements, was_flat);
         fmt::Node::new(fmt::Kind::PrePostExec(exec))
     }

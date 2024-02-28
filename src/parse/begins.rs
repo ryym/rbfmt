@@ -39,7 +39,7 @@ impl<'src> super::Parser<'src> {
             .or(else_start)
             .or(ensure_start)
             .unwrap_or(end_loc.start_offset());
-        let statements = self.visit_statements(node.statements(), Some(statements_next));
+        let statements = self.parse_statements_body(node.statements(), Some(statements_next));
         let mut body = fmt::BlockBody::new(statements);
 
         if let Some(rescue_node) = node.rescue_clause() {
@@ -60,7 +60,7 @@ impl<'src> super::Parser<'src> {
                 .unwrap_or(end_loc.start_offset());
             let else_trailing = self.take_trailing_comment(keyword_next);
             let else_next = ensure_start.unwrap_or(end_loc.start_offset());
-            let else_statements = self.visit_statements(statements, Some(else_next));
+            let else_statements = self.parse_statements_body(statements, Some(else_next));
             body.set_rescue_else(fmt::Else {
                 keyword_trailing: else_trailing,
                 body: else_statements,
@@ -74,7 +74,8 @@ impl<'src> super::Parser<'src> {
                 .map(|s| s.location().start_offset())
                 .unwrap_or(end_loc.start_offset());
             let ensure_trailing = self.take_trailing_comment(keyword_next);
-            let ensure_statements = self.visit_statements(statements, Some(end_loc.start_offset()));
+            let ensure_statements =
+                self.parse_statements_body(statements, Some(end_loc.start_offset()));
             body.set_ensure(fmt::Else {
                 keyword_trailing: ensure_trailing,
                 body: ensure_statements,
@@ -125,7 +126,7 @@ impl<'src> super::Parser<'src> {
         rescue.set_head_trailing(head_trailing);
 
         let statements_next = consequent_start.unwrap_or(final_next);
-        let statements = self.visit_statements(statements, Some(statements_next));
+        let statements = self.parse_statements_body(statements, Some(statements_next));
         rescue.set_statements(statements);
         rescues.push(rescue);
 

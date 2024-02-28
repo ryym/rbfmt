@@ -85,7 +85,7 @@ impl<'src> super::Parser<'src> {
                     let loc = node.location();
                     self.last_loc_end = node.opening_loc().end_offset();
                     let statements =
-                        self.visit_statements(node.statements(), Some(loc.end_offset()));
+                        self.parse_statements_body(node.statements(), Some(loc.end_offset()));
                     let opening = src::source_lossy_at(&node.opening_loc());
                     let closing = src::source_lossy_at(&node.closing_loc());
                     let embedded_stmts = fmt::EmbeddedStatements::new(opening, statements, closing);
@@ -165,7 +165,7 @@ impl<'src> super::Parser<'src> {
                         &mut parts,
                     );
                     let statements =
-                        self.visit_statements(node.statements(), Some(loc.end_offset()));
+                        self.parse_statements_body(node.statements(), Some(loc.end_offset()));
                     let opening = src::source_lossy_at(&node.opening_loc());
                     let closing = src::source_lossy_at(&node.closing_loc());
                     let embedded = fmt::EmbeddedStatements::new(opening, statements, closing);

@@ -10,7 +10,8 @@ pub(super) struct Postmodifier<'src> {
 impl<'src> super::Parser<'src> {
     pub(super) fn parse_postmodifier(&mut self, postmod: Postmodifier) -> fmt::Node {
         let kwd_loc = postmod.keyword_loc;
-        let statements = self.visit_statements(postmod.statements, Some(kwd_loc.start_offset()));
+        let statements =
+            self.parse_statements_body(postmod.statements, Some(kwd_loc.start_offset()));
 
         let predicate = self.visit(postmod.predicate, None);
 
