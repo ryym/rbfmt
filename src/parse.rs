@@ -1,7 +1,9 @@
+mod arrays;
 mod assigns;
 mod atoms;
 mod calls;
 mod cases;
+mod hashes;
 mod ifs;
 mod loops;
 mod postmodifiers;
@@ -142,8 +144,7 @@ impl Parser<'_> {
 
             prism::Node::ConstantPathNode { .. } => {
                 let node = node.as_constant_path_node().unwrap();
-                let const_path = self.visit_constant_path(node.parent(), node.child());
-                fmt::Node::new(fmt::Kind::ConstantPath(const_path))
+                self.parse_constant_path(node.parent(), node.child())
             }
 
             prism::Node::StringNode { .. } => {
@@ -422,8 +423,7 @@ impl Parser<'_> {
             prism::Node::ConstantTargetNode { .. } => self.parse_as_atom(node),
             prism::Node::ConstantPathTargetNode { .. } => {
                 let node = node.as_constant_path_target_node().unwrap();
-                let const_path = self.visit_constant_path(node.parent(), node.child());
-                fmt::Node::new(fmt::Kind::ConstantPath(const_path))
+                self.parse_constant_path(node.parent(), node.child())
             }
             prism::Node::CallTargetNode { .. } => {
                 let node = node.as_call_target_node().unwrap();
@@ -448,24 +448,15 @@ impl Parser<'_> {
                     node.rparen_loc(),
                 )
             }
-            prism::Node::ImplicitRestNode { .. } => {
-                let atom = fmt::Atom("".to_string());
-                fmt::Node::new(fmt::Kind::Atom(atom))
-            }
+            prism::Node::ImplicitRestNode { .. } => self.parse_implicit(),
 
             prism::Node::SplatNode { .. } => {
                 let node = node.as_splat_node().unwrap();
-                let operator = Self::source_lossy_at(&node.operator_loc());
-                let expr = node.expression().map(|expr| self.visit(expr, None));
-                let splat = fmt::Prefix::new(operator, expr);
-                fmt::Node::new(fmt::Kind::Prefix(splat))
+                self.parse_splat(node)
             }
             prism::Node::AssocSplatNode { .. } => {
                 let node = node.as_assoc_splat_node().unwrap();
-                let operator = Self::source_lossy_at(&node.operator_loc());
-                let value = node.value().map(|v| self.visit(v, None));
-                let splat = fmt::Prefix::new(operator, value);
-                fmt::Node::new(fmt::Kind::Prefix(splat))
+                self.parse_assoc_splat(node)
             }
             prism::Node::BlockArgumentNode { .. } => {
                 let node = node.as_block_argument_node().unwrap();
@@ -475,75 +466,18 @@ impl Parser<'_> {
 
             prism::Node::ArrayNode { .. } => {
                 let node = node.as_array_node().unwrap();
-                let opening_loc = node.opening_loc();
-                let closing_loc = node.closing_loc();
-                let opening = opening_loc.as_ref().map(Self::source_lossy_at);
-                let closing = closing_loc.as_ref().map(Self::source_lossy_at);
-                let mut array = fmt::Array::new(opening, closing);
-                let closing_start = closing_loc.map(|l| l.start_offset());
-                Self::each_node_with_trailing_end(
-                    node.elements().iter(),
-                    closing_start,
-                    |node, trailing_end| match node {
-                        prism::Node::KeywordHashNode { .. } => {
-                            let node = node.as_keyword_hash_node().unwrap();
-                            self.each_keyword_hash_element(node, trailing_end, |element| {
-                                array.append_element(element);
-                            });
-                        }
-                        _ => {
-                            let element = self.visit(node, trailing_end);
-                            array.append_element(element);
-                        }
-                    },
-                );
-                if let Some(closing_start) = closing_start {
-                    let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
-                    array.set_virtual_end(virtual_end);
-                }
-                fmt::Node::new(fmt::Kind::Array(array))
+                self.parse_array(node)
             }
 
             prism::Node::HashNode { .. } => {
                 let node = node.as_hash_node().unwrap();
-                let opening_loc = node.opening_loc();
-                let closing_loc = node.closing_loc();
-                let opening = Self::source_lossy_at(&opening_loc);
-                let closing = Self::source_lossy_at(&closing_loc);
-                let should_be_inline = if let Some(first_element) = node.elements().iter().next() {
-                    !self.does_line_break_exist_in(
-                        opening_loc.start_offset(),
-                        first_element.location().start_offset(),
-                    )
-                } else {
-                    true
-                };
-                let mut hash = fmt::Hash::new(opening, closing, should_be_inline);
-                let closing_start = closing_loc.start_offset();
-                Self::each_node_with_trailing_end(
-                    node.elements().iter(),
-                    Some(closing_start),
-                    |node, trailing_end| {
-                        let element = self.visit(node, trailing_end);
-                        hash.append_element(element);
-                    },
-                );
-                let virtual_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
-                hash.set_virtual_end(virtual_end);
-                fmt::Node::new(fmt::Kind::Hash(hash))
+                self.parse_hash(node)
             }
             prism::Node::AssocNode { .. } => {
                 let node = node.as_assoc_node().unwrap();
-                let key = node.key();
-                let key = self.visit(key, None);
-                let operator = node.operator_loc().map(|l| Self::source_lossy_at(&l));
-                let value = self.visit(node.value(), None);
-                let assoc = fmt::Assoc::new(key, operator, value);
-                fmt::Node::new(fmt::Kind::Assoc(assoc))
+                self.parse_assoc(node)
             }
-            prism::Node::ImplicitNode { .. } => {
-                fmt::Node::new(fmt::Kind::Atom(fmt::Atom("".to_string())))
-            }
+            prism::Node::ImplicitNode { .. } => self.parse_implicit(),
 
             prism::Node::ParenthesesNode { .. } => {
                 let node = node.as_parentheses_node().unwrap();
@@ -769,31 +703,6 @@ impl Parser<'_> {
 
             _ => todo!("parse {:?}", node),
         }
-    }
-
-    fn visit_constant_path(
-        &mut self,
-        parent: Option<prism::Node>,
-        child: prism::Node,
-    ) -> fmt::ConstantPath {
-        let mut const_path = match parent {
-            Some(parent) => {
-                let parent = self.visit(parent, None);
-                match parent.kind {
-                    fmt::Kind::ConstantPath(const_path) => const_path,
-                    _ => fmt::ConstantPath::new(Some(parent)),
-                }
-            }
-            None => fmt::ConstantPath::new(None),
-        };
-        if !matches!(child, prism::Node::ConstantReadNode { .. }) {
-            panic!("unexpected constant path child: {:?}", child);
-        }
-        let child_loc = child.location();
-        let path_leading = self.take_leading_trivia(child_loc.start_offset());
-        let path = Self::source_lossy_at(&child_loc);
-        const_path.append_part(path_leading, path);
-        const_path
     }
 
     fn visit_statements(

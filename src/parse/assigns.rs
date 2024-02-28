@@ -23,10 +23,9 @@ impl<'src> super::Parser<'src> {
         operator_loc: prism::Location,
         value: prism::Node,
     ) -> fmt::Node {
-        let const_path = self.visit_constant_path(const_path.parent(), const_path.child());
+        let target = self.parse_constant_path(const_path.parent(), const_path.child());
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.visit(value, None);
-        let target = fmt::Node::new(fmt::Kind::ConstantPath(const_path));
         let assign = fmt::Assign::new(target, operator, value);
         fmt::Node::new(fmt::Kind::Assign(assign))
     }
