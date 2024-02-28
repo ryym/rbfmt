@@ -1,6 +1,7 @@
 mod atoms;
 mod cases;
 mod ifs;
+mod loops;
 mod postmodifiers;
 mod regexps;
 mod src;
@@ -569,47 +570,16 @@ impl Parser<'_> {
 
             prism::Node::WhileNode { .. } => {
                 let node = node.as_while_node().unwrap();
-                if let Some(closing_loc) = node.closing_loc() {
-                    let whle = self.visit_while_or_until(
-                        true,
-                        node.predicate(),
-                        node.statements(),
-                        closing_loc,
-                    );
-                    fmt::Node::new(fmt::Kind::While(whle))
-                } else {
-                    self.parse_postmodifier(postmodifiers::Postmodifier {
-                        keyword: "while".to_string(),
-                        keyword_loc: node.keyword_loc(),
-                        predicate: node.predicate(),
-                        statements: node.statements(),
-                    })
-                }
+                self.parse_while(node)
             }
             prism::Node::UntilNode { .. } => {
                 let node = node.as_until_node().unwrap();
-                if let Some(closing_loc) = node.closing_loc() {
-                    let whle = self.visit_while_or_until(
-                        false,
-                        node.predicate(),
-                        node.statements(),
-                        closing_loc,
-                    );
-                    fmt::Node::new(fmt::Kind::While(whle))
-                } else {
-                    self.parse_postmodifier(postmodifiers::Postmodifier {
-                        keyword: "until".to_string(),
-                        keyword_loc: node.keyword_loc(),
-                        predicate: node.predicate(),
-                        statements: node.statements(),
-                    })
-                }
+                self.parse_until(node)
             }
 
             prism::Node::ForNode { .. } => {
                 let node = node.as_for_node().unwrap();
-                let expr = self.visit_for(node);
-                fmt::Node::new(fmt::Kind::For(expr))
+                self.parse_for(node)
             }
 
             prism::Node::RescueModifierNode { .. } => {
@@ -1389,42 +1359,6 @@ impl Parser<'_> {
         let pattern = self.visit(pattern, None);
         let operator = Self::source_lossy_at(&operator_loc);
         fmt::MatchAssign::new(expression, operator, pattern)
-    }
-
-    fn visit_while_or_until(
-        &mut self,
-        is_while: bool,
-        predicate: prism::Node,
-        body: Option<prism::StatementsNode>,
-        closing_loc: prism::Location,
-    ) -> fmt::While {
-        let predicate_next = body
-            .as_ref()
-            .map(|b| b.location().start_offset())
-            .unwrap_or(closing_loc.start_offset());
-        let predicate = self.visit(predicate, Some(predicate_next));
-        let body = self.visit_statements(body, Some(closing_loc.start_offset()));
-        let content = fmt::Conditional::new(predicate, body);
-        fmt::While { is_while, content }
-    }
-
-    fn visit_for(&mut self, node: prism::ForNode) -> fmt::For {
-        let body = node.statements();
-        let end_loc = node.end_keyword_loc();
-
-        let index = self.visit(node.index(), Some(node.in_keyword_loc().start_offset()));
-        let collection_next = body
-            .as_ref()
-            .map(|b| b.location().start_offset())
-            .unwrap_or(end_loc.start_offset());
-        let collection = self.visit(node.collection(), Some(collection_next));
-        let body = self.visit_statements(body, Some(end_loc.start_offset()));
-
-        fmt::For {
-            index: Box::new(index),
-            collection: Box::new(collection),
-            body,
-        }
     }
 
     fn visit_call_root<C: CallRoot>(&mut self, call: &C) -> fmt::MethodChain {
