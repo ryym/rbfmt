@@ -248,13 +248,11 @@ impl Parser<'_> {
             }
             prism::Node::ForwardingSuperNode { .. } => {
                 let node = node.as_forwarding_super_node().unwrap();
-                let chain = self.parse_call_root(&node);
-                fmt::Node::new(fmt::Kind::MethodChain(chain))
+                self.parse_call_root(&node)
             }
             prism::Node::SuperNode { .. } => {
                 let node = node.as_super_node().unwrap();
-                let chain = self.parse_call_root(&node);
-                fmt::Node::new(fmt::Kind::MethodChain(chain))
+                self.parse_call_root(&node)
             }
             prism::Node::YieldNode { .. } => {
                 let node = node.as_yield_node().unwrap();
@@ -499,13 +497,11 @@ impl Parser<'_> {
             }
             prism::Node::CallTargetNode { .. } => {
                 let node = node.as_call_target_node().unwrap();
-                let chain = self.parse_call_root(&node);
-                fmt::Node::new(fmt::Kind::MethodChain(chain))
+                self.parse_call_root(&node)
             }
             prism::Node::IndexTargetNode { .. } => {
                 let node = node.as_index_target_node().unwrap();
-                let chain = self.parse_call_root(&node);
-                fmt::Node::new(fmt::Kind::MethodChain(chain))
+                self.parse_call_root(&node)
             }
 
             prism::Node::MultiWriteNode { .. } => {
@@ -1327,10 +1323,9 @@ impl Parser<'_> {
         operator_loc: prism::Location,
         value: prism::Node,
     ) -> fmt::Assign {
-        let chain = self.parse_call_root(call);
+        let target = self.parse_call_root(call);
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.visit(value, None);
-        let target = fmt::Node::new(fmt::Kind::MethodChain(chain));
         fmt::Assign::new(target, operator, value)
     }
 

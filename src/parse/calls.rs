@@ -2,36 +2,17 @@ use crate::fmt;
 
 impl<'src> super::Parser<'src> {
     pub(super) fn parse_call(&mut self, node: prism::CallNode) -> fmt::Node {
-        let kind = match detect_method_type(&node) {
-            MethodType::Normal => {
-                let chain = self.parse_call_root(&node);
-                fmt::Kind::MethodChain(chain)
-            }
-            MethodType::Not => {
-                let chain = self.parse_not(node);
-                fmt::Kind::MethodChain(chain)
-            }
-            MethodType::Unary => {
-                let prefix = self.parse_prefix_call(node);
-                fmt::Kind::Prefix(prefix)
-            }
-            MethodType::Binary => {
-                let chain = self.parse_infix_call(node);
-                fmt::Kind::InfixChain(chain)
-            }
-            MethodType::Assign => {
-                let assign = self.parse_write_call(node);
-                fmt::Kind::Assign(assign)
-            }
-            MethodType::IndexAssign => {
-                let assign = self.parse_index_write_call(node);
-                fmt::Kind::Assign(assign)
-            }
-        };
-        fmt::Node::new(kind)
+        match detect_method_type(&node) {
+            MethodType::Normal => self.parse_call_root(&node),
+            MethodType::Not => self.parse_not(node),
+            MethodType::Unary => self.parse_prefix_call(node),
+            MethodType::Binary => self.parse_infix_call(node),
+            MethodType::Assign => self.parse_write_call(node),
+            MethodType::IndexAssign => self.parse_index_write_call(node),
+        }
     }
 
-    pub(super) fn parse_call_root<C: CallRoot>(&mut self, call: &C) -> fmt::MethodChain {
+    pub(super) fn parse_call_root<C: CallRoot>(&mut self, call: &C) -> fmt::Node {
         let current_chain = call.receiver().map(|receiver| {
             let receiver_trailing_end = call
                 .message_loc()
@@ -111,10 +92,10 @@ impl<'src> super::Parser<'src> {
         };
 
         self.last_loc_end = call.location().end_offset();
-        chain
+        fmt::Node::new(fmt::Kind::MethodChain(chain))
     }
 
-    fn parse_not(&mut self, node: prism::CallNode) -> fmt::MethodChain {
+    fn parse_not(&mut self, node: prism::CallNode) -> fmt::Node {
         // not(v) is parsed like below:
         //   receiver: v
         //   method name: "!"
@@ -135,16 +116,17 @@ impl<'src> super::Parser<'src> {
         args.set_virtual_end(virtual_end);
         args.last_comma_allowed = false;
 
-        fmt::MethodChain::without_receiver(fmt::MessageCall::new(
+        let chain = fmt::MethodChain::without_receiver(fmt::MessageCall::new(
             fmt::LeadingTrivia::new(),
             None,
             "not".to_string(),
             Some(args),
             None,
-        ))
+        ));
+        fmt::Node::new(fmt::Kind::MethodChain(chain))
     }
 
-    fn parse_prefix_call(&mut self, call: prism::CallNode) -> fmt::Prefix {
+    fn parse_prefix_call(&mut self, call: prism::CallNode) -> fmt::Node {
         let msg_loc = call
             .message_loc()
             .expect("prefix operation must have message");
@@ -153,10 +135,11 @@ impl<'src> super::Parser<'src> {
             .receiver()
             .expect("prefix operation must have receiver");
         let receiver = self.visit(receiver, None);
-        fmt::Prefix::new(operator, Some(receiver))
+        let prefix = fmt::Prefix::new(operator, Some(receiver));
+        fmt::Node::new(fmt::Kind::Prefix(prefix))
     }
 
-    fn parse_infix_call(&mut self, call: prism::CallNode) -> fmt::InfixChain {
+    fn parse_infix_call(&mut self, call: prism::CallNode) -> fmt::Node {
         let msg_loc = call
             .message_loc()
             .expect("infix operation must have message");
@@ -165,10 +148,11 @@ impl<'src> super::Parser<'src> {
             .arguments()
             .and_then(|args| args.arguments().iter().next())
             .expect("infix operation must have argument");
-        self.visit_infix_op(receiver, msg_loc, right)
+        let chain = self.visit_infix_op(receiver, msg_loc, right);
+        fmt::Node::new(fmt::Kind::InfixChain(chain))
     }
 
-    fn parse_write_call(&mut self, call: prism::CallNode) -> fmt::Assign {
+    fn parse_write_call(&mut self, call: prism::CallNode) -> fmt::Node {
         let msg_loc = call.message_loc().expect("call write must have message");
         let receiver = call.receiver().expect("call write must have receiver");
         let receiver = self.visit(receiver, Some(msg_loc.start_offset()));
@@ -192,10 +176,11 @@ impl<'src> super::Parser<'src> {
         let left = fmt::Node::new(fmt::Kind::MethodChain(chain));
         let right = self.visit(arg, None);
         let operator = "=".to_string();
-        fmt::Assign::new(left, operator, right)
+        let assign = fmt::Assign::new(left, operator, right);
+        fmt::Node::new(fmt::Kind::Assign(assign))
     }
 
-    fn parse_index_write_call(&mut self, call: prism::CallNode) -> fmt::Assign {
+    fn parse_index_write_call(&mut self, call: prism::CallNode) -> fmt::Node {
         let (opening_loc, closing_loc) = match (call.opening_loc(), call.closing_loc()) {
             (Some(op), Some(cl)) => (op, cl),
             _ => panic!("index write must have opening and closing"),
@@ -223,7 +208,8 @@ impl<'src> super::Parser<'src> {
         let left = fmt::Node::new(fmt::Kind::MethodChain(chain));
         let right = self.visit(arg2, None);
         let operator = "=".to_string();
-        fmt::Assign::new(left, operator, right)
+        let assign = fmt::Assign::new(left, operator, right);
+        fmt::Node::new(fmt::Kind::Assign(assign))
     }
 }
 
