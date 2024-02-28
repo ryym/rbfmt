@@ -4,6 +4,7 @@ mod atoms;
 mod calls;
 mod cases;
 mod classes;
+mod consts;
 mod hashes;
 mod ifs;
 mod loops;
