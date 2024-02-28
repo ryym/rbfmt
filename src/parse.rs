@@ -584,8 +584,7 @@ impl Parser<'_> {
 
             prism::Node::RescueModifierNode { .. } => {
                 let node = node.as_rescue_modifier_node().unwrap();
-                let postmod = self.parse_rescue_modifier(node);
-                fmt::Node::new(fmt::Kind::Postmodifier(postmod))
+                self.parse_rescue_modifier(node)
             }
 
             prism::Node::CallNode { .. } => {

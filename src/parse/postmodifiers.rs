@@ -22,10 +22,7 @@ impl<'src> super::Parser<'src> {
         fmt::Node::new(fmt::Kind::Postmodifier(postmod))
     }
 
-    pub(super) fn parse_rescue_modifier(
-        &mut self,
-        node: prism::RescueModifierNode,
-    ) -> fmt::Postmodifier {
+    pub(super) fn parse_rescue_modifier(&mut self, node: prism::RescueModifierNode) -> fmt::Node {
         let kwd_loc = node.keyword_loc();
         let expr = self.visit(node.expression(), Some(kwd_loc.start_offset()));
         let statements = self.wrap_as_statements(Some(expr), kwd_loc.start_offset());
@@ -33,9 +30,10 @@ impl<'src> super::Parser<'src> {
         let rescue_expr = node.rescue_expression();
         let rescue_expr = self.visit(rescue_expr, None);
 
-        fmt::Postmodifier::new(
+        let postmod = fmt::Postmodifier::new(
             "rescue".to_string(),
             fmt::Conditional::new(rescue_expr, statements),
-        )
+        );
+        fmt::Node::new(fmt::Kind::Postmodifier(postmod))
     }
 }
