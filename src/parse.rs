@@ -1,3 +1,4 @@
+mod assigns;
 mod atoms;
 mod calls;
 mod cases;
@@ -283,200 +284,135 @@ impl Parser<'_> {
 
             prism::Node::LocalVariableWriteNode { .. } => {
                 let node = node.as_local_variable_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::LocalVariableAndWriteNode { .. } => {
                 let node = node.as_local_variable_and_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::LocalVariableOrWriteNode { .. } => {
                 let node = node.as_local_variable_or_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::LocalVariableOperatorWriteNode { .. } => {
                 let node = node.as_local_variable_operator_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
 
             prism::Node::InstanceVariableWriteNode { .. } => {
                 let node = node.as_instance_variable_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::InstanceVariableAndWriteNode { .. } => {
                 let node = node.as_instance_variable_and_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::InstanceVariableOrWriteNode { .. } => {
                 let node = node.as_instance_variable_or_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::InstanceVariableOperatorWriteNode { .. } => {
                 let node = node.as_instance_variable_operator_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
 
             prism::Node::ClassVariableWriteNode { .. } => {
                 let node = node.as_class_variable_write_node().unwrap();
-                let assign = self.visit_variable_assign(
+                self.parse_variable_assign(
                     node.name_loc(),
                     // XXX: When does the operator becomes None?
                     node.operator_loc().expect("must have operator"),
                     node.value(),
-                );
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                )
             }
             prism::Node::ClassVariableAndWriteNode { .. } => {
                 let node = node.as_class_variable_and_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::ClassVariableOrWriteNode { .. } => {
                 let node = node.as_class_variable_or_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::ClassVariableOperatorWriteNode { .. } => {
                 let node = node.as_class_variable_operator_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
 
             prism::Node::GlobalVariableWriteNode { .. } => {
                 let node = node.as_global_variable_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::GlobalVariableAndWriteNode { .. } => {
                 let node = node.as_global_variable_and_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::GlobalVariableOrWriteNode { .. } => {
                 let node = node.as_global_variable_or_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::GlobalVariableOperatorWriteNode { .. } => {
                 let node = node.as_global_variable_operator_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
 
             prism::Node::ConstantWriteNode { .. } => {
                 let node = node.as_constant_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::ConstantAndWriteNode { .. } => {
                 let node = node.as_constant_and_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::ConstantOrWriteNode { .. } => {
                 let node = node.as_constant_or_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::ConstantOperatorWriteNode { .. } => {
                 let node = node.as_constant_operator_write_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
 
             prism::Node::ConstantPathWriteNode { .. } => {
                 let node = node.as_constant_path_write_node().unwrap();
-                let assign = self.visit_constant_path_assign(
-                    node.target(),
-                    node.operator_loc(),
-                    node.value(),
-                );
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_constant_path_assign(node.target(), node.operator_loc(), node.value())
             }
             prism::Node::ConstantPathAndWriteNode { .. } => {
                 let node = node.as_constant_path_and_write_node().unwrap();
-                let assign = self.visit_constant_path_assign(
-                    node.target(),
-                    node.operator_loc(),
-                    node.value(),
-                );
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_constant_path_assign(node.target(), node.operator_loc(), node.value())
             }
             prism::Node::ConstantPathOrWriteNode { .. } => {
                 let node = node.as_constant_path_or_write_node().unwrap();
-                let assign = self.visit_constant_path_assign(
-                    node.target(),
-                    node.operator_loc(),
-                    node.value(),
-                );
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_constant_path_assign(node.target(), node.operator_loc(), node.value())
             }
             prism::Node::ConstantPathOperatorWriteNode { .. } => {
                 let node = node.as_constant_path_operator_write_node().unwrap();
-                let assign = self.visit_constant_path_assign(
-                    node.target(),
-                    node.operator_loc(),
-                    node.value(),
-                );
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_constant_path_assign(node.target(), node.operator_loc(), node.value())
             }
 
             prism::Node::CallAndWriteNode { .. } => {
                 let node = node.as_call_and_write_node().unwrap();
-                let assign = self.visit_call_assign(&node, node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_call_assign(&node, node.operator_loc(), node.value())
             }
             prism::Node::CallOrWriteNode { .. } => {
                 let node = node.as_call_or_write_node().unwrap();
-                let assign = self.visit_call_assign(&node, node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_call_assign(&node, node.operator_loc(), node.value())
             }
             prism::Node::CallOperatorWriteNode { .. } => {
                 let node = node.as_call_operator_write_node().unwrap();
-                let assign = self.visit_call_assign(&node, node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_call_assign(&node, node.operator_loc(), node.value())
             }
 
             prism::Node::IndexAndWriteNode { .. } => {
                 let node = node.as_index_and_write_node().unwrap();
-                let assign = self.visit_call_assign(&node, node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_call_assign(&node, node.operator_loc(), node.value())
             }
             prism::Node::IndexOrWriteNode { .. } => {
                 let node = node.as_index_or_write_node().unwrap();
-                let assign = self.visit_call_assign(&node, node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_call_assign(&node, node.operator_loc(), node.value())
             }
             prism::Node::IndexOperatorWriteNode { .. } => {
                 let node = node.as_index_operator_write_node().unwrap();
-                let assign = self.visit_call_assign(&node, node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_call_assign(&node, node.operator_loc(), node.value())
             }
 
             prism::Node::LocalVariableTargetNode { .. } => self.parse_as_atom(node),
@@ -500,19 +436,17 @@ impl Parser<'_> {
 
             prism::Node::MultiWriteNode { .. } => {
                 let node = node.as_multi_write_node().unwrap();
-                let assign = self.visit_multi_assign(node);
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_multi_assign(node)
             }
             prism::Node::MultiTargetNode { .. } => {
                 let node = node.as_multi_target_node().unwrap();
-                let target = self.visit_multi_assign_target(
+                self.parse_multi_assign_target(
                     node.lefts(),
                     node.rest(),
                     node.rights(),
                     node.lparen_loc(),
                     node.rparen_loc(),
-                );
-                fmt::Node::new(fmt::Kind::MultiAssignTarget(target))
+                )
             }
             prism::Node::ImplicitRestNode { .. } => {
                 let atom = fmt::Atom("".to_string());
@@ -634,9 +568,7 @@ impl Parser<'_> {
             prism::Node::BlockParameterNode { .. } => self.parse_as_atom(node),
             prism::Node::OptionalParameterNode { .. } => {
                 let node = node.as_optional_parameter_node().unwrap();
-                let assign =
-                    self.visit_variable_assign(node.name_loc(), node.operator_loc(), node.value());
-                fmt::Node::new(fmt::Kind::Assign(assign))
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::OptionalKeywordParameterNode { .. } => {
                 let node = node.as_optional_keyword_parameter_node().unwrap();
@@ -1240,111 +1172,6 @@ impl Parser<'_> {
         let mut call_like = fmt::CallLike::new("defined?".to_string());
         call_like.set_arguments(args);
         call_like
-    }
-
-    fn visit_variable_assign(
-        &mut self,
-        name_loc: prism::Location,
-        operator_loc: prism::Location,
-        value: prism::Node,
-    ) -> fmt::Assign {
-        let name = Self::source_lossy_at(&name_loc);
-        let operator = Self::source_lossy_at(&operator_loc);
-        let value = self.visit(value, None);
-        let target = fmt::Node::new(fmt::Kind::Atom(fmt::Atom(name)));
-        fmt::Assign::new(target, operator, value)
-    }
-
-    fn visit_constant_path_assign(
-        &mut self,
-        const_path: prism::ConstantPathNode,
-        operator_loc: prism::Location,
-        value: prism::Node,
-    ) -> fmt::Assign {
-        let const_path = self.visit_constant_path(const_path.parent(), const_path.child());
-        let operator = Self::source_lossy_at(&operator_loc);
-        let value = self.visit(value, None);
-        let target = fmt::Node::new(fmt::Kind::ConstantPath(const_path));
-        fmt::Assign::new(target, operator, value)
-    }
-
-    fn visit_call_assign(
-        &mut self,
-        call: &impl calls::CallRoot,
-        operator_loc: prism::Location,
-        value: prism::Node,
-    ) -> fmt::Assign {
-        let target = self.parse_call_root(call);
-        let operator = Self::source_lossy_at(&operator_loc);
-        let value = self.visit(value, None);
-        fmt::Assign::new(target, operator, value)
-    }
-
-    fn visit_multi_assign(&mut self, node: prism::MultiWriteNode) -> fmt::Assign {
-        let target = self.visit_multi_assign_target(
-            node.lefts(),
-            node.rest(),
-            node.rights(),
-            node.lparen_loc(),
-            node.rparen_loc(),
-        );
-        let operator = Self::source_lossy_at(&node.operator_loc());
-        let value = self.visit(node.value(), None);
-
-        let target = fmt::Node::new(fmt::Kind::MultiAssignTarget(target));
-        fmt::Assign::new(target, operator, value)
-    }
-
-    fn visit_multi_assign_target(
-        &mut self,
-        lefts: prism::NodeList,
-        rest: Option<prism::Node>,
-        rights: prism::NodeList,
-        lparen_loc: Option<prism::Location>,
-        rparen_loc: Option<prism::Location>,
-    ) -> fmt::MultiAssignTarget {
-        let lparen = lparen_loc.as_ref().map(Self::source_lossy_at);
-        let rparen = rparen_loc.as_ref().map(Self::source_lossy_at);
-        let mut multi = fmt::MultiAssignTarget::new(lparen, rparen);
-
-        let implicit_rest = rest
-            .as_ref()
-            .map_or(false, |r| matches!(r, prism::Node::ImplicitRestNode { .. }));
-        multi.set_implicit_rest(implicit_rest);
-
-        let rest_start = if implicit_rest {
-            None
-        } else {
-            rest.as_ref().map(|r| r.location().start_offset())
-        };
-        let rights_first_start = rights.iter().next().map(|n| n.location().start_offset());
-        let rparen_start = rparen_loc.as_ref().map(|l| l.start_offset());
-
-        let left_trailing_end = rest_start.or(rights_first_start).or(rparen_start);
-        Self::each_node_with_trailing_end(lefts.iter(), left_trailing_end, |node, trailing_end| {
-            let target = self.visit(node, trailing_end);
-            multi.append_target(target);
-        });
-
-        if !implicit_rest {
-            if let Some(rest) = rest {
-                let rest_trailing_end = rights_first_start.or(rparen_start);
-                let target = self.visit(rest, rest_trailing_end);
-                multi.append_target(target);
-            }
-        }
-
-        Self::each_node_with_trailing_end(rights.iter(), rparen_start, |node, trailing_end| {
-            let target = self.visit(node, trailing_end);
-            multi.append_target(target);
-        });
-
-        if let Some(rparen_loc) = rparen_loc {
-            let virtual_end = self.take_end_trivia_as_virtual_end(Some(rparen_loc.start_offset()));
-            multi.set_virtual_end(virtual_end);
-        }
-
-        multi
     }
 
     fn visit_def(&mut self, node: prism::DefNode) -> (fmt::LeadingTrivia, fmt::Def) {
