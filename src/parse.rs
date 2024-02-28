@@ -1,5 +1,7 @@
+mod regexps;
 mod src;
 mod strings;
+mod symbols;
 
 use crate::fmt;
 use std::{collections::HashMap, iter::Peekable, ops::Range};
@@ -535,59 +537,28 @@ impl Parser<'_> {
 
             prism::Node::SymbolNode { .. } => {
                 let node = node.as_symbol_node().unwrap();
-                // XXX: I cannot find the case where the value_loc is None.
-                let value_loc = node.value_loc().expect("symbol value must exist");
-                let str = self.parse_string(node.opening_loc(), value_loc, node.closing_loc());
-                fmt::Node::new(fmt::Kind::StringLike(str))
+                self.parse_symbol(node)
             }
             prism::Node::InterpolatedSymbolNode { .. } => {
                 let node = node.as_interpolated_symbol_node().unwrap();
-                let str = self.parse_interpolated_string(
-                    node.opening_loc(),
-                    node.parts(),
-                    node.closing_loc(),
-                );
-                let kind = fmt::Kind::DynStringLike(str);
-                fmt::Node::new(kind)
+                self.parse_interpolated_symbol(node)
             }
 
             prism::Node::RegularExpressionNode { .. } => {
                 let node = node.as_regular_expression_node().unwrap();
-                let str = self.parse_string(
-                    Some(node.opening_loc()),
-                    node.content_loc(),
-                    Some(node.closing_loc()),
-                );
-                fmt::Node::new(fmt::Kind::StringLike(str))
+                self.parse_regexp(node)
             }
             prism::Node::InterpolatedRegularExpressionNode { .. } => {
                 let node = node.as_interpolated_regular_expression_node().unwrap();
-                let str = self.parse_interpolated_string(
-                    Some(node.opening_loc()),
-                    node.parts(),
-                    Some(node.closing_loc()),
-                );
-                let kind = fmt::Kind::DynStringLike(str);
-                fmt::Node::new(kind)
+                self.parse_interpolated_regexp(node)
             }
             prism::Node::MatchLastLineNode { .. } => {
                 let node = node.as_match_last_line_node().unwrap();
-                let str = self.parse_string(
-                    Some(node.opening_loc()),
-                    node.content_loc(),
-                    Some(node.closing_loc()),
-                );
-                fmt::Node::new(fmt::Kind::StringLike(str))
+                self.parse_match_last_line(node)
             }
             prism::Node::InterpolatedMatchLastLineNode { .. } => {
                 let node = node.as_interpolated_match_last_line_node().unwrap();
-                let str = self.parse_interpolated_string(
-                    Some(node.opening_loc()),
-                    node.parts(),
-                    Some(node.closing_loc()),
-                );
-                let kind = fmt::Kind::DynStringLike(str);
-                fmt::Node::new(kind)
+                self.parse_interpolated_match_last_line(node)
             }
             prism::Node::MatchWriteNode { .. } => {
                 let node = node.as_match_write_node().unwrap();
