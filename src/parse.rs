@@ -686,80 +686,6 @@ impl Parser<'_> {
         }
     }
 
-    fn visit_arguments(
-        &mut self,
-        node: Option<prism::ArgumentsNode>,
-        block_arg: Option<prism::BlockArgumentNode>,
-        opening_loc: Option<prism::Location>,
-        closing_loc: Option<prism::Location>,
-    ) -> Option<fmt::Arguments> {
-        let opening = opening_loc.as_ref().map(Self::source_lossy_at);
-        let closing = closing_loc.as_ref().map(Self::source_lossy_at);
-        let closing_start = closing_loc.as_ref().map(|l| l.start_offset());
-        match node {
-            None => {
-                let block_arg =
-                    block_arg.map(|block_arg| self.visit(block_arg.as_node(), closing_start));
-                let virtual_end = closing_start.and_then(|closing_start| {
-                    self.take_end_trivia_as_virtual_end(Some(closing_start))
-                });
-                match (block_arg, virtual_end, &opening) {
-                    (None, None, None) => None,
-                    (block_arg, virtual_end, _) => {
-                        let mut args = fmt::Arguments::new(opening, closing);
-                        if let Some(block_arg) = block_arg {
-                            args.append_node(block_arg);
-                            args.last_comma_allowed = false;
-                        }
-                        if virtual_end.is_some() {
-                            args.set_virtual_end(virtual_end)
-                        }
-                        Some(args)
-                    }
-                }
-            }
-            Some(args_node) => {
-                let mut args = fmt::Arguments::new(opening, closing);
-                let mut nodes = args_node.arguments().iter().collect::<Vec<_>>();
-                if let Some(block_arg) = block_arg {
-                    nodes.push(block_arg.as_node());
-                }
-                let mut idx = 0;
-                let last_idx = nodes.len() - 1;
-                Self::each_node_with_trailing_end(
-                    nodes.into_iter(),
-                    closing_start,
-                    |node, trailing_end| {
-                        if idx == last_idx {
-                            args.last_comma_allowed = !matches!(
-                                node,
-                                prism::Node::ForwardingArgumentsNode { .. }
-                                    | prism::Node::BlockArgumentNode { .. }
-                            );
-                        }
-                        match node {
-                            prism::Node::KeywordHashNode { .. } => {
-                                let node = node.as_keyword_hash_node().unwrap();
-                                self.each_keyword_hash_element(node, trailing_end, |fmt_node| {
-                                    args.append_node(fmt_node);
-                                });
-                            }
-                            _ => {
-                                let fmt_node = self.visit(node, trailing_end);
-                                args.append_node(fmt_node);
-                            }
-                        }
-
-                        idx += 1;
-                    },
-                );
-                let virtual_end = self.take_end_trivia_as_virtual_end(closing_start);
-                args.set_virtual_end(virtual_end);
-                Some(args)
-            }
-        }
-    }
-
     fn each_keyword_hash_element(
         &mut self,
         node: prism::KeywordHashNode,
@@ -774,50 +700,6 @@ impl Parser<'_> {
                 f(element);
             },
         );
-    }
-
-    fn visit_block(&mut self, node: prism::BlockNode) -> fmt::Block {
-        let loc = node.location();
-        let opening = Self::source_lossy_at(&node.opening_loc());
-        let closing = Self::source_lossy_at(&node.closing_loc());
-        let was_flat = !self.does_line_break_exist_in(loc.start_offset(), loc.end_offset());
-        let mut method_block = fmt::Block::new(was_flat, opening, closing);
-
-        let body = node.body();
-        let body_start = body.as_ref().and_then(|b| match b {
-            prism::Node::BeginNode { .. } => {
-                Self::start_of_begin_block_content(b.as_begin_node().unwrap())
-            }
-            _ => Some(b.location().start_offset()),
-        });
-        let params = node.parameters();
-        let params_start = params.as_ref().map(|p| p.location().start_offset());
-        let closing_loc = node.closing_loc();
-
-        let opening_next_loc = params_start
-            .or(body_start)
-            .unwrap_or(closing_loc.start_offset());
-        let opening_trailing = self.take_trailing_comment(opening_next_loc);
-        method_block.set_opening_trailing(opening_trailing);
-
-        if let Some(params) = params {
-            let params_next_loc = body_start.unwrap_or(closing_loc.start_offset());
-            match params {
-                prism::Node::BlockParametersNode { .. } => {
-                    let node = params.as_block_parameters_node().unwrap();
-                    let params = self.visit_block_parameters(node, params_next_loc);
-                    method_block.set_parameters(params);
-                }
-                prism::Node::NumberedParametersNode { .. } => {}
-                _ => panic!("unexpected node for call block params: {:?}", node),
-            }
-        }
-
-        let body_end_loc = closing_loc.start_offset();
-        let body = self.parse_block_body(body, body_end_loc);
-        method_block.set_body(body);
-
-        method_block
     }
 
     fn start_of_begin_block_content(begin: prism::BeginNode) -> Option<usize> {
