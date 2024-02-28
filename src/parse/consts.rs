@@ -8,7 +8,7 @@ impl<'src> super::Parser<'src> {
     ) -> fmt::Node {
         let mut const_path = match parent {
             Some(parent) => {
-                let parent = self.visit(parent, None);
+                let parent = self.parse(parent, None);
                 match parent.kind {
                     fmt::Kind::ConstantPath(const_path) => const_path,
                     _ => fmt::ConstantPath::new(Some(parent)),

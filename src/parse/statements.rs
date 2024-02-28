@@ -19,7 +19,7 @@ impl<'src> super::Parser<'src> {
         let mut statements = fmt::Statements::new();
         if let Some(node) = node {
             Self::each_node_with_trailing_end(node.body().iter(), end, |node, trailing_end| {
-                let fmt_node = self.visit(node, trailing_end);
+                let fmt_node = self.parse(node, trailing_end);
                 statements.append_node(fmt_node);
             });
         }
@@ -30,7 +30,7 @@ impl<'src> super::Parser<'src> {
 
     pub(super) fn parse_parentheses(&mut self, node: prism::ParenthesesNode) -> fmt::Node {
         let closing_start = node.closing_loc().start_offset();
-        let body = node.body().map(|b| self.visit(b, Some(closing_start)));
+        let body = node.body().map(|b| self.parse(b, Some(closing_start)));
         let body = self.wrap_as_statements(body, closing_start);
         let parens = fmt::Parens::new(body);
         fmt::Node::new(fmt::Kind::Parens(parens))

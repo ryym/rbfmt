@@ -11,7 +11,7 @@ impl<'src> super::Parser<'src> {
     ) -> fmt::Node {
         let name = Self::source_lossy_at(&name_loc);
         let operator = Self::source_lossy_at(&operator_loc);
-        let value = self.visit(value, None);
+        let value = self.parse(value, None);
         let target = fmt::Node::new(fmt::Kind::Atom(fmt::Atom(name)));
         let assign = fmt::Assign::new(target, operator, value);
         fmt::Node::new(fmt::Kind::Assign(assign))
@@ -25,7 +25,7 @@ impl<'src> super::Parser<'src> {
     ) -> fmt::Node {
         let target = self.parse_constant_path(const_path.parent(), const_path.child());
         let operator = Self::source_lossy_at(&operator_loc);
-        let value = self.visit(value, None);
+        let value = self.parse(value, None);
         let assign = fmt::Assign::new(target, operator, value);
         fmt::Node::new(fmt::Kind::Assign(assign))
     }
@@ -38,7 +38,7 @@ impl<'src> super::Parser<'src> {
     ) -> fmt::Node {
         let target = self.parse_call_root(call);
         let operator = Self::source_lossy_at(&operator_loc);
-        let value = self.visit(value, None);
+        let value = self.parse(value, None);
         let assign = fmt::Assign::new(target, operator, value);
         fmt::Node::new(fmt::Kind::Assign(assign))
     }
@@ -52,7 +52,7 @@ impl<'src> super::Parser<'src> {
             node.rparen_loc(),
         );
         let operator = Self::source_lossy_at(&node.operator_loc());
-        let value = self.visit(node.value(), None);
+        let value = self.parse(node.value(), None);
         let assign = fmt::Assign::new(target, operator, value);
         fmt::Node::new(fmt::Kind::Assign(assign))
     }
@@ -84,20 +84,20 @@ impl<'src> super::Parser<'src> {
 
         let left_trailing_end = rest_start.or(rights_first_start).or(rparen_start);
         Self::each_node_with_trailing_end(lefts.iter(), left_trailing_end, |node, trailing_end| {
-            let target = self.visit(node, trailing_end);
+            let target = self.parse(node, trailing_end);
             multi.append_target(target);
         });
 
         if !implicit_rest {
             if let Some(rest) = rest {
                 let rest_trailing_end = rights_first_start.or(rparen_start);
-                let target = self.visit(rest, rest_trailing_end);
+                let target = self.parse(rest, rest_trailing_end);
                 multi.append_target(target);
             }
         }
 
         Self::each_node_with_trailing_end(rights.iter(), rparen_start, |node, trailing_end| {
-            let target = self.visit(node, trailing_end);
+            let target = self.parse(node, trailing_end);
             multi.append_target(target);
         });
 

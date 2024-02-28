@@ -4,7 +4,7 @@ impl<'src> super::Parser<'src> {
     pub(super) fn parse_undef(&mut self, undef: prism::UndefNode) -> fmt::Node {
         let mut args = fmt::Arguments::new(None, None);
         Self::each_node_with_trailing_end(undef.names().iter(), None, |node, trailing_end| {
-            let node = self.visit(node, trailing_end);
+            let node = self.parse(node, trailing_end);
             args.append_node(node);
         });
         let mut call_like = fmt::CallLike::new("undef".to_string());
@@ -18,7 +18,7 @@ impl<'src> super::Parser<'src> {
 
         let value = defined.value();
         let value_next = rparen_loc.as_ref().map(|l| l.start_offset());
-        let value = self.visit(value, value_next);
+        let value = self.parse(value, value_next);
 
         let lparen = lparen_loc.as_ref().map(Self::source_lossy_at);
         let rparen = rparen_loc.as_ref().map(Self::source_lossy_at);
@@ -57,8 +57,8 @@ impl<'src> super::Parser<'src> {
     ) -> fmt::Node {
         let additional_leading = self.take_leading_trivia(new_name.location().start_offset());
         let old_loc = old_name.location();
-        let new_name = self.visit(new_name, Some(old_loc.start_offset()));
-        let old_name = self.visit(old_name, None);
+        let new_name = self.parse(new_name, Some(old_loc.start_offset()));
+        let old_name = self.parse(old_name, None);
         let alias = fmt::Alias::new(new_name, old_name);
         fmt::Node::with_leading_trivia(additional_leading, fmt::Kind::Alias(alias))
     }

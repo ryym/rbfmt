@@ -20,7 +20,7 @@ impl<'src> super::Parser<'src> {
             node.elements().iter(),
             Some(closing_start),
             |node, trailing_end| {
-                let element = self.visit(node, trailing_end);
+                let element = self.parse(node, trailing_end);
                 hash.append_element(element);
             },
         );
@@ -31,16 +31,16 @@ impl<'src> super::Parser<'src> {
 
     pub(super) fn parse_assoc(&mut self, node: prism::AssocNode) -> fmt::Node {
         let key = node.key();
-        let key = self.visit(key, None);
+        let key = self.parse(key, None);
         let operator = node.operator_loc().map(|l| Self::source_lossy_at(&l));
-        let value = self.visit(node.value(), None);
+        let value = self.parse(node.value(), None);
         let assoc = fmt::Assoc::new(key, operator, value);
         fmt::Node::new(fmt::Kind::Assoc(assoc))
     }
 
     pub(super) fn parse_assoc_splat(&mut self, node: prism::AssocSplatNode) -> fmt::Node {
         let operator = Self::source_lossy_at(&node.operator_loc());
-        let value = node.value().map(|v| self.visit(v, None));
+        let value = node.value().map(|v| self.parse(v, None));
         let splat = fmt::Prefix::new(operator, value);
         fmt::Node::new(fmt::Kind::Prefix(splat))
     }

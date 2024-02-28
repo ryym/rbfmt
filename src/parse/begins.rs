@@ -110,14 +110,14 @@ impl<'src> super::Parser<'src> {
             node.exceptions().iter(),
             Some(head_next),
             |node, trailing_end| {
-                let fmt_node = self.visit(node, trailing_end);
+                let fmt_node = self.parse(node, trailing_end);
                 rescue.append_exception(fmt_node);
             },
         );
 
         if let Some(reference) = reference {
             let reference_next = statements_start.or(consequent_start).unwrap_or(final_next);
-            let reference = self.visit(reference, Some(reference_next));
+            let reference = self.parse(reference, Some(reference_next));
             rescue.set_reference(reference);
         }
 

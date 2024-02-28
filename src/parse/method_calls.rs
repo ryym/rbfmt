@@ -22,7 +22,7 @@ impl<'src> super::Parser<'src> {
                 .or_else(|| call.arguments().map(|a| a.location()))
                 .or_else(|| call.block().map(|a| a.location()))
                 .map(|l| l.start_offset());
-            let node = self.visit(receiver, receiver_trailing_end);
+            let node = self.parse(receiver, receiver_trailing_end);
             match node.kind {
                 fmt::Kind::MethodChain(chain) => (chain, node.trailing_trivia),
                 _ => (
@@ -112,7 +112,7 @@ impl<'src> super::Parser<'src> {
         let mut args = fmt::Arguments::new(opening, closing);
 
         let closing_start = closing_loc.map(|l| l.start_offset());
-        let receiver = self.visit(receiver, closing_start);
+        let receiver = self.parse(receiver, closing_start);
         args.append_node(receiver);
         let virtual_end = self.take_end_trivia_as_virtual_end(closing_start);
         args.set_virtual_end(virtual_end);
@@ -136,7 +136,7 @@ impl<'src> super::Parser<'src> {
         let receiver = call
             .receiver()
             .expect("prefix operation must have receiver");
-        let receiver = self.visit(receiver, None);
+        let receiver = self.parse(receiver, None);
         let prefix = fmt::Prefix::new(operator, Some(receiver));
         fmt::Node::new(fmt::Kind::Prefix(prefix))
     }
@@ -159,14 +159,14 @@ impl<'src> super::Parser<'src> {
         operator_loc: prism::Location,
         right: prism::Node,
     ) -> fmt::Node {
-        let left = self.visit(left, Some(operator_loc.start_offset()));
+        let left = self.parse(left, Some(operator_loc.start_offset()));
         let operator = Self::source_lossy_at(&operator_loc);
         let precedence = fmt::InfixPrecedence::from_operator(&operator);
         let mut chain = match left.kind {
             fmt::Kind::InfixChain(chain) if chain.precedence() == &precedence => chain,
             _ => fmt::InfixChain::new(left, precedence),
         };
-        let right = self.visit(right, None);
+        let right = self.parse(right, None);
         chain.append_right(operator, right);
         fmt::Node::new(fmt::Kind::InfixChain(chain))
     }
@@ -174,7 +174,7 @@ impl<'src> super::Parser<'src> {
     fn parse_write_call(&mut self, call: prism::CallNode) -> fmt::Node {
         let msg_loc = call.message_loc().expect("call write must have message");
         let receiver = call.receiver().expect("call write must have receiver");
-        let receiver = self.visit(receiver, Some(msg_loc.start_offset()));
+        let receiver = self.parse(receiver, Some(msg_loc.start_offset()));
 
         let call_leading = self.take_leading_trivia(msg_loc.start_offset());
         let call_operator = call.call_operator_loc().as_ref().map(Self::source_lossy_at);
@@ -193,7 +193,7 @@ impl<'src> super::Parser<'src> {
         );
 
         let left = fmt::Node::new(fmt::Kind::MethodChain(chain));
-        let right = self.visit(arg, None);
+        let right = self.parse(arg, None);
         let operator = "=".to_string();
         let assign = fmt::Assign::new(left, operator, right);
         fmt::Node::new(fmt::Kind::Assign(assign))
@@ -206,7 +206,7 @@ impl<'src> super::Parser<'src> {
         };
 
         let receiver = call.receiver().expect("index write must have receiver");
-        let receiver = self.visit(receiver, Some(opening_loc.start_offset()));
+        let receiver = self.parse(receiver, Some(opening_loc.start_offset()));
 
         let args = call.arguments().expect("index write must have arguments");
         let mut args_iter = args.arguments().iter();
@@ -217,7 +217,7 @@ impl<'src> super::Parser<'src> {
 
         let mut left_args = fmt::Arguments::new(Some("[".to_string()), Some("]".to_string()));
         let closing_start = closing_loc.start_offset();
-        left_args.append_node(self.visit(arg1, Some(closing_start)));
+        left_args.append_node(self.parse(arg1, Some(closing_start)));
         let left_args_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
         left_args.set_virtual_end(left_args_end);
 
@@ -225,7 +225,7 @@ impl<'src> super::Parser<'src> {
         chain.append_index_call(fmt::IndexCall::new(left_args, None));
 
         let left = fmt::Node::new(fmt::Kind::MethodChain(chain));
-        let right = self.visit(arg2, None);
+        let right = self.parse(arg2, None);
         let operator = "=".to_string();
         let assign = fmt::Assign::new(left, operator, right);
         fmt::Node::new(fmt::Kind::Assign(assign))
@@ -269,7 +269,7 @@ impl<'src> super::Parser<'src> {
         match node {
             None => {
                 let block_arg =
-                    block_arg.map(|block_arg| self.visit(block_arg.as_node(), closing_start));
+                    block_arg.map(|block_arg| self.parse(block_arg.as_node(), closing_start));
                 let virtual_end = closing_start.and_then(|closing_start| {
                     self.take_end_trivia_as_virtual_end(Some(closing_start))
                 });
@@ -315,7 +315,7 @@ impl<'src> super::Parser<'src> {
                                 });
                             }
                             _ => {
-                                let fmt_node = self.visit(node, trailing_end);
+                                let fmt_node = self.parse(node, trailing_end);
                                 args.append_node(fmt_node);
                             }
                         }

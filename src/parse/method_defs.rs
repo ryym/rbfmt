@@ -15,7 +15,7 @@ impl<'src> super::Parser<'src> {
         let leading = self.take_leading_trivia(leading_end);
 
         let name_end = name_loc.end_offset();
-        let receiver = receiver.map(|r| self.visit(r, Some(name_end)));
+        let receiver = receiver.map(|r| self.parse(r, Some(name_end)));
         let name = Self::source_lossy_at(&node.name_loc());
         let mut def = fmt::Def::new(receiver, name);
 
@@ -45,7 +45,7 @@ impl<'src> super::Parser<'src> {
 
         if node.equal_loc().is_some() {
             let body = node.body().expect("shorthand def body must exist");
-            let body = self.visit(body, None);
+            let body = self.parse(body, None);
             def.set_body(fmt::DefBody::Short {
                 body: Box::new(body),
             });
@@ -105,14 +105,14 @@ impl<'src> super::Parser<'src> {
         let name = Self::source_lossy_at(&node.name_loc());
         let name = fmt::Node::new(fmt::Kind::Atom(fmt::Atom(name)));
         let value = node.value();
-        let value = self.visit(value, None);
+        let value = self.parse(value, None);
         let assoc = fmt::Assoc::new(name, None, value);
         fmt::Node::new(fmt::Kind::Assoc(assoc))
     }
 
     pub(super) fn parse_block_arg(&mut self, node: prism::BlockArgumentNode) -> fmt::Node {
         let operator = Self::source_lossy_at(&node.operator_loc());
-        let expr = node.expression().map(|expr| self.visit(expr, None));
+        let expr = node.expression().map(|expr| self.parse(expr, None));
         let prefix = fmt::Prefix::new(operator, expr);
         fmt::Node::new(fmt::Kind::Prefix(prefix))
     }
@@ -156,7 +156,7 @@ impl<'src> super::Parser<'src> {
                 locals.iter(),
                 Some(closing_start),
                 |node, trailing_end| {
-                    let fmt_node = self.visit(node, trailing_end);
+                    let fmt_node = self.parse(node, trailing_end);
                     block_params.append_local(fmt_node);
                 },
             );
@@ -198,7 +198,7 @@ impl<'src> super::Parser<'src> {
             nodes.push(block.as_node());
         }
         Self::each_node_with_trailing_end(nodes.into_iter(), trailing_end, |node, trailing_end| {
-            let fmt_node = self.visit(node, trailing_end);
+            let fmt_node = self.parse(node, trailing_end);
             f(fmt_node);
         });
     }

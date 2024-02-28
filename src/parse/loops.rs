@@ -44,7 +44,7 @@ impl<'src> super::Parser<'src> {
             .as_ref()
             .map(|b| b.location().start_offset())
             .unwrap_or(closing_loc.start_offset());
-        let predicate = self.visit(predicate, Some(predicate_next));
+        let predicate = self.parse(predicate, Some(predicate_next));
         let body = self.parse_statements_body(body, Some(closing_loc.start_offset()));
         let content = fmt::Conditional::new(predicate, body);
         fmt::While { is_while, content }
@@ -54,12 +54,12 @@ impl<'src> super::Parser<'src> {
         let body = node.statements();
         let end_loc = node.end_keyword_loc();
 
-        let index = self.visit(node.index(), Some(node.in_keyword_loc().start_offset()));
+        let index = self.parse(node.index(), Some(node.in_keyword_loc().start_offset()));
         let collection_next = body
             .as_ref()
             .map(|b| b.location().start_offset())
             .unwrap_or(end_loc.start_offset());
-        let collection = self.visit(node.collection(), Some(collection_next));
+        let collection = self.parse(node.collection(), Some(collection_next));
         let body = self.parse_statements_body(body, Some(end_loc.start_offset()));
 
         let for_kind = fmt::For {

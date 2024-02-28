@@ -13,7 +13,7 @@ impl<'src> super::Parser<'src> {
         let pred_next = first_branch_start
             .or(consequent.as_ref().map(|c| c.location().start_offset()))
             .unwrap_or(end_loc.start_offset());
-        let predicate = node.predicate().map(|n| self.visit(n, Some(pred_next)));
+        let predicate = node.predicate().map(|n| self.parse(n, Some(pred_next)));
         let case_trailing = if predicate.is_some() {
             fmt::TrailingTrivia::none()
         } else {
@@ -65,7 +65,7 @@ impl<'src> super::Parser<'src> {
             .statements()
             .as_ref()
             .map(|n| n.location().start_offset());
-        let pattern = self.visit(node.pattern(), pattern_next);
+        let pattern = self.parse(node.pattern(), pattern_next);
 
         let mut case_in = fmt::CaseIn::new(was_flat, pattern);
         let body = self.parse_statements_body(node.statements(), body_end);
@@ -79,15 +79,15 @@ impl<'src> super::Parser<'src> {
         operator_loc: prism::Location,
         pattern: prism::Node,
     ) -> fmt::Node {
-        let expression = self.visit(expression, Some(operator_loc.start_offset()));
-        let pattern = self.visit(pattern, None);
+        let expression = self.parse(expression, Some(operator_loc.start_offset()));
+        let pattern = self.parse(pattern, None);
         let operator = Self::source_lossy_at(&operator_loc);
         let match_assign = fmt::MatchAssign::new(expression, operator, pattern);
         fmt::Node::new(fmt::Kind::MatchAssign(match_assign))
     }
 
     pub(super) fn parse_array_pattern(&mut self, node: prism::ArrayPatternNode) -> fmt::Node {
-        let constant = node.constant().map(|c| self.visit(c, None));
+        let constant = node.constant().map(|c| self.parse(c, None));
         let opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
         let closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
         let mut array = fmt::ArrayPattern::new(constant, opening, closing);
@@ -106,7 +106,7 @@ impl<'src> super::Parser<'src> {
             node.requireds().iter(),
             requireds_next,
             |node, trailing_end| {
-                let element = self.visit(node, trailing_end);
+                let element = self.parse(node, trailing_end);
                 array.append_element(element);
             },
         );
@@ -116,7 +116,7 @@ impl<'src> super::Parser<'src> {
                 .as_ref()
                 .map(|p| p.location().start_offset())
                 .or(closing_start);
-            let element = self.visit(rest, rest_next);
+            let element = self.parse(rest, rest_next);
             array.append_element(element);
             array.last_comma_allowed = false;
         }
@@ -126,7 +126,7 @@ impl<'src> super::Parser<'src> {
                 node.posts().iter(),
                 closing_start,
                 |node, trailing_end| {
-                    let element = self.visit(node, trailing_end);
+                    let element = self.parse(node, trailing_end);
                     array.append_element(element);
                 },
             );
@@ -140,7 +140,7 @@ impl<'src> super::Parser<'src> {
     }
 
     pub(super) fn parse_find_pattern(&mut self, node: prism::FindPatternNode) -> fmt::Node {
-        let constant = node.constant().map(|c| self.visit(c, None));
+        let constant = node.constant().map(|c| self.parse(c, None));
         let opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
         let closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
         let mut array = fmt::ArrayPattern::new(constant, opening, closing);
@@ -154,21 +154,21 @@ impl<'src> super::Parser<'src> {
             .next()
             .map(|n| n.location().start_offset())
             .unwrap_or(right.location().start_offset());
-        let left = self.visit(node.left(), Some(left_next));
+        let left = self.parse(node.left(), Some(left_next));
         array.append_element(left);
 
         Self::each_node_with_trailing_end(
             node.requireds().iter(),
             Some(right.location().start_offset()),
             |node, trailing_end| {
-                let element = self.visit(node, trailing_end);
+                let element = self.parse(node, trailing_end);
                 array.append_element(element);
             },
         );
 
         let closing_start = node.closing_loc().as_ref().map(|l| l.start_offset());
 
-        let right = self.visit(right, closing_start);
+        let right = self.parse(right, closing_start);
         array.append_element(right);
 
         let end = self.take_end_trivia_as_virtual_end(closing_start);
@@ -178,7 +178,7 @@ impl<'src> super::Parser<'src> {
     }
 
     pub(super) fn parse_hash_pattern(&mut self, node: prism::HashPatternNode) -> fmt::Node {
-        let constant = node.constant().map(|c| self.visit(c, None));
+        let constant = node.constant().map(|c| self.parse(c, None));
         let opening_loc = node.opening_loc();
         let closing_loc = node.closing_loc();
         let opening = opening_loc.as_ref().map(Self::source_lossy_at);
@@ -203,13 +203,13 @@ impl<'src> super::Parser<'src> {
             node.elements().iter(),
             elements_next,
             |node, trailing_end| {
-                let element = self.visit(node, trailing_end);
+                let element = self.parse(node, trailing_end);
                 hash.append_element(element);
             },
         );
 
         if let Some(rest) = node.rest() {
-            let rest = self.visit(rest, closing_start);
+            let rest = self.parse(rest, closing_start);
             hash.append_element(rest);
             hash.last_comma_allowed = false;
         }
@@ -226,7 +226,7 @@ impl<'src> super::Parser<'src> {
     ) -> fmt::Node {
         let operator = Self::source_lossy_at(&node.operator_loc());
         let rparen_start = node.rparen_loc().start_offset();
-        let expression = self.visit(node.expression(), Some(rparen_start));
+        let expression = self.parse(node.expression(), Some(rparen_start));
 
         let mut stmts = fmt::Statements::new();
         stmts.append_node(expression);
@@ -241,15 +241,15 @@ impl<'src> super::Parser<'src> {
 
     pub(super) fn parse_pinned_variable(&mut self, node: prism::PinnedVariableNode) -> fmt::Node {
         let operator = Self::source_lossy_at(&node.operator_loc());
-        let variable = self.visit(node.variable(), None);
+        let variable = self.parse(node.variable(), None);
         let prefix = fmt::Prefix::new(operator, Some(variable));
         fmt::Node::new(fmt::Kind::Prefix(prefix))
     }
 
     pub(super) fn parse_capture_pattern(&mut self, node: prism::CapturePatternNode) -> fmt::Node {
-        let value = self.visit(node.value(), Some(node.operator_loc().start_offset()));
+        let value = self.parse(node.value(), Some(node.operator_loc().start_offset()));
         let operator = Self::source_lossy_at(&node.operator_loc());
-        let target = self.visit(node.target(), None);
+        let target = self.parse(node.target(), None);
         let assoc = fmt::Assoc::new(value, Some(operator), target);
         fmt::Node::new(fmt::Kind::Assoc(assoc))
     }
@@ -259,13 +259,13 @@ impl<'src> super::Parser<'src> {
         node: prism::AlternationPatternNode,
     ) -> fmt::Node {
         let operator_loc = node.operator_loc();
-        let left = self.visit(node.left(), Some(operator_loc.start_offset()));
+        let left = self.parse(node.left(), Some(operator_loc.start_offset()));
         let mut chain = match left.kind {
             fmt::Kind::AltPatternChain(chain) => chain,
             _ => fmt::AltPatternChain::new(left),
         };
         let right = node.right();
-        let right = self.visit(right, None);
+        let right = self.parse(right, None);
         chain.append_right(right);
         fmt::Node::new(fmt::Kind::AltPatternChain(chain))
     }

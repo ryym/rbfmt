@@ -13,7 +13,7 @@ impl<'src> super::Parser<'src> {
         let pred_next = first_branch_start
             .or(consequent.as_ref().map(|c| c.location().start_offset()))
             .unwrap_or(end_loc.start_offset());
-        let predicate = node.predicate().map(|n| self.visit(n, Some(pred_next)));
+        let predicate = node.predicate().map(|n| self.parse(n, Some(pred_next)));
         let case_trailing = if predicate.is_some() {
             fmt::TrailingTrivia::none()
         } else {
@@ -71,7 +71,7 @@ impl<'src> super::Parser<'src> {
             node.conditions().iter(),
             conditions_next,
             |node, trailing_end| {
-                let cond = self.visit(node, trailing_end);
+                let cond = self.parse(node, trailing_end);
                 when.append_condition(cond);
             },
         );

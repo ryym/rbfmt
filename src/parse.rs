@@ -29,15 +29,7 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
     let result = prism::parse(&source);
 
     let comments = result.comments().peekable();
-    let heredoc_map = HashMap::new();
-
-    let mut parser = Parser {
-        src: &source,
-        comments,
-        heredoc_map,
-        position_gen: 0,
-        last_loc_end: 0,
-    };
+    let mut parser = Parser::new(&source, comments);
     let fmt_node = parser.parse_from_prism_node(result.node());
     // dbg!(&fmt_node);
     // dbg!(&builder.heredoc_map);
@@ -62,11 +54,21 @@ struct Parser<'src> {
 }
 
 impl Parser<'_> {
-    fn parse_from_prism_node(&mut self, node: prism::Node) -> fmt::Node {
-        self.visit(node, Some(self.src.len()))
+    fn new<'src>(src: &'src [u8], comments: Peekable<prism::Comments<'src>>) -> Parser<'src> {
+        Parser {
+            src,
+            comments,
+            heredoc_map: HashMap::new(),
+            position_gen: 0,
+            last_loc_end: 0,
+        }
     }
 
-    fn visit(&mut self, node: prism::Node, trailing_end: Option<usize>) -> fmt::Node {
+    fn parse_from_prism_node(&mut self, node: prism::Node) -> fmt::Node {
+        self.parse(node, Some(self.src.len()))
+    }
+
+    fn parse(&mut self, node: prism::Node, trailing_end: Option<usize>) -> fmt::Node {
         let loc = node.location();
         let loc_end = loc.end_offset();
 
@@ -189,7 +191,7 @@ impl Parser<'_> {
             }
             prism::Node::MatchWriteNode { .. } => {
                 let node = node.as_match_write_node().unwrap();
-                self.visit(node.call().as_node(), None)
+                self.parse(node.call().as_node(), None)
             }
 
             prism::Node::IfNode { .. } => {
@@ -608,7 +610,7 @@ impl Parser<'_> {
                 self.parse_alias(node.new_name(), node.old_name())
             }
 
-            _ => todo!("parse {:?}", node),
+            _ => unreachable!("prism node not handled: {:?}", node),
         }
     }
 
@@ -647,7 +649,7 @@ impl Parser<'_> {
             node.elements().iter(),
             trailing_end,
             |node, trailing_end| {
-                let element = self.visit(node, trailing_end);
+                let element = self.parse(node, trailing_end);
                 f(element);
             },
         );

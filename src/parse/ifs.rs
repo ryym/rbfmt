@@ -69,7 +69,7 @@ impl<'src> super::Parser<'src> {
             .or_else(|| conseq.as_ref().map(|c| c.location()))
             .map(|l| l.start_offset())
             .unwrap_or(end_loc.start_offset());
-        let predicate = self.visit(node.predicate, Some(next_pred_loc_start));
+        let predicate = self.parse(node.predicate, Some(next_pred_loc_start));
 
         let ifexpr = match conseq {
             // if...(elsif...|else...)+end
@@ -113,7 +113,7 @@ impl<'src> super::Parser<'src> {
                     .map(|s| s.location().start_offset())
                     .or_else(|| consequent.as_ref().map(|c| c.location().start_offset()))
                     .unwrap_or(end_loc.start_offset());
-                let predicate = self.visit(predicate, Some(predicate_next));
+                let predicate = self.parse(predicate, Some(predicate_next));
 
                 let body_end_loc = consequent
                     .as_ref()
@@ -144,7 +144,7 @@ impl<'src> super::Parser<'src> {
 
     fn visit_ternary(&mut self, node: prism::IfNode) -> fmt::Ternary {
         let question_loc = node.then_keyword_loc().expect("ternary if must have ?");
-        let predicate = self.visit(node.predicate(), Some(question_loc.start_offset()));
+        let predicate = self.parse(node.predicate(), Some(question_loc.start_offset()));
         let then = node
             .statements()
             .and_then(|s| s.body().iter().next())
@@ -159,8 +159,8 @@ impl<'src> super::Parser<'src> {
                         .expect("ternary if must have else statement");
                     let pred_trailing = self.take_trailing_comment(then.location().start_offset());
                     let loc = consequent.location();
-                    let then = self.visit(then, Some(loc.start_offset()));
-                    let otherwise = self.visit(otherwise, None);
+                    let then = self.parse(then, Some(loc.start_offset()));
+                    let otherwise = self.parse(otherwise, None);
                     fmt::Ternary::new(predicate, pred_trailing, then, otherwise)
                 }
                 _ => panic!("ternary if consequent must be ElseNode: {:?}", node),

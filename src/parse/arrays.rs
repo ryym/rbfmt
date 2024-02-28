@@ -19,7 +19,7 @@ impl<'src> super::Parser<'src> {
                     });
                 }
                 _ => {
-                    let element = self.visit(node, trailing_end);
+                    let element = self.parse(node, trailing_end);
                     array.append_element(element);
                 }
             },
@@ -33,7 +33,7 @@ impl<'src> super::Parser<'src> {
 
     pub(super) fn parse_splat(&mut self, node: prism::SplatNode) -> fmt::Node {
         let operator = Self::source_lossy_at(&node.operator_loc());
-        let expr = node.expression().map(|expr| self.visit(expr, None));
+        let expr = node.expression().map(|expr| self.parse(expr, None));
         let splat = fmt::Prefix::new(operator, expr);
         fmt::Node::new(fmt::Kind::Prefix(splat))
     }

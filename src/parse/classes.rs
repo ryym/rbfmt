@@ -22,7 +22,7 @@ impl<'src> super::Parser<'src> {
         });
         let head_next = body_start.unwrap_or(end_loc.start_offset());
         let (superclass, head_trailing) = if let Some(superclass) = superclass {
-            let fmt_node = self.visit(superclass, Some(head_next));
+            let fmt_node = self.parse(superclass, Some(head_next));
             (Some(fmt_node), fmt::TrailingTrivia::none())
         } else {
             let head_trailing = self.take_trailing_comment(head_next);
@@ -51,7 +51,7 @@ impl<'src> super::Parser<'src> {
             _ => Some(b.location().start_offset()),
         });
         let expr_next = body_start.unwrap_or(end_loc.start_offset());
-        let expr = self.visit(node.expression(), Some(expr_next));
+        let expr = self.parse(node.expression(), Some(expr_next));
         let body = self.parse_block_body(body, end_loc.start_offset());
         let class = fmt::SingletonClass {
             expression: Box::new(expr),
