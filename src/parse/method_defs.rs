@@ -1,5 +1,7 @@
 use crate::fmt;
 
+use super::begins;
+
 impl<'src> super::Parser<'src> {
     pub(super) fn parse_def(&mut self, node: prism::DefNode) -> fmt::Node {
         let receiver = node.receiver();
@@ -52,7 +54,7 @@ impl<'src> super::Parser<'src> {
             let body = node.body();
             let body_start = body.as_ref().and_then(|b| match b {
                 prism::Node::BeginNode { .. } => {
-                    Self::start_of_begin_block_content(b.as_begin_node().unwrap())
+                    begins::start_of_begin_block_content(b.as_begin_node().unwrap())
                 }
                 _ => Some(b.location().start_offset()),
             });

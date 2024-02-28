@@ -1,5 +1,7 @@
 use crate::fmt;
 
+use super::begins;
+
 impl<'src> super::Parser<'src> {
     pub(super) fn parse_class_like(
         &mut self,
@@ -14,7 +16,7 @@ impl<'src> super::Parser<'src> {
 
         let body_start = body.as_ref().and_then(|b| match b {
             prism::Node::BeginNode { .. } => {
-                Self::start_of_begin_block_content(b.as_begin_node().unwrap())
+                begins::start_of_begin_block_content(b.as_begin_node().unwrap())
             }
             _ => Some(b.location().start_offset()),
         });
@@ -44,7 +46,7 @@ impl<'src> super::Parser<'src> {
         let end_loc = node.end_keyword_loc();
         let body_start = body.as_ref().and_then(|b| match b {
             prism::Node::BeginNode { .. } => {
-                Self::start_of_begin_block_content(b.as_begin_node().unwrap())
+                begins::start_of_begin_block_content(b.as_begin_node().unwrap())
             }
             _ => Some(b.location().start_offset()),
         });
