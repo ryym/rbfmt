@@ -357,7 +357,7 @@ impl<'src> super::Parser<'src> {
             match params {
                 prism::Node::BlockParametersNode { .. } => {
                     let node = params.as_block_parameters_node().unwrap();
-                    let params = self.visit_block_parameters(node, params_next_loc);
+                    let params = self.parse_block_parameters(node, params_next_loc);
                     method_block.set_parameters(params);
                 }
                 prism::Node::NumberedParametersNode { .. } => {}
