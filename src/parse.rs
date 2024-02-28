@@ -256,24 +256,20 @@ impl Parser<'_> {
             }
             prism::Node::YieldNode { .. } => {
                 let node = node.as_yield_node().unwrap();
-                let call_like = self.visit_yield(node);
-                fmt::Node::new(fmt::Kind::CallLike(call_like))
+                self.parse_yield(node)
             }
 
             prism::Node::BreakNode { .. } => {
                 let node = node.as_break_node().unwrap();
-                let call_like = self.parse_call_like(node.keyword_loc(), node.arguments());
-                fmt::Node::new(fmt::Kind::CallLike(call_like))
+                self.parse_call_like(node.keyword_loc(), node.arguments())
             }
             prism::Node::NextNode { .. } => {
                 let node = node.as_next_node().unwrap();
-                let call_like = self.parse_call_like(node.keyword_loc(), node.arguments());
-                fmt::Node::new(fmt::Kind::CallLike(call_like))
+                self.parse_call_like(node.keyword_loc(), node.arguments())
             }
             prism::Node::ReturnNode { .. } => {
                 let node = node.as_return_node().unwrap();
-                let call_like = self.parse_call_like(node.keyword_loc(), node.arguments());
-                fmt::Node::new(fmt::Kind::CallLike(call_like))
+                self.parse_call_like(node.keyword_loc(), node.arguments())
             }
 
             prism::Node::AndNode { .. } => {
@@ -1210,31 +1206,6 @@ impl Parser<'_> {
         block.set_body(body);
 
         fmt::Lambda::new(params, block)
-    }
-
-    fn parse_call_like(
-        &mut self,
-        name_loc: prism::Location,
-        arguments: Option<prism::ArgumentsNode>,
-    ) -> fmt::CallLike {
-        let name = Self::source_lossy_at(&name_loc);
-        let mut call_like = fmt::CallLike::new(name);
-        let args = self.visit_arguments(arguments, None, None, None);
-        if let Some(args) = args {
-            call_like.set_arguments(args);
-        }
-        call_like
-    }
-
-    fn visit_yield(&mut self, node: prism::YieldNode) -> fmt::CallLike {
-        let args =
-            self.visit_arguments(node.arguments(), None, node.lparen_loc(), node.rparen_loc());
-        let mut call_like = fmt::CallLike::new("yield".to_string());
-        if let Some(mut args) = args {
-            args.last_comma_allowed = false;
-            call_like.set_arguments(args);
-        }
-        call_like
     }
 
     fn visit_undef(&mut self, undef: prism::UndefNode) -> fmt::CallLike {

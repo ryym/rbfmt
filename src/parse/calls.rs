@@ -228,6 +228,31 @@ impl<'src> super::Parser<'src> {
         let assign = fmt::Assign::new(left, operator, right);
         fmt::Node::new(fmt::Kind::Assign(assign))
     }
+
+    pub(super) fn parse_call_like(
+        &mut self,
+        name_loc: prism::Location,
+        arguments: Option<prism::ArgumentsNode>,
+    ) -> fmt::Node {
+        let name = Self::source_lossy_at(&name_loc);
+        let mut call_like = fmt::CallLike::new(name);
+        let args = self.visit_arguments(arguments, None, None, None);
+        if let Some(args) = args {
+            call_like.set_arguments(args);
+        }
+        fmt::Node::new(fmt::Kind::CallLike(call_like))
+    }
+
+    pub(super) fn parse_yield(&mut self, node: prism::YieldNode) -> fmt::Node {
+        let args =
+            self.visit_arguments(node.arguments(), None, node.lparen_loc(), node.rparen_loc());
+        let mut call_like = fmt::CallLike::new("yield".to_string());
+        if let Some(mut args) = args {
+            args.last_comma_allowed = false;
+            call_like.set_arguments(args);
+        }
+        fmt::Node::new(fmt::Kind::CallLike(call_like))
+    }
 }
 
 fn detect_method_type(call: &prism::CallNode) -> MethodType {
