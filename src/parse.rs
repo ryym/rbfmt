@@ -1,4 +1,6 @@
 mod atoms;
+mod ifs;
+mod postmodifiers;
 mod regexps;
 mod src;
 mod strings;
@@ -33,15 +35,6 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
 pub(crate) struct ParserResult {
     pub node: fmt::Node,
     pub heredoc_map: fmt::HeredocMap,
-}
-
-struct IfOrUnless<'src> {
-    is_if: bool,
-    loc: prism::Location<'src>,
-    predicate: prism::Node<'src>,
-    statements: Option<prism::StatementsNode<'src>>,
-    consequent: Option<prism::Node<'src>>,
-    end_loc: Option<prism::Location<'src>>,
 }
 
 trait CallRoot {
@@ -380,13 +373,6 @@ impl<'src> CallRoot for prism::SuperNode<'src> {
     }
 }
 
-struct Postmodifier<'src> {
-    keyword: String,
-    keyword_loc: prism::Location<'src>,
-    predicate: prism::Node<'src>,
-    statements: Option<prism::StatementsNode<'src>>,
-}
-
 #[derive(Debug)]
 enum MethodType {
     Normal,      // foo(a)
@@ -568,46 +554,11 @@ impl Parser<'_> {
 
             prism::Node::IfNode { .. } => {
                 let node = node.as_if_node().unwrap();
-                if node.end_keyword_loc().is_some() {
-                    self.visit_if_or_unless(IfOrUnless {
-                        is_if: true,
-                        loc: node.location(),
-                        predicate: node.predicate(),
-                        statements: node.statements(),
-                        consequent: node.consequent(),
-                        end_loc: node.end_keyword_loc(),
-                    })
-                } else if node.then_keyword_loc().map(|l| l.as_slice()) == Some(b"?") {
-                    let ternary = self.visit_ternary(node);
-                    fmt::Node::new(fmt::Kind::Ternary(ternary))
-                } else {
-                    self.visit_postmodifier(Postmodifier {
-                        keyword: "if".to_string(),
-                        keyword_loc: node.if_keyword_loc().expect("if modifier must have if"),
-                        predicate: node.predicate(),
-                        statements: node.statements(),
-                    })
-                }
+                self.parse_if_or_ternary(node)
             }
             prism::Node::UnlessNode { .. } => {
                 let node = node.as_unless_node().unwrap();
-                if node.end_keyword_loc().is_some() {
-                    self.visit_if_or_unless(IfOrUnless {
-                        is_if: false,
-                        loc: node.location(),
-                        predicate: node.predicate(),
-                        statements: node.statements(),
-                        consequent: node.consequent().map(|n| n.as_node()),
-                        end_loc: node.end_keyword_loc(),
-                    })
-                } else {
-                    self.visit_postmodifier(Postmodifier {
-                        keyword: "unless".to_string(),
-                        keyword_loc: node.keyword_loc(),
-                        predicate: node.predicate(),
-                        statements: node.statements(),
-                    })
-                }
+                self.parse_unless(node)
             }
 
             prism::Node::CaseNode { .. } => {
@@ -627,7 +578,7 @@ impl Parser<'_> {
                     );
                     fmt::Node::new(fmt::Kind::While(whle))
                 } else {
-                    self.visit_postmodifier(Postmodifier {
+                    self.parse_postmodifier(postmodifiers::Postmodifier {
                         keyword: "while".to_string(),
                         keyword_loc: node.keyword_loc(),
                         predicate: node.predicate(),
@@ -646,7 +597,7 @@ impl Parser<'_> {
                     );
                     fmt::Node::new(fmt::Kind::While(whle))
                 } else {
-                    self.visit_postmodifier(Postmodifier {
+                    self.parse_postmodifier(postmodifiers::Postmodifier {
                         keyword: "until".to_string(),
                         keyword_loc: node.keyword_loc(),
                         predicate: node.predicate(),
@@ -663,7 +614,7 @@ impl Parser<'_> {
 
             prism::Node::RescueModifierNode { .. } => {
                 let node = node.as_rescue_modifier_node().unwrap();
-                let postmod = self.visit_rescue_modifier(node);
+                let postmod = self.parse_rescue_modifier(node);
                 fmt::Node::new(fmt::Kind::Postmodifier(postmod))
             }
 
@@ -1343,93 +1294,6 @@ impl Parser<'_> {
         statements
     }
 
-    fn visit_if_or_unless(&mut self, node: IfOrUnless) -> fmt::Node {
-        let if_leading = self.take_leading_trivia(node.loc.start_offset());
-
-        let end_loc = node.end_loc.expect("if/unless expression must have end");
-        let end_start = end_loc.start_offset();
-
-        let conseq = node.consequent;
-        let next_pred_loc_start = node
-            .statements
-            .as_ref()
-            .map(|s| s.location())
-            .or_else(|| conseq.as_ref().map(|c| c.location()))
-            .map(|l| l.start_offset())
-            .unwrap_or(end_loc.start_offset());
-        let predicate = self.visit(node.predicate, Some(next_pred_loc_start));
-
-        let ifexpr = match conseq {
-            // if...(elsif...|else...)+end
-            Some(conseq) => {
-                // take trailing of else/elsif
-                let else_start = conseq.location().start_offset();
-                let body = self.visit_statements(node.statements, Some(else_start));
-                let if_first = fmt::Conditional::new(predicate, body);
-                let mut ifexpr = fmt::If::new(node.is_if, if_first);
-                self.visit_ifelse(conseq, &mut ifexpr);
-                ifexpr
-            }
-            // if...end
-            None => {
-                let body = self.visit_statements(node.statements, Some(end_start));
-                let if_first = fmt::Conditional::new(predicate, body);
-                fmt::If::new(node.is_if, if_first)
-            }
-        };
-
-        let mut node = fmt::Node::new(fmt::Kind::If(ifexpr));
-        node.prepend_leading_trivia(if_leading);
-        node
-    }
-
-    fn visit_ifelse(&mut self, node: prism::Node, ifexpr: &mut fmt::If) {
-        match node {
-            // elsif ("if" only, "unles...elsif" is syntax error)
-            prism::Node::IfNode { .. } => {
-                let node = node.as_if_node().unwrap();
-
-                let end_loc = node
-                    .end_keyword_loc()
-                    .expect("if/unless expression must have end");
-
-                let predicate = node.predicate();
-                let consequent = node.consequent();
-
-                let predicate_next = node
-                    .statements()
-                    .map(|s| s.location().start_offset())
-                    .or_else(|| consequent.as_ref().map(|c| c.location().start_offset()))
-                    .unwrap_or(end_loc.start_offset());
-                let predicate = self.visit(predicate, Some(predicate_next));
-
-                let body_end_loc = consequent
-                    .as_ref()
-                    .map(|n| n.location().start_offset())
-                    .unwrap_or(end_loc.start_offset());
-                let body = self.visit_statements(node.statements(), Some(body_end_loc));
-
-                let conditional = fmt::Conditional::new(predicate, body);
-                ifexpr.elsifs.push(conditional);
-                if let Some(consequent) = consequent {
-                    self.visit_ifelse(consequent, ifexpr);
-                }
-            }
-            // else
-            prism::Node::ElseNode { .. } => {
-                let node = node.as_else_node().unwrap();
-                let end_loc = node
-                    .end_keyword_loc()
-                    .expect("if/unless expression must have end");
-                let if_last = self.visit_else(node, end_loc.start_offset());
-                ifexpr.if_last = Some(if_last);
-            }
-            _ => {
-                panic!("unexpected node in IfNode: {:?}", node);
-            }
-        }
-    }
-
     fn visit_else(&mut self, node: prism::ElseNode, else_end: usize) -> fmt::Else {
         let else_next_loc = node
             .statements()
@@ -1640,61 +1504,6 @@ impl Parser<'_> {
             collection: Box::new(collection),
             body,
         }
-    }
-
-    fn visit_ternary(&mut self, node: prism::IfNode) -> fmt::Ternary {
-        let question_loc = node.then_keyword_loc().expect("ternary if must have ?");
-        let predicate = self.visit(node.predicate(), Some(question_loc.start_offset()));
-        let then = node
-            .statements()
-            .and_then(|s| s.body().iter().next())
-            .expect("ternary if must have then statement");
-        match node.consequent() {
-            Some(consequent) => match consequent {
-                prism::Node::ElseNode { .. } => {
-                    let consequent = consequent.as_else_node().unwrap();
-                    let otherwise = consequent
-                        .statements()
-                        .and_then(|s| s.body().iter().next())
-                        .expect("ternary if must have else statement");
-                    let pred_trailing = self.take_trailing_comment(then.location().start_offset());
-                    let loc = consequent.location();
-                    let then = self.visit(then, Some(loc.start_offset()));
-                    let otherwise = self.visit(otherwise, None);
-                    fmt::Ternary::new(predicate, pred_trailing, then, otherwise)
-                }
-                _ => panic!("ternary if consequent must be ElseNode: {:?}", node),
-            },
-            _ => panic!("ternary if must have consequent"),
-        }
-    }
-
-    fn visit_postmodifier(&mut self, postmod: Postmodifier) -> fmt::Node {
-        let kwd_loc = postmod.keyword_loc;
-        let statements = self.visit_statements(postmod.statements, Some(kwd_loc.start_offset()));
-
-        let predicate = self.visit(postmod.predicate, None);
-
-        let postmod = fmt::Postmodifier::new(
-            postmod.keyword,
-            fmt::Conditional::new(predicate, statements),
-        );
-
-        fmt::Node::new(fmt::Kind::Postmodifier(postmod))
-    }
-
-    fn visit_rescue_modifier(&mut self, node: prism::RescueModifierNode) -> fmt::Postmodifier {
-        let kwd_loc = node.keyword_loc();
-        let expr = self.visit(node.expression(), Some(kwd_loc.start_offset()));
-        let statements = self.wrap_as_statements(Some(expr), kwd_loc.start_offset());
-
-        let rescue_expr = node.rescue_expression();
-        let rescue_expr = self.visit(rescue_expr, None);
-
-        fmt::Postmodifier::new(
-            "rescue".to_string(),
-            fmt::Conditional::new(rescue_expr, statements),
-        )
     }
 
     fn visit_call_root<C: CallRoot>(&mut self, call: &C) -> fmt::MethodChain {
