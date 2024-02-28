@@ -6,6 +6,7 @@ mod cases;
 mod hashes;
 mod ifs;
 mod loops;
+mod methods;
 mod postmodifiers;
 mod regexps;
 mod src;
@@ -460,8 +461,7 @@ impl Parser<'_> {
             }
             prism::Node::BlockArgumentNode { .. } => {
                 let node = node.as_block_argument_node().unwrap();
-                let prefix = self.visit_block_arg(node);
-                fmt::Node::new(fmt::Kind::Prefix(prefix))
+                self.parse_block_arg(node)
             }
 
             prism::Node::ArrayNode { .. } => {
@@ -490,8 +490,7 @@ impl Parser<'_> {
 
             prism::Node::DefNode { .. } => {
                 let node = node.as_def_node().unwrap();
-                let (leading, def) = self.visit_def(node);
-                fmt::Node::with_leading_trivia(leading, fmt::Kind::Def(def))
+                self.parse_def(node)
             }
             prism::Node::NoKeywordsParameterNode { .. } => self.parse_as_atom(node),
             prism::Node::ForwardingParameterNode { .. } => self.parse_as_atom(node),
@@ -506,18 +505,12 @@ impl Parser<'_> {
             }
             prism::Node::OptionalKeywordParameterNode { .. } => {
                 let node = node.as_optional_keyword_parameter_node().unwrap();
-                let name = Self::source_lossy_at(&node.name_loc());
-                let name = fmt::Node::new(fmt::Kind::Atom(fmt::Atom(name)));
-                let value = node.value();
-                let value = self.visit(value, None);
-                let assoc = fmt::Assoc::new(name, None, value);
-                fmt::Node::new(fmt::Kind::Assoc(assoc))
+                self.parse_optional_keyword_argument(node)
             }
 
             prism::Node::LambdaNode { .. } => {
                 let node = node.as_lambda_node().unwrap();
-                let lambda = self.visit_lambda(node);
-                fmt::Node::new(fmt::Kind::Lambda(lambda))
+                self.parse_lambda(node)
             }
 
             prism::Node::UndefNode { .. } => {
@@ -909,12 +902,6 @@ impl Parser<'_> {
         );
     }
 
-    fn visit_block_arg(&mut self, node: prism::BlockArgumentNode) -> fmt::Prefix {
-        let operator = Self::source_lossy_at(&node.operator_loc());
-        let expr = node.expression().map(|expr| self.visit(expr, None));
-        fmt::Prefix::new(operator, expr)
-    }
-
     fn visit_block(&mut self, node: prism::BlockNode) -> fmt::Block {
         let loc = node.location();
         let opening = Self::source_lossy_at(&node.opening_loc());
@@ -1022,33 +1009,6 @@ impl Parser<'_> {
         block_params
     }
 
-    fn visit_lambda(&mut self, node: prism::LambdaNode) -> fmt::Lambda {
-        let params = node.parameters().map(|params| match params {
-            prism::Node::BlockParametersNode { .. } => {
-                let params = params.as_block_parameters_node().unwrap();
-                let params_end = params.location().end_offset();
-                self.visit_block_parameters(params, params_end)
-            }
-            _ => panic!("unexpected node for lambda params: {:?}", node),
-        });
-
-        let body_end = node.closing_loc().start_offset();
-        let body_opening_trailing = self.take_trailing_comment(body_end);
-        let body = self.parse_block_body(node.body(), body_end);
-
-        let was_flat = !self.does_line_break_exist_in(
-            node.opening_loc().end_offset(),
-            node.closing_loc().start_offset(),
-        );
-        let opening = Self::source_lossy_at(&node.opening_loc());
-        let closing = Self::source_lossy_at(&node.closing_loc());
-        let mut block = fmt::Block::new(was_flat, opening, closing);
-        block.set_opening_trailing(body_opening_trailing);
-        block.set_body(body);
-
-        fmt::Lambda::new(params, block)
-    }
-
     fn visit_undef(&mut self, undef: prism::UndefNode) -> fmt::CallLike {
         let mut args = fmt::Arguments::new(None, None);
         Self::each_node_with_trailing_end(undef.names().iter(), None, |node, trailing_end| {
@@ -1081,73 +1041,6 @@ impl Parser<'_> {
         let mut call_like = fmt::CallLike::new("defined?".to_string());
         call_like.set_arguments(args);
         call_like
-    }
-
-    fn visit_def(&mut self, node: prism::DefNode) -> (fmt::LeadingTrivia, fmt::Def) {
-        let receiver = node.receiver();
-        let name_loc = node.name_loc();
-
-        // Take leading trivia of receiver or method name.
-        let leading_end = receiver
-            .as_ref()
-            .map(|r| r.location().start_offset())
-            .unwrap_or_else(|| name_loc.start_offset());
-        let leading = self.take_leading_trivia(leading_end);
-
-        let name_end = name_loc.end_offset();
-        let receiver = receiver.map(|r| self.visit(r, Some(name_end)));
-        let name = Self::source_lossy_at(&node.name_loc());
-        let mut def = fmt::Def::new(receiver, name);
-
-        let lparen_loc = node.lparen_loc();
-        let rparen_loc = node.rparen_loc();
-        if let Some(params) = node.parameters() {
-            let lparen = lparen_loc.as_ref().map(Self::source_lossy_at);
-            let rparen = rparen_loc.as_ref().map(Self::source_lossy_at);
-            let mut parameters = fmt::MethodParameters::new(lparen, rparen);
-            let params_next = rparen_loc.as_ref().map(|l| l.start_offset());
-            self.visit_parameter_nodes(params, params_next, |node| {
-                parameters.append_param(node);
-            });
-            let virtual_end = self.take_end_trivia_as_virtual_end(params_next);
-            parameters.set_virtual_end(virtual_end);
-            def.set_parameters(parameters);
-        } else if let (Some(lparen_loc), Some(rparen_loc)) = (&lparen_loc, &rparen_loc) {
-            let virtual_end = self.take_end_trivia_as_virtual_end(Some(rparen_loc.start_offset()));
-            if virtual_end.is_some() {
-                let lparen = Self::source_lossy_at(lparen_loc);
-                let rparen = Self::source_lossy_at(rparen_loc);
-                let mut parameters = fmt::MethodParameters::new(Some(lparen), Some(rparen));
-                parameters.set_virtual_end(virtual_end);
-                def.set_parameters(parameters);
-            }
-        }
-
-        if node.equal_loc().is_some() {
-            let body = node.body().expect("shorthand def body must exist");
-            let body = self.visit(body, None);
-            def.set_body(fmt::DefBody::Short {
-                body: Box::new(body),
-            });
-        } else {
-            let end_loc = node.end_keyword_loc().expect("block def must have end");
-            let body = node.body();
-            let body_start = body.as_ref().and_then(|b| match b {
-                prism::Node::BeginNode { .. } => {
-                    Self::start_of_begin_block_content(b.as_begin_node().unwrap())
-                }
-                _ => Some(b.location().start_offset()),
-            });
-            let head_next = body_start.unwrap_or(end_loc.start_offset());
-            let head_trailing = self.take_trailing_comment(head_next);
-            let block_body = self.parse_block_body(body, end_loc.start_offset());
-            def.set_body(fmt::DefBody::Block {
-                head_trailing,
-                body: block_body,
-            });
-        }
-
-        (leading, def)
     }
 
     fn parse_block_body(
