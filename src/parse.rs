@@ -1,3 +1,4 @@
+mod atoms;
 mod regexps;
 mod src;
 mod strings;
@@ -472,28 +473,28 @@ impl Parser<'_> {
                 fmt::Node::new(kind)
             }
 
-            prism::Node::SelfNode { .. } => self.parse_atom(node),
-            prism::Node::NilNode { .. } => self.parse_atom(node),
-            prism::Node::TrueNode { .. } => self.parse_atom(node),
-            prism::Node::FalseNode { .. } => self.parse_atom(node),
-            prism::Node::IntegerNode { .. } => self.parse_atom(node),
-            prism::Node::FloatNode { .. } => self.parse_atom(node),
-            prism::Node::RationalNode { .. } => self.parse_atom(node),
-            prism::Node::ImaginaryNode { .. } => self.parse_atom(node),
-            prism::Node::LocalVariableReadNode { .. } => self.parse_atom(node),
-            prism::Node::InstanceVariableReadNode { .. } => self.parse_atom(node),
-            prism::Node::ClassVariableReadNode { .. } => self.parse_atom(node),
-            prism::Node::GlobalVariableReadNode { .. } => self.parse_atom(node),
-            prism::Node::BackReferenceReadNode { .. } => self.parse_atom(node),
-            prism::Node::NumberedReferenceReadNode { .. } => self.parse_atom(node),
-            prism::Node::ConstantReadNode { .. } => self.parse_atom(node),
-            prism::Node::BlockLocalVariableNode { .. } => self.parse_atom(node),
-            prism::Node::ForwardingArgumentsNode { .. } => self.parse_atom(node),
-            prism::Node::RedoNode { .. } => self.parse_atom(node),
-            prism::Node::RetryNode { .. } => self.parse_atom(node),
-            prism::Node::SourceFileNode { .. } => self.parse_atom(node),
-            prism::Node::SourceLineNode { .. } => self.parse_atom(node),
-            prism::Node::SourceEncodingNode { .. } => self.parse_atom(node),
+            prism::Node::SelfNode { .. } => self.parse_as_atom(node),
+            prism::Node::NilNode { .. } => self.parse_as_atom(node),
+            prism::Node::TrueNode { .. } => self.parse_as_atom(node),
+            prism::Node::FalseNode { .. } => self.parse_as_atom(node),
+            prism::Node::IntegerNode { .. } => self.parse_as_atom(node),
+            prism::Node::FloatNode { .. } => self.parse_as_atom(node),
+            prism::Node::RationalNode { .. } => self.parse_as_atom(node),
+            prism::Node::ImaginaryNode { .. } => self.parse_as_atom(node),
+            prism::Node::LocalVariableReadNode { .. } => self.parse_as_atom(node),
+            prism::Node::InstanceVariableReadNode { .. } => self.parse_as_atom(node),
+            prism::Node::ClassVariableReadNode { .. } => self.parse_as_atom(node),
+            prism::Node::GlobalVariableReadNode { .. } => self.parse_as_atom(node),
+            prism::Node::BackReferenceReadNode { .. } => self.parse_as_atom(node),
+            prism::Node::NumberedReferenceReadNode { .. } => self.parse_as_atom(node),
+            prism::Node::ConstantReadNode { .. } => self.parse_as_atom(node),
+            prism::Node::BlockLocalVariableNode { .. } => self.parse_as_atom(node),
+            prism::Node::ForwardingArgumentsNode { .. } => self.parse_as_atom(node),
+            prism::Node::RedoNode { .. } => self.parse_as_atom(node),
+            prism::Node::RetryNode { .. } => self.parse_as_atom(node),
+            prism::Node::SourceFileNode { .. } => self.parse_as_atom(node),
+            prism::Node::SourceLineNode { .. } => self.parse_as_atom(node),
+            prism::Node::SourceEncodingNode { .. } => self.parse_as_atom(node),
 
             prism::Node::ConstantPathNode { .. } => {
                 let node = node.as_constant_path_node().unwrap();
@@ -938,11 +939,11 @@ impl Parser<'_> {
                 fmt::Node::new(fmt::Kind::Assign(assign))
             }
 
-            prism::Node::LocalVariableTargetNode { .. } => self.parse_atom(node),
-            prism::Node::InstanceVariableTargetNode { .. } => self.parse_atom(node),
-            prism::Node::ClassVariableTargetNode { .. } => self.parse_atom(node),
-            prism::Node::GlobalVariableTargetNode { .. } => self.parse_atom(node),
-            prism::Node::ConstantTargetNode { .. } => self.parse_atom(node),
+            prism::Node::LocalVariableTargetNode { .. } => self.parse_as_atom(node),
+            prism::Node::InstanceVariableTargetNode { .. } => self.parse_as_atom(node),
+            prism::Node::ClassVariableTargetNode { .. } => self.parse_as_atom(node),
+            prism::Node::GlobalVariableTargetNode { .. } => self.parse_as_atom(node),
+            prism::Node::ConstantTargetNode { .. } => self.parse_as_atom(node),
             prism::Node::ConstantPathTargetNode { .. } => {
                 let node = node.as_constant_path_target_node().unwrap();
                 let const_path = self.visit_constant_path(node.parent(), node.child());
@@ -1086,13 +1087,13 @@ impl Parser<'_> {
                 let (leading, def) = self.visit_def(node);
                 fmt::Node::with_leading_trivia(leading, fmt::Kind::Def(def))
             }
-            prism::Node::NoKeywordsParameterNode { .. } => self.parse_atom(node),
-            prism::Node::ForwardingParameterNode { .. } => self.parse_atom(node),
-            prism::Node::RequiredParameterNode { .. } => self.parse_atom(node),
-            prism::Node::RequiredKeywordParameterNode { .. } => self.parse_atom(node),
-            prism::Node::RestParameterNode { .. } => self.parse_atom(node),
-            prism::Node::KeywordRestParameterNode { .. } => self.parse_atom(node),
-            prism::Node::BlockParameterNode { .. } => self.parse_atom(node),
+            prism::Node::NoKeywordsParameterNode { .. } => self.parse_as_atom(node),
+            prism::Node::ForwardingParameterNode { .. } => self.parse_as_atom(node),
+            prism::Node::RequiredParameterNode { .. } => self.parse_as_atom(node),
+            prism::Node::RequiredKeywordParameterNode { .. } => self.parse_as_atom(node),
+            prism::Node::RestParameterNode { .. } => self.parse_as_atom(node),
+            prism::Node::KeywordRestParameterNode { .. } => self.parse_as_atom(node),
+            prism::Node::BlockParameterNode { .. } => self.parse_as_atom(node),
             prism::Node::OptionalParameterNode { .. } => {
                 let node = node.as_optional_parameter_node().unwrap();
                 let assign =
@@ -1298,12 +1299,6 @@ impl Parser<'_> {
 
             _ => todo!("parse {:?}", node),
         }
-    }
-
-    fn parse_atom(&mut self, node: prism::Node) -> fmt::Node {
-        let loc = node.location();
-        let value = Self::source_lossy_at(&loc);
-        fmt::Node::new(fmt::Kind::Atom(fmt::Atom(value)))
     }
 
     fn visit_constant_path(
