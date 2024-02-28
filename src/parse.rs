@@ -9,6 +9,7 @@ mod ifs;
 mod loops;
 mod methods;
 mod postmodifiers;
+mod ranges;
 mod regexps;
 mod src;
 mod strings;
@@ -571,23 +572,11 @@ impl Parser<'_> {
 
             prism::Node::RangeNode { .. } => {
                 let node = node.as_range_node().unwrap();
-                let op_loc = node.operator_loc();
-                let op_start = op_loc.start_offset();
-                let left = node.left().map(|n| self.visit(n, Some(op_start)));
-                let operator = Self::source_lossy_at(&op_loc);
-                let right = node.right().map(|n| self.visit(n, None));
-                let range = fmt::RangeLike::new(left, operator, right);
-                fmt::Node::new(fmt::Kind::RangeLike(range))
+                self.parse_range_like(node.operator_loc(), node.left(), node.right())
             }
             prism::Node::FlipFlopNode { .. } => {
                 let node = node.as_flip_flop_node().unwrap();
-                let op_loc = node.operator_loc();
-                let op_start = op_loc.start_offset();
-                let left = node.left().map(|n| self.visit(n, Some(op_start)));
-                let operator = Self::source_lossy_at(&op_loc);
-                let right = node.right().map(|n| self.visit(n, None));
-                let flipflop = fmt::RangeLike::new(left, operator, right);
-                fmt::Node::new(fmt::Kind::RangeLike(flipflop))
+                self.parse_range_like(node.operator_loc(), node.left(), node.right())
             }
 
             prism::Node::CaseMatchNode { .. } => {
