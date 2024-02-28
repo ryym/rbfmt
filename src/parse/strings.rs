@@ -1,7 +1,5 @@
 use crate::fmt;
 
-use super::src;
-
 impl<'src> super::Parser<'src> {
     pub(super) fn parse_string_or_heredoc(
         &mut self,
@@ -41,9 +39,9 @@ impl<'src> super::Parser<'src> {
         value_loc: prism::Location,
         closing_loc: Option<prism::Location>,
     ) -> fmt::StringLike {
-        let value = src::source_lossy_at(&value_loc);
-        let opening = opening_loc.as_ref().map(src::source_lossy_at);
-        let closing = closing_loc.as_ref().map(src::source_lossy_at);
+        let value = Self::source_lossy_at(&value_loc);
+        let opening = opening_loc.as_ref().map(Self::source_lossy_at);
+        let closing = closing_loc.as_ref().map(Self::source_lossy_at);
         fmt::StringLike::new(opening, value.into(), closing)
     }
 
@@ -53,8 +51,8 @@ impl<'src> super::Parser<'src> {
         parts: prism::NodeList,
         closing_loc: Option<prism::Location>,
     ) -> fmt::DynStringLike {
-        let opening = opening_loc.as_ref().map(src::source_lossy_at);
-        let closing = closing_loc.as_ref().map(src::source_lossy_at);
+        let opening = opening_loc.as_ref().map(Self::source_lossy_at);
+        let closing = closing_loc.as_ref().map(Self::source_lossy_at);
         let mut dstr = fmt::DynStringLike::new(opening, closing);
         for part in parts.iter() {
             match part {
@@ -86,15 +84,15 @@ impl<'src> super::Parser<'src> {
                     self.last_loc_end = node.opening_loc().end_offset();
                     let statements =
                         self.parse_statements_body(node.statements(), Some(loc.end_offset()));
-                    let opening = src::source_lossy_at(&node.opening_loc());
-                    let closing = src::source_lossy_at(&node.closing_loc());
+                    let opening = Self::source_lossy_at(&node.opening_loc());
+                    let closing = Self::source_lossy_at(&node.closing_loc());
                     let embedded_stmts = fmt::EmbeddedStatements::new(opening, statements, closing);
                     dstr.append_part(fmt::DynStrPart::Statements(embedded_stmts));
                 }
                 prism::Node::EmbeddedVariableNode { .. } => {
                     let node = part.as_embedded_variable_node().unwrap();
-                    let operator = src::source_lossy_at(&node.operator_loc());
-                    let variable = src::source_lossy_at(&node.variable().location());
+                    let operator = Self::source_lossy_at(&node.operator_loc());
+                    let variable = Self::source_lossy_at(&node.variable().location());
                     let embedded_var = fmt::EmbeddedVariable::new(operator, variable);
                     dstr.append_part(fmt::DynStrPart::Variable(embedded_var));
                 }
@@ -114,7 +112,7 @@ impl<'src> super::Parser<'src> {
         let (indent_mode, id) = fmt::HeredocIndentMode::parse_mode_and_id(open);
         let opening_id = String::from_utf8_lossy(id).to_string();
         let closing_loc = closing_loc.expect("heredoc must have closing");
-        let closing_id = src::source_lossy_at(&closing_loc)
+        let closing_id = Self::source_lossy_at(&closing_loc)
             .trim_start()
             .trim_end_matches('\n')
             .to_string();
@@ -166,8 +164,8 @@ impl<'src> super::Parser<'src> {
                     );
                     let statements =
                         self.parse_statements_body(node.statements(), Some(loc.end_offset()));
-                    let opening = src::source_lossy_at(&node.opening_loc());
-                    let closing = src::source_lossy_at(&node.closing_loc());
+                    let opening = Self::source_lossy_at(&node.opening_loc());
+                    let closing = Self::source_lossy_at(&node.closing_loc());
                     let embedded = fmt::EmbeddedStatements::new(opening, statements, closing);
                     parts.push(fmt::HeredocPart::Statements(embedded));
                 }
@@ -180,8 +178,8 @@ impl<'src> super::Parser<'src> {
                         self.src,
                         &mut parts,
                     );
-                    let operator = src::source_lossy_at(&node.operator_loc());
-                    let variable = src::source_lossy_at(&node.variable().location());
+                    let operator = Self::source_lossy_at(&node.operator_loc());
+                    let variable = Self::source_lossy_at(&node.variable().location());
                     let embedded_var = fmt::EmbeddedVariable::new(operator, variable);
                     parts.push(fmt::HeredocPart::Variable(embedded_var));
                 }
@@ -189,7 +187,7 @@ impl<'src> super::Parser<'src> {
             }
         }
         let closing_loc = closing_loc.expect("heredoc must have closing");
-        let closing_id = src::source_lossy_at(&closing_loc)
+        let closing_id = Self::source_lossy_at(&closing_loc)
             .trim_start()
             .trim_end_matches('\n')
             .to_string();

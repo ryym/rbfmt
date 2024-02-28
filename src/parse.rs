@@ -17,7 +17,6 @@ mod pattern_matches;
 mod postmodifiers;
 mod ranges;
 mod regexps;
-mod src;
 mod statements;
 mod strings;
 mod symbols;
@@ -65,31 +64,6 @@ struct Parser<'src> {
 impl Parser<'_> {
     fn parse_from_prism_node(&mut self, node: prism::Node) -> fmt::Node {
         self.visit(node, Some(self.src.len()))
-    }
-
-    fn next_pos(&mut self) -> fmt::Pos {
-        self.position_gen += 1;
-        fmt::Pos(self.position_gen)
-    }
-
-    fn source_lossy_at(loc: &prism::Location) -> String {
-        String::from_utf8_lossy(loc.as_slice()).to_string()
-    }
-
-    fn each_node_with_trailing_end<'a>(
-        mut nodes: impl Iterator<Item = prism::Node<'a>>,
-        last_trailing_end: Option<usize>,
-        mut f: impl FnMut(prism::Node<'a>, Option<usize>),
-    ) {
-        if let Some(node) = nodes.next() {
-            let mut prev = node;
-            for next in nodes {
-                let trailing_end = next.location().start_offset();
-                f(prev, Some(trailing_end));
-                prev = next;
-            }
-            f(prev, last_trailing_end);
-        }
     }
 
     fn visit(&mut self, node: prism::Node, trailing_end: Option<usize>) -> fmt::Node {
@@ -635,6 +609,31 @@ impl Parser<'_> {
             }
 
             _ => todo!("parse {:?}", node),
+        }
+    }
+
+    fn next_pos(&mut self) -> fmt::Pos {
+        self.position_gen += 1;
+        fmt::Pos(self.position_gen)
+    }
+
+    fn source_lossy_at(loc: &prism::Location) -> String {
+        String::from_utf8_lossy(loc.as_slice()).to_string()
+    }
+
+    fn each_node_with_trailing_end<'a>(
+        mut nodes: impl Iterator<Item = prism::Node<'a>>,
+        last_trailing_end: Option<usize>,
+        mut f: impl FnMut(prism::Node<'a>, Option<usize>),
+    ) {
+        if let Some(node) = nodes.next() {
+            let mut prev = node;
+            for next in nodes {
+                let trailing_end = next.location().start_offset();
+                f(prev, Some(trailing_end));
+                prev = next;
+            }
+            f(prev, last_trailing_end);
         }
     }
 
