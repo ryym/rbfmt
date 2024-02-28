@@ -278,13 +278,11 @@ impl Parser<'_> {
 
             prism::Node::AndNode { .. } => {
                 let node = node.as_and_node().unwrap();
-                let chain = self.visit_infix_op(node.left(), node.operator_loc(), node.right());
-                fmt::Node::new(fmt::Kind::InfixChain(chain))
+                self.parse_infix_operation(node.left(), node.operator_loc(), node.right())
             }
             prism::Node::OrNode { .. } => {
                 let node = node.as_or_node().unwrap();
-                let chain = self.visit_infix_op(node.left(), node.operator_loc(), node.right());
-                fmt::Node::new(fmt::Kind::InfixChain(chain))
+                self.parse_infix_operation(node.left(), node.operator_loc(), node.right())
             }
 
             prism::Node::LocalVariableWriteNode { .. } => {
@@ -1185,24 +1183,6 @@ impl Parser<'_> {
         let trailing = self.take_trailing_comment(trailing_end);
         block_params.set_closing_trailing(trailing);
         block_params
-    }
-
-    fn visit_infix_op(
-        &mut self,
-        left: prism::Node,
-        operator_loc: prism::Location,
-        right: prism::Node,
-    ) -> fmt::InfixChain {
-        let left = self.visit(left, Some(operator_loc.start_offset()));
-        let operator = Self::source_lossy_at(&operator_loc);
-        let precedence = fmt::InfixPrecedence::from_operator(&operator);
-        let mut chain = match left.kind {
-            fmt::Kind::InfixChain(chain) if chain.precedence() == &precedence => chain,
-            _ => fmt::InfixChain::new(left, precedence),
-        };
-        let right = self.visit(right, None);
-        chain.append_right(operator, right);
-        chain
     }
 
     fn visit_lambda(&mut self, node: prism::LambdaNode) -> fmt::Lambda {

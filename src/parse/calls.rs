@@ -148,7 +148,24 @@ impl<'src> super::Parser<'src> {
             .arguments()
             .and_then(|args| args.arguments().iter().next())
             .expect("infix operation must have argument");
-        let chain = self.visit_infix_op(receiver, msg_loc, right);
+        self.parse_infix_operation(receiver, msg_loc, right)
+    }
+
+    pub(super) fn parse_infix_operation(
+        &mut self,
+        left: prism::Node,
+        operator_loc: prism::Location,
+        right: prism::Node,
+    ) -> fmt::Node {
+        let left = self.visit(left, Some(operator_loc.start_offset()));
+        let operator = Self::source_lossy_at(&operator_loc);
+        let precedence = fmt::InfixPrecedence::from_operator(&operator);
+        let mut chain = match left.kind {
+            fmt::Kind::InfixChain(chain) if chain.precedence() == &precedence => chain,
+            _ => fmt::InfixChain::new(left, precedence),
+        };
+        let right = self.visit(right, None);
+        chain.append_right(operator, right);
         fmt::Node::new(fmt::Kind::InfixChain(chain))
     }
 
