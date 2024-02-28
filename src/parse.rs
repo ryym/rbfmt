@@ -1,14 +1,14 @@
 mod arrays;
 mod assigns;
 mod atoms;
-mod calls;
 mod cases;
 mod classes;
 mod consts;
 mod hashes;
 mod ifs;
 mod loops;
-mod methods;
+mod method_calls;
+mod method_defs;
 mod miscs;
 mod pattern_matches;
 mod postmodifiers;

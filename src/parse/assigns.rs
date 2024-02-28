@@ -1,6 +1,6 @@
 use crate::fmt;
 
-use super::calls;
+use super::method_calls;
 
 impl<'src> super::Parser<'src> {
     pub(super) fn parse_variable_assign(
@@ -32,7 +32,7 @@ impl<'src> super::Parser<'src> {
 
     pub(super) fn parse_call_assign(
         &mut self,
-        call: &impl calls::CallRoot,
+        call: &impl method_calls::CallRoot,
         operator_loc: prism::Location,
         value: prism::Node,
     ) -> fmt::Node {
