@@ -4,10 +4,8 @@ mod parse;
 #[cfg(test)]
 mod test;
 
-pub fn format(source: Vec<u8>) -> String {
-    let result = match parse::parse_into_fmt_node(source) {
-        None => return String::new(),
-        Some(result) => result,
-    };
-    fmt::format(result.node, result.heredoc_map)
+pub fn format(source: Vec<u8>) -> Result<String, parse::ParseError> {
+    let result = parse::parse_into_fmt_node(source)?;
+    let formatted = fmt::format(result.node, result.heredoc_map);
+    Ok(formatted)
 }

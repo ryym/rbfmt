@@ -42,6 +42,8 @@ fn compare_files(dir_path: PathBuf) {
 
     let input = fs::read(&input_path).unwrap();
     let want = fs::read_to_string(&output_path).unwrap();
-    let got = crate::format(input);
-    assert_eq!(want, got, "{:?}", &input_path);
+    match crate::format(input) {
+        Ok(got) => assert_eq!(want, got, "{:?}", &input_path),
+        Err(err) => unreachable!("test file could not be formatted: {:?}", err),
+    }
 }

@@ -25,15 +25,38 @@ mod trivia;
 use crate::fmt;
 use std::{collections::HashMap, iter::Peekable};
 
-pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Option<ParserResult> {
+#[derive(Debug)]
+pub struct ParseError {
+    messages: Vec<String>,
+}
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "parse error:")?;
+        for message in self.messages.iter() {
+            writeln!(f, "{message}")?;
+        }
+        Ok(())
+    }
+}
+impl std::error::Error for ParseError {}
+
+pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Result<ParserResult, ParseError> {
     let result = prism::parse(&source);
+
+    let messages = result
+        .errors()
+        .map(|e| e.message().to_string())
+        .collect::<Vec<_>>();
+    if !messages.is_empty() {
+        return Err(ParseError { messages });
+    }
 
     let comments = result.comments().peekable();
     let mut parser = Parser::new(&source, comments);
     let fmt_node = parser.parse_from_prism_node(result.node());
     // dbg!(&fmt_node);
     // dbg!(&builder.heredoc_map);
-    Some(ParserResult {
+    Ok(ParserResult {
         node: fmt_node,
         heredoc_map: parser.heredoc_map,
     })

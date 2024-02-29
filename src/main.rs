@@ -29,11 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     for path in target_paths {
         let source = fs::read(&path)?;
-        // let result = panic::catch_unwind(|| {});
-        // if result.is_err() {
-        //     println!("paniced in {:?}", &path);
-        // }
-        let result = rbf::format(source);
+        let result = rbf::format(source)?;
         if write_to_file {
             fs::write(&path, result)?;
         } else {
