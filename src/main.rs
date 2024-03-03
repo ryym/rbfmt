@@ -1,7 +1,7 @@
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    let result = rbfmt::run_command(std::env::args());
+    let result = rbfmt::run_command(&mut std::io::stdout(), std::env::args());
     match result {
         Ok(_) => ExitCode::SUCCESS,
         Err(err) => {

@@ -1,4 +1,4 @@
-use std::{error::Error, ffi::OsStr, path::PathBuf};
+use std::{error::Error, ffi::OsStr, io::Write, path::PathBuf};
 
 #[derive(Debug)]
 enum Action {
@@ -23,18 +23,21 @@ impl std::fmt::Display for SomeError {
 }
 impl std::error::Error for SomeError {}
 
-pub fn run(args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Result<(), Box<dyn Error>> {
+pub fn run(
+    w: &mut impl Write,
+    args: impl IntoIterator<Item = impl AsRef<OsStr>>,
+) -> Result<(), Box<dyn Error>> {
     let action = parse_args(args)?;
     match action {
         Action::Help(message) => {
-            print!("{message}");
+            write!(w, "{message}")?;
             Ok(())
         }
-        Action::Format(request) => run_format(request),
+        Action::Format(request) => run_format(w, request),
     }
 }
 
-fn run_format(request: FormatRequest) -> Result<(), Box<dyn Error>> {
+fn run_format(w: &mut impl Write, request: FormatRequest) -> Result<(), Box<dyn Error>> {
     let target_paths = flatten_target_paths(request.target_paths)?;
     let need_file_separator = target_paths.len() > 1;
     for path in target_paths {
@@ -44,9 +47,9 @@ fn run_format(request: FormatRequest) -> Result<(), Box<dyn Error>> {
             std::fs::write(&path, result)?;
         } else {
             if need_file_separator {
-                println!("\n------ {:?} -----", &path);
+                writeln!(w, "\n------ {:?} -----", &path)?;
             }
-            print!("{}", result);
+            write!(w, "{}", result)?;
         }
     }
     Ok(())
@@ -104,4 +107,19 @@ fn build_options() -> getopts::Options {
     o.optflag("h", "help", "print this help message");
     o.optflag("w", "write", "Write output to files instead of STDOUT");
     o
+}
+
+#[cfg(test)]
+mod test {
+    use std::error::Error;
+
+    #[test]
+    fn print_help_when_no_args_provided() -> Result<(), Box<dyn Error>> {
+        let mut output = Vec::new();
+        super::run(&mut output, [""])?;
+
+        let output = String::from_utf8(output)?.to_string();
+        assert!(output.starts_with("Usage:"));
+        Ok(())
+    }
 }
