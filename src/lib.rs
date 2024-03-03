@@ -1,4 +1,7 @@
-use std::{error::Error, io::Write};
+use std::{
+    error::Error,
+    io::{Read, Write},
+};
 
 mod cli;
 mod fmt;
@@ -8,10 +11,11 @@ mod parse;
 mod test;
 
 pub fn run_command(
+    input: &mut impl Read,
     output: &mut impl Write,
     args: impl Iterator<Item = String>,
 ) -> Result<(), Box<dyn Error>> {
-    crate::cli::run(output, args)
+    crate::cli::run(input, output, args)
 }
 
 pub fn format_source(source: Vec<u8>) -> Result<String, parse::ParseError> {
