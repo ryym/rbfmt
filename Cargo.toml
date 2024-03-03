@@ -1,9 +1,12 @@
 [package]
-name = "rbfmt"
-version = "0.0.1"
+authors = ["ryym <ryym.64@gmail.com>"]
+description = "Ruby code formatter"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+keywords = ["ruby", "formatter"]
+license = "MIT"
+name = "rbfmt"
+repository = "https://github.com/ryym/rbfmt"
+version = "0.0.1"
 
 [dependencies]
 getopts = "0.2.21"
