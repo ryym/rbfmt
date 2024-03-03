@@ -5,9 +5,11 @@ use std::{
     path::PathBuf,
 };
 
+const VERSION: &str = "0.0.1";
+
 #[derive(Debug)]
 enum Action {
-    Help(String),
+    Print(String),
     Format(FormatRequest),
 }
 
@@ -41,8 +43,8 @@ pub fn run(
 ) -> Result<(), Box<dyn Error>> {
     let action = parse_args(args)?;
     match action {
-        Action::Help(message) => {
-            write!(w, "{message}")?;
+        Action::Print(message) => {
+            writeln!(w, "{}", message.trim())?;
             Ok(())
         }
         Action::Format(request) => run_format(r, w, request),
@@ -117,9 +119,12 @@ fn parse_args(args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Result<Actio
     let options = build_options();
 
     let matches = options.parse(args)?;
+    if matches.opt_present("v") {
+        return Ok(Action::Print(VERSION.to_string()));
+    }
     if matches.opt_present("h") || matches.free.is_empty() {
         let usage = options.usage("Usage: rbfmt [options] [path/-]...");
-        return Ok(Action::Help(usage));
+        return Ok(Action::Print(usage));
     }
 
     let write_to_file = matches.opt_present("w");
@@ -140,8 +145,9 @@ fn parse_args(args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Result<Actio
 
 fn build_options() -> getopts::Options {
     let mut o = getopts::Options::new();
-    o.optflag("h", "help", "print this help message");
+    o.optflag("h", "help", "Print this help message");
     o.optflag("w", "write", "Write output to files instead of STDOUT");
+    o.optflag("v", "version", "Print version");
     o
 }
 
@@ -150,6 +156,16 @@ mod test {
     use std::error::Error;
 
     use similar_asserts::assert_eq;
+
+    #[test]
+    fn print_version() -> Result<(), Box<dyn Error>> {
+        let mut output = Vec::new();
+        super::run(&mut std::io::empty(), &mut output, ["-v"])?;
+
+        let output = String::from_utf8(output)?.to_string();
+        assert_eq!(output, format!("{}\n", super::VERSION));
+        Ok(())
+    }
 
     #[test]
     fn print_help_when_no_args_provided() -> Result<(), Box<dyn Error>> {
