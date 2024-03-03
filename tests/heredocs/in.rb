@@ -168,21 +168,6 @@ foo(
   d, # d
 )
 
-p <<A+%
-a
-A
-b
-
-p <<A+%
-a
-A
-b#{1+1}
-
-p <<A + "b
-a
-A
-b"
-
 <<~TABS
 indentation is not adjusted if there are tabs.
 	123
@@ -315,3 +300,18 @@ ABC
     #{:abc}
   ABC
 }456"
+
+p <<A+%
+a
+A
+b
+
+p <<A+%
+a
+A
+b#{1+1}
+
+p <<A + "b
+a
+A
+b"
