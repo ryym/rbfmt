@@ -1,0 +1,17 @@
+name: Build & Test
+
+on:
+  push:
+
+env: 
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update
+      - run: rustup --version
+      - run: cargo build
+      - run: make test
