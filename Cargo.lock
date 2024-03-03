@@ -275,7 +275,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rbf"
+name = "rbfmt"
 version = "0.1.0"
 dependencies = [
  "getopts",

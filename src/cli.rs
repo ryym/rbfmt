@@ -88,7 +88,7 @@ fn parse_args(args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Result<Actio
 
     let matches = options.parse(args.skip(1))?;
     if matches.opt_present("h") || matches.free.is_empty() {
-        let usage = options.usage("Usage: rbf [options] [path]...");
+        let usage = options.usage("Usage: rbfmt [options] [path]...");
         return Ok(Action::Help(usage));
     }
 
