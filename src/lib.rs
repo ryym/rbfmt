@@ -1,6 +1,9 @@
 use std::error::Error;
 
+use config::FormatConfig;
+
 mod cli;
+mod config;
 mod fmt;
 mod parse;
 
@@ -15,8 +18,8 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     )
 }
 
-pub fn format_source(source: Vec<u8>) -> Result<String, parse::ParseError> {
+pub fn format_source(source: Vec<u8>, config: FormatConfig) -> Result<String, parse::ParseError> {
     let result = parse::parse_into_fmt_node(source)?;
-    let formatted = fmt::format(result.node, result.heredoc_map);
+    let formatted = fmt::format(config, result.node, result.heredoc_map);
     Ok(formatted)
 }

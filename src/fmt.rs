@@ -9,9 +9,13 @@ pub(crate) use trivia::{Comment, LeadingTrivia, LineTrivia, TrailingTrivia};
 
 use self::output::{FormatContext, Output};
 
-pub(crate) fn format(node: Node, heredoc_map: HeredocMap) -> String {
+pub(crate) fn format(
+    config: crate::config::FormatConfig,
+    node: Node,
+    heredoc_map: HeredocMap,
+) -> String {
     let config = FormatConfig {
-        line_width: 100,
+        line_width: config.line_width,
         indent_size: 2,
     };
     let ctx = FormatContext { heredoc_map };

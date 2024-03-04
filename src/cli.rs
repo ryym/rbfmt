@@ -5,6 +5,8 @@ use std::{
     path::PathBuf,
 };
 
+use crate::config;
+
 const VERSION: &str = "0.0.1";
 
 #[derive(Debug)]
@@ -60,7 +62,9 @@ fn run_format(
         FormatTarget::Stdin => {
             let mut source = Vec::new();
             r.read_to_end(&mut source)?;
-            let result = crate::format_source(source)?;
+            let cwd = std::env::current_dir()?;
+            let config = config::config_of_dir(&cwd)?;
+            let result = crate::format_source(source, config.format)?;
             write!(w, "{}", result)?;
             Ok(())
         }
@@ -69,7 +73,8 @@ fn run_format(
             let need_file_separator = paths.len() > 1;
             for path in target_paths {
                 let source = std::fs::read(&path)?;
-                let result = crate::format_source(source)?;
+                let config = config::config_of_path(&path)?;
+                let result = crate::format_source(source, config.format)?;
                 if request.write_to_file {
                     std::fs::write(&path, result)?;
                 } else {
@@ -114,6 +119,11 @@ fn append_paths_recursively(path: PathBuf, paths: &mut Vec<PathBuf>) -> Result<(
     Ok(())
 }
 
+const USAGE_FOOTER: &str = "
+To configure formatting, put .rbfmt.yml file.
+ref: https://github.com/ryym/rbfmt
+";
+
 fn parse_args(args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Result<Action, Box<dyn Error>> {
     let args = args.into_iter();
     let options = build_options();
@@ -123,7 +133,8 @@ fn parse_args(args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Result<Actio
         return Ok(Action::Print(VERSION.to_string()));
     }
     if matches.opt_present("h") || matches.free.is_empty() {
-        let usage = options.usage("Usage: rbfmt [options] [path/-]...");
+        let mut usage = options.usage("Usage: rbfmt [options] [path/-]...");
+        usage.push_str(USAGE_FOOTER);
         return Ok(Action::Print(usage));
     }
 

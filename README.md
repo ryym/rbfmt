@@ -28,3 +28,14 @@ foo.bar(
 ```bash
 $ cargo install rbfmt
 ```
+
+## Configuration
+
+You can configure formatting via `.rbfmt.yml` file.
+
+Available values and defaults:
+
+```yaml
+format:
+  line_width: 100
+```
