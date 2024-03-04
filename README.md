@@ -1,9 +1,9 @@
 > [!WARNING]
-> This is heavily under development and has many TODOs and bugs.
+> This is currently under development and has many TODOs and bugs.
 
 # rbfmt
 
-Rbfmt is a yet another Ruby code formatter, based on the Ruby's official [Prism][prism] parser.
+Rbfmt is a yet another Ruby code formatter written in Rust, based on the Ruby's official [Prism][prism] parser.
 
 [prism]: https://ruby.github.io/prism/
 
