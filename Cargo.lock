@@ -277,6 +277,8 @@ version = "0.0.1"
 dependencies = [
  "getopts",
  "ruby-prism",
+ "serde",
+ "serde_yaml",
  "similar-asserts",
 ]
 
