@@ -55,7 +55,7 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Result<ParserResult, Parse
     let mut parser = Parser::new(&source, comments);
     let fmt_node = parser.parse_from_prism_node(result.node());
     // dbg!(&fmt_node);
-    // dbg!(&builder.heredoc_map);
+    // dbg!(&parser.heredoc_map);
     Ok(ParserResult {
         node: fmt_node,
         heredoc_map: parser.heredoc_map,

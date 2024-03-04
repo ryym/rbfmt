@@ -168,6 +168,41 @@ foo(
   d, # d
 )
 
+<<~H1
+    indentation is adjusted
+    foo #{:bar} baz
+    #{1} ab #{2} cd #{3}
+      wow
+H1
+
+<<~H1
+indentation is adjusted
+ #{1}
+a #{2} b
+H1
+
+<<~H1
+      indentation is adjusted even if there are empty lines
+
+      below is an empty line starting with spaces less than desired indent
+    
+ 
+      below is an empty line starting with spaces more than desired indent
+         
+      bbbb
+
+      #{1} a
+
+H1
+
+<<~H1
+      indentation is adjusted
+
+       #{1}
+         
+      a #{2} b
+H1
+
 <<~TABS
 indentation is not adjusted if there are tabs.
 	123

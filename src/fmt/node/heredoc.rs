@@ -82,27 +82,46 @@ impl Heredoc {
             }
             HeredocIndentMode::AllIndented => {
                 o.indent();
-                let (min_spaces, line_start_str_indice) = Self::inspect_body_indent(&self.parts);
+                let body_info =
+                    inspect_body_indent(&self.parts).unwrap_or(SquigglyHeredocBodyInfo {
+                        min_spaces: 0,
+                        line_starts: vec![],
+                    });
                 let desired_indent = " ".repeat(o.indent);
                 for (i, part) in self.parts.iter().enumerate() {
-                    let is_line_start = line_start_str_indice.contains(&i);
-                    if is_line_start {
-                        o.push_str_without_indent(&desired_indent);
-                    }
+                    let line_start = body_info.line_starts.get(i).unwrap_or(&None);
                     match part {
                         HeredocPart::Str(str) => {
                             // Ignore non-UTF8 source code for now.
                             let value = String::from_utf8_lossy(&str.value);
-                            if is_line_start {
-                                o.push_str_without_indent(&value[min_spaces..]);
+                            if let Some(line_start) = line_start {
+                                if let Some(empty_line) = &line_start.empty_line {
+                                    if body_info.min_spaces < empty_line.prefix_spaces {
+                                        o.push_str_without_indent(&desired_indent);
+                                        o.push_str_without_indent(&value[body_info.min_spaces..]);
+                                    } else {
+                                        o.push_str_without_indent(
+                                            &value[empty_line.prefix_spaces..],
+                                        );
+                                    }
+                                } else {
+                                    o.push_str_without_indent(&desired_indent);
+                                    o.push_str_without_indent(&value[body_info.min_spaces..]);
+                                }
                             } else {
                                 o.push_str_without_indent(&value);
                             }
                         }
                         HeredocPart::Statements(embedded) => {
+                            if line_start.is_some() {
+                                o.push_str_without_indent(&desired_indent);
+                            }
                             embedded.format(o, ctx);
                         }
                         HeredocPart::Variable(var) => {
+                            if line_start.is_some() {
+                                o.push_str_without_indent(&desired_indent);
+                            }
                             var.format(o);
                         }
                     }
@@ -114,18 +133,26 @@ impl Heredoc {
         }
         o.indent = actual_indent;
     }
+}
 
-    fn inspect_body_indent(parts: &Vec<HeredocPart>) -> (usize, Vec<usize>) {
-        if parts.is_empty() {
-            return (0, vec![]);
-        }
-        let mut is_line_start = matches!(parts[0], HeredocPart::Str(_));
-        let mut min_spaces = usize::MAX;
-        let mut line_start_str_indice: Vec<usize> = vec![];
-        for (part_idx, part) in parts.iter().enumerate() {
-            match part {
-                HeredocPart::Str(str) => {
-                    if is_line_start {
+fn inspect_body_indent(parts: &Vec<HeredocPart>) -> Option<SquigglyHeredocBodyInfo> {
+    if parts.is_empty() {
+        return None;
+    }
+    let mut is_line_start = matches!(parts[0], HeredocPart::Str(_));
+    let mut min_spaces = usize::MAX;
+    let mut line_starts = Vec::with_capacity(parts.len());
+    for part in parts {
+        match part {
+            HeredocPart::Str(str) => {
+                let line_start = if is_line_start {
+                    // Empty lines does not contribute to determining `min_spaces`,
+                    // even if it starts with some spaces.
+                    if let Some(prefix_spaces) = prefix_spaces_of_empty_line(&str.value) {
+                        Some(SquigglyHeredocLineStartPartInfo {
+                            empty_line: Some(SquigglyHeredocEmptyLineInfo { prefix_spaces }),
+                        })
+                    } else {
                         let mut i = 0;
                         let mut spaces = 0;
                         while i < str.value.len() {
@@ -137,7 +164,7 @@ impl Heredoc {
                                     // If there is a line that has a mixture of spaces and tabs
                                     // at the beginning of the line, do not adjust the indentation.
                                     // Its handling seems so complicated: https://bugs.ruby-lang.org/issues/9098.
-                                    return (0, vec![]);
+                                    return None;
                                 }
                                 _ => break,
                             }
@@ -146,23 +173,66 @@ impl Heredoc {
                         if spaces < min_spaces {
                             min_spaces = spaces;
                         }
-                        line_start_str_indice.push(part_idx);
+                        Some(SquigglyHeredocLineStartPartInfo { empty_line: None })
                     }
-                    is_line_start = str.value.last().unwrap() == &b'\n';
-                }
-                _ => {
-                    if is_line_start {
-                        line_start_str_indice.push(part_idx);
-                    }
-                    is_line_start = false;
-                }
+                } else {
+                    None
+                };
+                line_starts.push(line_start);
+                is_line_start = str.value.last().unwrap() == &b'\n';
+            }
+            _ => {
+                let line_start = if is_line_start {
+                    Some(SquigglyHeredocLineStartPartInfo { empty_line: None })
+                } else {
+                    None
+                };
+                line_starts.push(line_start);
+                is_line_start = false;
             }
         }
-        if min_spaces == usize::MAX {
-            min_spaces = 0;
-        }
-        (min_spaces, line_start_str_indice)
     }
+    if min_spaces == usize::MAX {
+        min_spaces = 0;
+    }
+    Some(SquigglyHeredocBodyInfo {
+        min_spaces,
+        line_starts,
+    })
+}
+
+// return a number of spaces at line start only if it is an empty (space-only) line.
+// return None if
+//   - the value is not a line, that is, it does not end with a line break
+//   - the value is a line but contains non-space characters
+fn prefix_spaces_of_empty_line(value: &Vec<u8>) -> Option<usize> {
+    if value.last().map_or(false, |c| c != &b'\n') {
+        return None;
+    }
+    let mut spaces_len = 0;
+    for char in value.iter().take(value.len() - 1) {
+        if char != &b' ' {
+            return None;
+        }
+        spaces_len += 1;
+    }
+    Some(spaces_len)
+}
+
+#[derive(Debug)]
+struct SquigglyHeredocBodyInfo {
+    min_spaces: usize,
+    line_starts: Vec<Option<SquigglyHeredocLineStartPartInfo>>,
+}
+
+#[derive(Debug)]
+struct SquigglyHeredocLineStartPartInfo {
+    empty_line: Option<SquigglyHeredocEmptyLineInfo>,
+}
+
+#[derive(Debug)]
+struct SquigglyHeredocEmptyLineInfo {
+    prefix_spaces: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
