@@ -38,7 +38,7 @@ impl<'src> super::Parser<'src> {
             fmt::LeadingTrivia::new()
         };
 
-        let arguments = call.arguments();
+        let arguments_iter = call.arguments().map(|n| n.arguments().iter());
         let block = call.block();
         let opening_loc = call.opening_loc();
         let closing_loc = call.closing_loc();
@@ -46,7 +46,7 @@ impl<'src> super::Parser<'src> {
             Some(node) => match node {
                 // method call with block literal (e.g. "foo { a }", "foo(a) { b }")
                 prism::Node::BlockNode { .. } => {
-                    let args = self.parse_arguments(arguments, None, opening_loc, closing_loc);
+                    let args = self.parse_arguments(arguments_iter, None, opening_loc, closing_loc);
                     let block = node.as_block_node().unwrap();
                     let block = self.parse_block(block);
                     (args, Some(block))
@@ -54,15 +54,19 @@ impl<'src> super::Parser<'src> {
                 // method call with a block argument (e.g. "foo(&a)", "foo(a, &b)")
                 prism::Node::BlockArgumentNode { .. } => {
                     let block_arg = node.as_block_argument_node().unwrap();
-                    let args =
-                        self.parse_arguments(arguments, Some(block_arg), opening_loc, closing_loc);
+                    let args = self.parse_arguments(
+                        arguments_iter,
+                        Some(block_arg),
+                        opening_loc,
+                        closing_loc,
+                    );
                     (args, None)
                 }
                 _ => panic!("unexpected block node of call: {:?}", node),
             },
             // method call without block (e.g. "foo", "foo(a)")
             None => {
-                let args = self.parse_arguments(arguments, None, opening_loc, closing_loc);
+                let args = self.parse_arguments(arguments_iter, None, opening_loc, closing_loc);
                 (args, None)
             }
         };
@@ -209,23 +213,30 @@ impl<'src> super::Parser<'src> {
         let receiver = self.parse(receiver, Some(opening_loc.start_offset()));
 
         let args = call.arguments().expect("index write must have arguments");
-        let mut args_iter = args.arguments().iter();
-        let (arg1, arg2) = match (args_iter.next(), args_iter.next(), args_iter.next()) {
-            (Some(arg1), Some(arg2), None) => (arg1, arg2),
-            _ => panic!("index write must have exactly two arguments"),
-        };
+        let mut args = args.arguments().iter().collect::<Vec<_>>();
+        let last_arg = args.pop().expect("index write must have arguments");
+        let args_iter = Some(args.into_iter());
 
-        let mut left_args = fmt::Arguments::new(Some("[".to_string()), Some("]".to_string()));
-        let closing_start = closing_loc.start_offset();
-        left_args.append_node(self.parse(arg1, Some(closing_start)));
-        let left_args_end = self.take_end_trivia_as_virtual_end(Some(closing_start));
-        left_args.set_virtual_end(left_args_end);
+        let left_args = if let Some(block) = call.block() {
+            let block_arg = block
+                .as_block_argument_node()
+                .expect("index write cannot have block");
+            self.parse_arguments(
+                args_iter,
+                Some(block_arg),
+                Some(opening_loc),
+                Some(closing_loc),
+            )
+        } else {
+            self.parse_arguments(args_iter, None, Some(opening_loc), Some(closing_loc))
+        };
+        let left_args = left_args.expect("index write must have arguments or block arguments");
 
         let mut chain = fmt::MethodChain::with_receiver(receiver);
         chain.append_index_call(fmt::IndexCall::new(left_args, None));
 
         let left = fmt::Node::new(fmt::Kind::MethodChain(chain));
-        let right = self.parse(arg2, None);
+        let right = self.parse(last_arg, None);
         let operator = "=".to_string();
         let assign = fmt::Assign::new(left, operator, right);
         fmt::Node::new(fmt::Kind::Assign(assign))
@@ -238,7 +249,7 @@ impl<'src> super::Parser<'src> {
     ) -> fmt::Node {
         let name = Self::source_lossy_at(&name_loc);
         let mut call_like = fmt::CallLike::new(name);
-        let args = self.parse_arguments(arguments, None, None, None);
+        let args = self.parse_arguments(arguments.map(|n| n.arguments().iter()), None, None, None);
         if let Some(args) = args {
             call_like.set_arguments(args);
         }
@@ -246,8 +257,12 @@ impl<'src> super::Parser<'src> {
     }
 
     pub(super) fn parse_yield(&mut self, node: prism::YieldNode) -> fmt::Node {
-        let args =
-            self.parse_arguments(node.arguments(), None, node.lparen_loc(), node.rparen_loc());
+        let args = self.parse_arguments(
+            node.arguments().map(|n| n.arguments().iter()),
+            None,
+            node.lparen_loc(),
+            node.rparen_loc(),
+        );
         let mut call_like = fmt::CallLike::new("yield".to_string());
         if let Some(mut args) = args {
             args.last_comma_allowed = false;
@@ -256,9 +271,10 @@ impl<'src> super::Parser<'src> {
         fmt::Node::new(fmt::Kind::CallLike(call_like))
     }
 
-    fn parse_arguments(
+    fn parse_arguments<'a>(
         &mut self,
-        node: Option<prism::ArgumentsNode>,
+        args_iter: Option<impl Iterator<Item = prism::Node<'a>>>,
+        // XXX: こっちが Node を受け取っちゃうのもありかも
         block_arg: Option<prism::BlockArgumentNode>,
         opening_loc: Option<prism::Location>,
         closing_loc: Option<prism::Location>,
@@ -266,7 +282,7 @@ impl<'src> super::Parser<'src> {
         let opening = opening_loc.as_ref().map(Self::source_lossy_at);
         let closing = closing_loc.as_ref().map(Self::source_lossy_at);
         let closing_start = closing_loc.as_ref().map(|l| l.start_offset());
-        match node {
+        match args_iter {
             None => {
                 let block_arg =
                     block_arg.map(|block_arg| self.parse(block_arg.as_node(), closing_start));
@@ -288,9 +304,9 @@ impl<'src> super::Parser<'src> {
                     }
                 }
             }
-            Some(args_node) => {
+            Some(args_iter) => {
                 let mut args = fmt::Arguments::new(opening, closing);
-                let mut nodes = args_node.arguments().iter().collect::<Vec<_>>();
+                let mut nodes = args_iter.collect::<Vec<_>>();
                 if let Some(block_arg) = block_arg {
                     nodes.push(block_arg.as_node());
                 }
