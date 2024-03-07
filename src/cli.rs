@@ -74,14 +74,22 @@ fn run_format(
             for path in target_paths {
                 let source = std::fs::read(&path)?;
                 let config = config::config_of_path(&path)?;
-                let result = crate::format_source(source, config.format)?;
-                if request.write_to_file {
-                    std::fs::write(&path, result)?;
-                } else {
-                    if need_file_separator {
-                        writeln!(w, "\n------ {:?} -----", &path)?;
+                let result = crate::format_source(source, config.format);
+                match result {
+                    Ok(result) => {
+                        if request.write_to_file {
+                            std::fs::write(&path, result)?;
+                        } else {
+                            if need_file_separator {
+                                writeln!(w, "\n------ {:?} -----", &path)?;
+                            }
+                            write!(w, "{}", result)?;
+                        }
                     }
-                    write!(w, "{}", result)?;
+                    Err(err) => {
+                        writeln!(w, "failed to format {:?}", &path)?;
+                        writeln!(w, "error: {err}")?;
+                    }
                 }
             }
             Ok(())
