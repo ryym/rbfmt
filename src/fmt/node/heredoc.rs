@@ -86,6 +86,7 @@ impl Heredoc {
                 let body_info =
                     inspect_body_indent(&self.parts).unwrap_or(SquigglyHeredocBodyInfo {
                         min_spaces: 0,
+                        has_content: false,
                         line_starts: vec![],
                     });
                 let desired_indent = " ".repeat(o.indent);
@@ -97,7 +98,9 @@ impl Heredoc {
                             let value = String::from_utf8_lossy(&str.value);
                             if let Some(line_start) = line_start {
                                 if let Some(empty_line) = &line_start.empty_line {
-                                    if body_info.min_spaces < empty_line.prefix_spaces {
+                                    if body_info.has_content
+                                        && body_info.min_spaces < empty_line.prefix_spaces
+                                    {
                                         o.push_str_without_indent(&desired_indent);
                                         o.push_str_without_indent(&value[body_info.min_spaces..]);
                                     } else {
@@ -143,6 +146,7 @@ fn inspect_body_indent(parts: &Vec<HeredocPart>) -> Option<SquigglyHeredocBodyIn
     let mut is_line_start = matches!(parts[0], HeredocPart::Str(_));
     let mut min_spaces = usize::MAX;
     let mut line_starts = Vec::with_capacity(parts.len());
+    let mut has_content = false;
     for part in parts {
         match part {
             HeredocPart::Str(str) => {
@@ -174,6 +178,7 @@ fn inspect_body_indent(parts: &Vec<HeredocPart>) -> Option<SquigglyHeredocBodyIn
                         if spaces < min_spaces {
                             min_spaces = spaces;
                         }
+                        has_content = true;
                         Some(SquigglyHeredocLineStartPartInfo { empty_line: None })
                     }
                 } else {
@@ -198,6 +203,7 @@ fn inspect_body_indent(parts: &Vec<HeredocPart>) -> Option<SquigglyHeredocBodyIn
     }
     Some(SquigglyHeredocBodyInfo {
         min_spaces,
+        has_content,
         line_starts,
     })
 }
@@ -226,6 +232,7 @@ fn prefix_spaces_of_empty_line(value: &Vec<u8>) -> Option<usize> {
 #[derive(Debug)]
 struct SquigglyHeredocBodyInfo {
     min_spaces: usize,
+    has_content: bool,
     line_starts: Vec<Option<SquigglyHeredocLineStartPartInfo>>,
 }
 

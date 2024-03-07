@@ -27,6 +27,31 @@ EMPTY
 <<~EMPTY
 EMPTY
 
+<<EMPTY2
+
+EMPTY2
+
+<<-EMPTY2
+
+EMPTY2
+
+<<~EMPTY2
+
+EMPTY2
+
+<<SPACE_ONLY
+  
+SPACE_ONLY
+
+<<-SPACE_ONLY
+  
+SPACE_ONLY
+
+<<~SPACE_ONLY
+
+
+SPACE_ONLY
+
 if check_indent
   <<NONE
 NONE
