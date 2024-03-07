@@ -58,6 +58,7 @@ impl Heredoc {
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext, state: &HeredocState) {
         let actual_indent = o.indent;
         o.indent = state.opening_line_indent;
+
         match self.indent_mode {
             HeredocIndentMode::None | HeredocIndentMode::EndIndented => {
                 for part in &self.parts {
@@ -78,7 +79,7 @@ impl Heredoc {
                 if matches!(self.indent_mode, HeredocIndentMode::EndIndented) {
                     o.put_indent();
                 }
-                o.push_str(&self.id);
+                o.push_str_without_indent(&self.id);
             }
             HeredocIndentMode::AllIndented => {
                 o.indent();

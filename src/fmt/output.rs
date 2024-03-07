@@ -118,6 +118,8 @@ impl Output {
     }
 
     pub(super) fn push_str_without_indent(&mut self, str: &str) {
+        // XXX: When we push the content of a string, it could contain a line-break.
+        // In that case, `remaining_width` could be wrong.
         self.buffer.push_str(str);
         self.remaining_width = self.remaining_width.saturating_sub(str.len());
     }

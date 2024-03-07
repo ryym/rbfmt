@@ -27,6 +27,19 @@ EMPTY
 <<~EMPTY
 EMPTY
 
+if check_indent
+  <<NONE
+NONE
+
+  <<-END_ONLY
+content
+END_ONLY
+
+  <<~ALL
+content
+ALL
+end
+
 <<~CC
   squiggly
 CC
