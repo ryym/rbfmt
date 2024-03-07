@@ -179,7 +179,7 @@ fn inspect_body_indent(parts: &Vec<HeredocPart>) -> Option<SquigglyHeredocBodyIn
                     None
                 };
                 line_starts.push(line_start);
-                is_line_start = str.value.last().unwrap() == &b'\n';
+                is_line_start = str.value.last().map_or(false, |b| b == &b'\n');
             }
             _ => {
                 let line_start = if is_line_start {
@@ -206,6 +206,9 @@ fn inspect_body_indent(parts: &Vec<HeredocPart>) -> Option<SquigglyHeredocBodyIn
 //   - the value is not a line, that is, it does not end with a line break
 //   - the value is a line but contains non-space characters
 fn prefix_spaces_of_empty_line(value: &Vec<u8>) -> Option<usize> {
+    if value.is_empty() {
+        return Some(0);
+    }
     if value.last().map_or(false, |c| c != &b'\n') {
         return None;
     }

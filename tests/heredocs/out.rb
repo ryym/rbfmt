@@ -18,6 +18,15 @@ x
 
 BB
 
+<<EMPTY
+EMPTY
+
+<<-EMPTY
+EMPTY
+
+<<~EMPTY
+EMPTY
+
 <<~CC
   squiggly
 CC
