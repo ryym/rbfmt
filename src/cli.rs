@@ -101,15 +101,23 @@ fn flatten_target_paths(target_paths: &Vec<String>) -> Result<Vec<PathBuf>, Box<
     let mut paths = vec![];
     for path in target_paths {
         let path = PathBuf::from(path);
-        append_paths_recursively(path, &mut paths)?;
+        append_paths_recursively(path, &mut paths, false)?;
     }
     Ok(paths)
 }
 
-fn append_paths_recursively(path: PathBuf, paths: &mut Vec<PathBuf>) -> Result<(), Box<dyn Error>> {
+fn append_paths_recursively(
+    path: PathBuf,
+    paths: &mut Vec<PathBuf>,
+    ignore_non_existiing_path: bool,
+) -> Result<(), Box<dyn Error>> {
     if !path.exists() {
-        let message = format!("file not exist: {}", path.as_os_str().to_string_lossy());
-        return Err(Box::new(SomeError(message)));
+        if ignore_non_existiing_path {
+            return Ok(());
+        } else {
+            let message = format!("file not exist: {}", path.as_os_str().to_string_lossy());
+            return Err(Box::new(SomeError(message)));
+        }
     }
     if path.is_file() {
         if let Some(ext) = path.extension() {
@@ -121,7 +129,7 @@ fn append_paths_recursively(path: PathBuf, paths: &mut Vec<PathBuf>) -> Result<(
         let entries = std::fs::read_dir(path)?;
         for entry in entries {
             let path = entry?.path();
-            append_paths_recursively(path, paths)?;
+            append_paths_recursively(path, paths, true)?;
         }
     }
     Ok(())
