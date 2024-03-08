@@ -311,34 +311,40 @@ impl<'src> super::Parser<'src> {
                     nodes.push(block_arg.as_node());
                 }
                 let mut idx = 0;
-                let last_idx = nodes.len() - 1;
-                Self::each_node_with_trailing_end(
-                    nodes.into_iter(),
-                    closing_start,
-                    |node, trailing_end| {
-                        if idx == last_idx {
-                            args.last_comma_allowed = !matches!(
-                                node,
-                                prism::Node::ForwardingArgumentsNode { .. }
-                                    | prism::Node::BlockArgumentNode { .. }
-                            );
-                        }
-                        match node {
-                            prism::Node::KeywordHashNode { .. } => {
-                                let node = node.as_keyword_hash_node().unwrap();
-                                self.each_keyword_hash_element(node, trailing_end, |fmt_node| {
+                if !nodes.is_empty() {
+                    let last_idx = nodes.len() - 1;
+                    Self::each_node_with_trailing_end(
+                        nodes.into_iter(),
+                        closing_start,
+                        |node, trailing_end| {
+                            if idx == last_idx {
+                                args.last_comma_allowed = !matches!(
+                                    node,
+                                    prism::Node::ForwardingArgumentsNode { .. }
+                                        | prism::Node::BlockArgumentNode { .. }
+                                );
+                            }
+                            match node {
+                                prism::Node::KeywordHashNode { .. } => {
+                                    let node = node.as_keyword_hash_node().unwrap();
+                                    self.each_keyword_hash_element(
+                                        node,
+                                        trailing_end,
+                                        |fmt_node| {
+                                            args.append_node(fmt_node);
+                                        },
+                                    );
+                                }
+                                _ => {
+                                    let fmt_node = self.parse(node, trailing_end);
                                     args.append_node(fmt_node);
-                                });
+                                }
                             }
-                            _ => {
-                                let fmt_node = self.parse(node, trailing_end);
-                                args.append_node(fmt_node);
-                            }
-                        }
 
-                        idx += 1;
-                    },
-                );
+                            idx += 1;
+                        },
+                    );
+                }
                 let virtual_end = self.take_end_trivia_as_virtual_end(closing_start);
                 args.set_virtual_end(virtual_end);
                 Some(args)
