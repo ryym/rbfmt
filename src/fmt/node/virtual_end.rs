@@ -1,7 +1,7 @@
 use crate::fmt::{
     output::{FormatContext, Output},
     shape::Shape,
-    LeadingTrivia, LineTrivia,
+    Comment, LeadingTrivia, LineTrivia,
 };
 
 #[derive(Debug)]
@@ -54,7 +54,10 @@ impl VirtualEnd {
                     }
                 }
                 LineTrivia::Comment(comment) => {
-                    o.push_str(&comment.value);
+                    match &comment {
+                        Comment::Oneline(comment) => o.push_str(comment),
+                        Comment::Block(comment) => o.push_str_without_indent(comment),
+                    }
                     if i < last_idx {
                         o.break_line(ctx);
                     }

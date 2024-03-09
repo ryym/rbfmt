@@ -66,7 +66,10 @@ impl LeadingTrivia {
                     }
                 }
                 LineTrivia::Comment(comment) => {
-                    o.push_str(&comment.value);
+                    match &comment {
+                        Comment::Oneline(comment) => o.push_str(comment),
+                        Comment::Block(comment) => o.push_str_without_indent(comment),
+                    }
                     o.break_line(ctx);
                 }
             }
@@ -76,12 +79,12 @@ impl LeadingTrivia {
 
 #[derive(Debug)]
 pub(crate) struct TrailingTrivia {
-    comment: Option<Comment>,
+    comment: Option<String>,
     shape: Shape,
 }
 
 impl TrailingTrivia {
-    pub(crate) fn new(comment: Option<Comment>) -> Self {
+    pub(crate) fn new(comment: Option<String>) -> Self {
         let shape = if comment.is_some() {
             Shape::LineEnd {
                 // Do not take into account the length of trailing comment.
@@ -97,7 +100,7 @@ impl TrailingTrivia {
         Self::new(None)
     }
 
-    pub(crate) fn comment(&self) -> &Option<Comment> {
+    pub(crate) fn comment(&self) -> &Option<String> {
         &self.comment
     }
 
@@ -112,14 +115,15 @@ impl TrailingTrivia {
     pub(crate) fn format(&self, o: &mut Output) {
         if let Some(comment) = &self.comment() {
             o.push(' ');
-            o.buffer.push_str(&comment.value);
+            o.buffer.push_str(comment);
         }
     }
 }
 
 #[derive(Debug)]
-pub(crate) struct Comment {
-    pub value: String,
+pub(crate) enum Comment {
+    Oneline(String),
+    Block(String),
 }
 
 #[derive(Debug)]

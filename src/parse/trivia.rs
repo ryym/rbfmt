@@ -25,12 +25,14 @@ impl<'src> super::Parser<'src> {
                 break;
             };
             let mut value = Self::source_lossy_at(&loc);
-            if value.starts_with("=begin") {
+            let comment = if value.starts_with("=begin") {
                 value = value.trim_end().to_string();
-            }
-            let fmt_comment = fmt::Comment { value };
+                fmt::Comment::Block(value)
+            } else {
+                fmt::Comment::Oneline(value)
+            };
             self.take_empty_lines_until(loc.start_offset(), &mut trivia);
-            trivia.append_line(fmt::LineTrivia::Comment(fmt_comment));
+            trivia.append_line(fmt::LineTrivia::Comment(comment));
             self.last_loc_end = loc.end_offset() - 1;
             self.comments.next();
         }
@@ -56,8 +58,7 @@ impl<'src> super::Parser<'src> {
                 self.last_loc_end = loc.end_offset() - 1;
                 self.comments.next();
                 let value = Self::source_lossy_at(&loc);
-                let comment = Some(fmt::Comment { value });
-                return fmt::TrailingTrivia::new(comment);
+                return fmt::TrailingTrivia::new(Some(value));
             }
         };
         fmt::TrailingTrivia::none()

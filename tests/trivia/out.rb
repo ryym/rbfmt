@@ -23,4 +23,12 @@ comment
 here
 =end
 
+if true
+  1
+=begin
+  abc
+=end
+  a
+end
+
 # comment-9
