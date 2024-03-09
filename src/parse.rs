@@ -45,7 +45,15 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Result<ParserResult, Parse
 
     let messages = result
         .errors()
-        .map(|e| e.message().to_string())
+        .map(|e| {
+            let loc = e.location();
+            format!(
+                "[{},{}] {}",
+                loc.start_offset(),
+                loc.end_offset(),
+                e.message()
+            )
+        })
         .collect::<Vec<_>>();
     if !messages.is_empty() {
         return Err(ParseError { messages });
