@@ -138,7 +138,7 @@ impl<'src> super::Parser<'src> {
         let opening_id = String::from_utf8_lossy(id).to_string();
 
         let mut parts = vec![];
-        let mut last_str_end: Option<usize> = None;
+        let mut last_part_end: Option<usize> = None;
         for part in content_parts.iter() {
             match part {
                 prism::Node::StringNode { .. } => {
@@ -151,13 +151,13 @@ impl<'src> super::Parser<'src> {
                     );
                     parts.push(fmt::HeredocPart::Str(str));
                     self.last_loc_end = node_end;
-                    last_str_end = Some(node_end);
+                    last_part_end = Some(node_end);
                 }
                 prism::Node::EmbeddedStatementsNode { .. } => {
                     let node = part.as_embedded_statements_node().unwrap();
                     let loc = node.location();
                     parse_spaces_before_interpolation(
-                        last_str_end,
+                        last_part_end,
                         loc.start_offset(),
                         self.src,
                         &mut parts,
@@ -168,12 +168,14 @@ impl<'src> super::Parser<'src> {
                     let closing = Self::source_lossy_at(&node.closing_loc());
                     let embedded = fmt::EmbeddedStatements::new(opening, statements, closing);
                     parts.push(fmt::HeredocPart::Statements(embedded));
+                    self.last_loc_end = loc.end_offset();
+                    last_part_end = Some(loc.end_offset());
                 }
                 prism::Node::EmbeddedVariableNode { .. } => {
                     let node = part.as_embedded_variable_node().unwrap();
                     let loc = node.location();
                     parse_spaces_before_interpolation(
-                        last_str_end,
+                        last_part_end,
                         loc.start_offset(),
                         self.src,
                         &mut parts,
@@ -182,6 +184,8 @@ impl<'src> super::Parser<'src> {
                     let variable = Self::source_lossy_at(&node.variable().location());
                     let embedded_var = fmt::EmbeddedVariable::new(operator, variable);
                     parts.push(fmt::HeredocPart::Variable(embedded_var));
+                    self.last_loc_end = loc.end_offset();
+                    last_part_end = Some(loc.end_offset());
                 }
                 _ => panic!("unexpected heredoc part: {:?}", part),
             }
@@ -214,14 +218,14 @@ fn is_heredoc(str_opening_loc: Option<&prism::Location>) -> bool {
 // I don't know why but ruby-prism ignores spaces before an interpolation in some cases.
 // It is confusing so we parse all spaces before interpolation.
 fn parse_spaces_before_interpolation(
-    last_str_end: Option<usize>,
+    last_part_end: Option<usize>,
     embedded_start: usize,
     src: &[u8],
     parts: &mut Vec<fmt::HeredocPart>,
 ) {
-    let str = if let Some(last_str_end) = last_str_end {
-        if last_str_end < embedded_start {
-            let value = src[last_str_end..embedded_start].to_vec();
+    let str = if let Some(last_part_end) = last_part_end {
+        if last_part_end < embedded_start {
+            let value = src[last_part_end..embedded_start].to_vec();
             Some(fmt::StringLike::new(None, value, None))
         } else {
             None
