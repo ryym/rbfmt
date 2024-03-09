@@ -72,15 +72,16 @@ impl<'src> super::Parser<'src> {
         };
 
         let name = String::from_utf8_lossy(call.name()).to_string();
+        let call_operator_loc = call.call_operator_loc();
         let chain = match current_chain {
             Some((mut chain, last_call_trailing)) => {
-                if name == "[]" {
+                if call_operator_loc.is_none() && name == "[]" {
                     chain.append_index_call(fmt::IndexCall::new(
                         args.expect("index call must have arguments"),
                         block,
                     ));
                 } else {
-                    let call_operator = call.call_operator_loc().map(|l| Self::source_lossy_at(&l));
+                    let call_operator = call_operator_loc.map(|l| Self::source_lossy_at(&l));
                     chain.append_message_call(
                         last_call_trailing,
                         fmt::MessageCall::new(call_leading, call_operator, name, args, block),
@@ -402,10 +403,8 @@ fn detect_method_type(call: &prism::CallNode) -> MethodType {
     if method_name == b"!" && call.message_loc().map_or(false, |m| m.as_slice() == b"not") {
         return MethodType::Not;
     }
-    if call.receiver().is_some()
-        && call.call_operator_loc().is_none()
-        && call.opening_loc().is_none()
-    {
+    let call_operator_loc = call.call_operator_loc();
+    if call.receiver().is_some() && call_operator_loc.is_none() && call.opening_loc().is_none() {
         return if call.arguments().is_some() {
             MethodType::Binary
         } else {
@@ -420,7 +419,11 @@ fn detect_method_type(call: &prism::CallNode) -> MethodType {
         && method_name != b"!="
     {
         return if method_name == b"[]=" {
-            MethodType::IndexAssign
+            if call_operator_loc.is_none() {
+                MethodType::IndexAssign
+            } else {
+                MethodType::Normal
+            }
         } else {
             MethodType::Assign
         };
