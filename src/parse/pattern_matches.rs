@@ -88,12 +88,28 @@ impl<'src> super::Parser<'src> {
 
     pub(super) fn parse_array_pattern(&mut self, node: prism::ArrayPatternNode) -> fmt::Node {
         let constant = node.constant().map(|c| self.parse(c, None));
-        let opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
-        let closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
-        let mut array = fmt::ArrayPattern::new(constant, opening, closing);
-
+        let mut opening = node.opening_loc().as_ref().map(Self::source_lossy_at);
+        let mut closing = node.closing_loc().as_ref().map(Self::source_lossy_at);
         let rest = node.rest();
         let posts = node.posts();
+
+        if closing.is_none() && posts.iter().next().is_none() {
+            if let Some(rest) = rest.as_ref() {
+                let should_close = match rest {
+                    prism::Node::ImplicitRestNode { .. } => true,
+                    prism::Node::SplatNode { .. } => {
+                        rest.as_splat_node().unwrap().expression().is_none()
+                    }
+                    _ => false,
+                };
+                if should_close {
+                    opening = Some("[".to_string());
+                    closing = Some("]".to_string());
+                }
+            }
+        }
+        let mut array = fmt::ArrayPattern::new(constant, opening, closing);
+
         let posts_head = posts.iter().next();
 
         let closing_start = node.closing_loc().as_ref().map(|c| c.start_offset());

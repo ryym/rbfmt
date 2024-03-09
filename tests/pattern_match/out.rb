@@ -56,6 +56,17 @@ xs => Foo(d, e, *f)
 xs => [a, *]
 xs => *, a
 xs => [*]
+xs => a, b
+xs => [a, ]
+xs => *a
+
+# Wrap by brackets automatically to avoid syntax error after stripping semicolons.
+xs => [a, ]
+xs => [a, *]
+case xs
+in [0, ]
+  nil
+end
 
 xs =>
   # 0
