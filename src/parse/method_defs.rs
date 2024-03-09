@@ -71,12 +71,13 @@ impl<'src> super::Parser<'src> {
     }
 
     pub(super) fn parse_lambda(&mut self, node: prism::LambdaNode) -> fmt::Node {
-        let params = node.parameters().map(|params| match params {
+        let params = node.parameters().and_then(|params| match params {
             prism::Node::BlockParametersNode { .. } => {
                 let params = params.as_block_parameters_node().unwrap();
                 let params_end = params.location().end_offset();
-                self.parse_block_parameters(params, params_end)
+                Some(self.parse_block_parameters(params, params_end))
             }
+            prism::Node::NumberedParametersNode { .. } => None,
             _ => panic!("unexpected node for lambda params: {:?}", node),
         });
 
