@@ -82,6 +82,7 @@ struct Parser<'src> {
     heredoc_map: fmt::HeredocMap,
     position_gen: usize,
     last_loc_end: usize,
+    last_heredoc_end: usize,
 }
 
 impl Parser<'_> {
@@ -92,7 +93,13 @@ impl Parser<'_> {
             heredoc_map: HashMap::new(),
             position_gen: 0,
             last_loc_end: 0,
+            last_heredoc_end: 0,
         }
+    }
+
+    fn register_heredoc(&mut self, pos: fmt::Pos, heredoc: fmt::Heredoc, closing_end: usize) {
+        self.heredoc_map.insert(pos, heredoc);
+        self.last_heredoc_end = closing_end - 1;
     }
 
     fn parse_from_prism_node(&mut self, node: prism::Node) -> fmt::Node {

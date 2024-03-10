@@ -370,6 +370,20 @@ hashes <<
     d: 4,
   }
 
+Foo.new(<<-RUBY, 3.3)
+      # frozen_string_literal: true
+
+      def valid_code; end
+RUBY
+Foo.new(
+  <<-RUBY,
+      # frozen_string_literal: true
+
+      def valid_code; end
+  RUBY
+  3.3, # foo
+)
+
 "123#{
   <<~ABC
     abc

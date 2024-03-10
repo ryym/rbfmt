@@ -123,7 +123,7 @@ impl<'src> super::Parser<'src> {
             parts: vec![fmt::HeredocPart::Str(str)],
         };
         let pos = self.next_pos();
-        self.heredoc_map.insert(pos, heredoc);
+        self.register_heredoc(pos, heredoc, closing_loc.end_offset());
         fmt::HeredocOpening::new(pos, opening_id, indent_mode)
     }
 
@@ -201,7 +201,7 @@ impl<'src> super::Parser<'src> {
             parts,
         };
         let pos = self.next_pos();
-        self.heredoc_map.insert(pos, heredoc);
+        self.register_heredoc(pos, heredoc, closing_loc.end_offset());
         fmt::HeredocOpening::new(pos, opening_id, indent_mode)
     }
 }

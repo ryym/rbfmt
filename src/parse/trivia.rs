@@ -18,10 +18,11 @@ impl<'src> super::Parser<'src> {
 
     pub(super) fn take_leading_trivia(&mut self, loc_start: usize) -> fmt::LeadingTrivia {
         let mut trivia = fmt::LeadingTrivia::new();
+        let mut last_end = self.determine_actual_last_end(loc_start);
 
         while let Some(comment) = self.comments.peek() {
             let loc = comment.location();
-            if !(self.last_loc_end..=loc_start).contains(&loc.start_offset()) {
+            if !(last_end..=loc_start).contains(&loc.start_offset()) {
                 break;
             };
             let mut value = Self::source_lossy_at(&loc);
@@ -31,18 +32,32 @@ impl<'src> super::Parser<'src> {
             } else {
                 fmt::Comment::Oneline(value)
             };
-            self.take_empty_lines_until(loc.start_offset(), &mut trivia);
+            self.take_empty_lines_until(last_end, loc.start_offset(), &mut trivia);
             trivia.append_line(fmt::LineTrivia::Comment(comment));
             self.last_loc_end = loc.end_offset() - 1;
             self.comments.next();
+            last_end = self.determine_actual_last_end(loc_start);
         }
 
-        self.take_empty_lines_until(loc_start, &mut trivia);
+        self.take_empty_lines_until(last_end, loc_start, &mut trivia);
         trivia
     }
 
-    pub(super) fn take_empty_lines_until(&mut self, end: usize, trivia: &mut fmt::LeadingTrivia) {
-        let range = self.last_empty_line_range_within(self.last_loc_end, end);
+    fn determine_actual_last_end(&self, base: usize) -> usize {
+        if self.last_loc_end < self.last_heredoc_end && self.last_heredoc_end < base {
+            self.last_heredoc_end
+        } else {
+            self.last_loc_end
+        }
+    }
+
+    fn take_empty_lines_until(
+        &mut self,
+        start: usize,
+        end: usize,
+        trivia: &mut fmt::LeadingTrivia,
+    ) {
+        let range = self.last_empty_line_range_within(start, end);
         if let Some(range) = range {
             trivia.append_line(fmt::LineTrivia::EmptyLine);
             self.last_loc_end = range.end;
