@@ -85,7 +85,7 @@ pub(crate) struct CaseWhen {
 impl CaseWhen {
     pub(crate) fn new(was_flat: bool) -> Self {
         let shape = if was_flat {
-            Shape::inline(0)
+            Shape::inline("when ".len())
         } else {
             Shape::Multilines
         };
@@ -104,6 +104,7 @@ impl CaseWhen {
     }
 
     pub(crate) fn set_body(&mut self, body: Statements) {
+        self.shape.append(&Shape::inline(" then ".len()));
         self.shape.append(&body.shape);
         self.body = body;
     }

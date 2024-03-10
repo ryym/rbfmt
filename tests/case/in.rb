@@ -61,3 +61,7 @@ when d
   3
 else 4
 end
+
+case foo
+when aaaaaaaaaaaaaaaaaaaa && bbbbbbbb then ->(v) { Cccccc::Ddddddddd.eeeeeeeee(bbbbbbbb.ffff(v)) }
+end
