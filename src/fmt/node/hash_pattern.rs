@@ -100,6 +100,7 @@ impl HashPattern {
                         end: false,
                     },
                 );
+                o.put_indent_if_needed();
                 element.format(o, ctx);
                 if i < last_idx || self.last_comma_allowed {
                     o.push(',');
@@ -109,6 +110,7 @@ impl HashPattern {
             o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, self.elements.is_empty());
             o.dedent();
             o.break_line(ctx);
+            o.put_indent_if_needed();
             o.push_str(self.closing.as_deref().unwrap_or("}"));
         }
     }

@@ -126,6 +126,7 @@ impl EmbeddedStatements {
             self.statements.format(o, ctx, true);
             o.break_line(ctx);
             o.dedent();
+            o.put_indent_if_needed();
         }
 
         o.push_str(&self.closing);

@@ -82,6 +82,7 @@ impl Array {
                         end: false,
                     },
                 );
+                o.put_indent_if_needed();
                 element.format(o, ctx);
                 o.push_str(self.separator());
                 element.trailing_trivia.format(o);
@@ -89,6 +90,7 @@ impl Array {
             o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, self.elements.is_empty());
             o.dedent();
             o.break_line(ctx);
+            o.put_indent_if_needed();
             o.push_str(self.closing.as_deref().unwrap_or("]"));
         }
     }

@@ -39,6 +39,7 @@ impl ClassLike {
                 superclass
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::trim());
+                o.put_indent_if_needed();
                 superclass.format(o, ctx);
                 superclass.trailing_trivia.format(o);
                 o.dedent();
@@ -48,6 +49,7 @@ impl ClassLike {
         }
         self.body.format(o, ctx, true);
         o.break_line(ctx);
+        o.put_indent_if_needed();
         o.push_str("end");
     }
 }

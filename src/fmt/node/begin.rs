@@ -20,8 +20,10 @@ impl Begin {
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         o.push_str("begin");
         self.keyword_trailing.format(o);
+        o.put_indent_if_needed();
         self.body.format(o, ctx, true);
         o.break_line(ctx);
+        o.put_indent_if_needed();
         o.push_str("end");
     }
 }

@@ -66,7 +66,7 @@ impl Heredoc {
                         HeredocPart::Str(str) => {
                             // Ignore non-UTF8 source code for now.
                             let value = String::from_utf8_lossy(&str.value);
-                            o.push_str_without_indent(&value);
+                            o.push_str(&value);
                         }
                         HeredocPart::Statements(embedded) => {
                             embedded.format(o, ctx);
@@ -79,7 +79,7 @@ impl Heredoc {
                 if matches!(self.indent_mode, HeredocIndentMode::EndIndented) {
                     o.put_indent();
                 }
-                o.push_str_without_indent(&self.id);
+                o.push_str(&self.id);
             }
             HeredocIndentMode::AllIndented => {
                 o.indent();
@@ -89,7 +89,6 @@ impl Heredoc {
                         has_content: false,
                         line_starts: vec![],
                     });
-                let desired_indent = " ".repeat(o.indent);
                 for (i, part) in self.parts.iter().enumerate() {
                     let line_start = body_info.line_starts.get(i).unwrap_or(&None);
                     match part {
@@ -101,30 +100,28 @@ impl Heredoc {
                                     if body_info.has_content
                                         && body_info.min_spaces < empty_line.prefix_spaces
                                     {
-                                        o.push_str_without_indent(&desired_indent);
-                                        o.push_str_without_indent(&value[body_info.min_spaces..]);
+                                        o.put_indent();
+                                        o.push_str(&value[body_info.min_spaces..]);
                                     } else {
-                                        o.push_str_without_indent(
-                                            &value[empty_line.prefix_spaces..],
-                                        );
+                                        o.push_str(&value[empty_line.prefix_spaces..]);
                                     }
                                 } else {
-                                    o.push_str_without_indent(&desired_indent);
-                                    o.push_str_without_indent(&value[body_info.min_spaces..]);
+                                    o.put_indent();
+                                    o.push_str(&value[body_info.min_spaces..]);
                                 }
                             } else {
-                                o.push_str_without_indent(&value);
+                                o.push_str(&value);
                             }
                         }
                         HeredocPart::Statements(embedded) => {
                             if line_start.is_some() {
-                                o.push_str_without_indent(&desired_indent);
+                                o.put_indent();
                             }
                             embedded.format(o, ctx);
                         }
                         HeredocPart::Variable(var) => {
                             if line_start.is_some() {
-                                o.push_str_without_indent(&desired_indent);
+                                o.put_indent();
                             }
                             var.format(o);
                         }
@@ -143,7 +140,7 @@ fn inspect_body_indent(parts: &Vec<HeredocPart>) -> Option<SquigglyHeredocBodyIn
     if parts.is_empty() {
         return None;
     }
-    let mut is_line_start = matches!(parts[0], HeredocPart::Str(_));
+    let mut is_line_start = true;
     let mut min_spaces = usize::MAX;
     let mut line_starts = Vec::with_capacity(parts.len());
     let mut has_content = false;

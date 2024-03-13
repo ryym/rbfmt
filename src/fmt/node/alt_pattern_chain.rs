@@ -49,6 +49,7 @@ impl AltPatternChain {
                 right
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::none());
+                o.put_indent_if_needed();
                 right.format(o, ctx);
                 o.dedent();
             }

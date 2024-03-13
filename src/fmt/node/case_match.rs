@@ -34,6 +34,7 @@ impl CaseMatch {
                     o.break_line(ctx);
                     pred.leading_trivia
                         .format(o, ctx, EmptyLineHandling::trim());
+                    o.put_indent_if_needed();
                     pred.format(o, ctx);
                     pred.trailing_trivia.format(o);
                     o.dedent();
@@ -56,10 +57,12 @@ impl CaseMatch {
             if i > 0 {
                 o.break_line(ctx);
             }
+            o.put_indent_if_needed();
             branch.format(o, ctx);
         }
         if let Some(otherwise) = &self.otherwise {
             o.break_line(ctx);
+            o.put_indent_if_needed();
             o.push_str("else");
             otherwise.keyword_trailing.format(o);
             if !otherwise.body.shape.is_empty() {
@@ -70,6 +73,7 @@ impl CaseMatch {
             }
         }
         o.break_line(ctx);
+        o.put_indent_if_needed();
         o.push_str("end");
     }
 }
@@ -124,6 +128,7 @@ impl CaseIn {
                 self.pattern
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::trim());
+                o.put_indent_if_needed();
                 self.pattern.format(o, ctx);
                 self.pattern.trailing_trivia.format(o);
                 o.dedent();

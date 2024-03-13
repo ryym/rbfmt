@@ -45,6 +45,7 @@ impl Assign {
             self.value
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
+            o.put_indent_if_needed();
             self.value.format(o, ctx);
             o.dedent();
         }

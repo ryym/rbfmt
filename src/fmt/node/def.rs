@@ -54,6 +54,7 @@ impl Def {
                 o.indent();
                 o.break_line(ctx);
                 // no leading trivia here.
+                o.put_indent_if_needed();
                 receiver.format(o, ctx);
             }
             o.push('.');
@@ -66,6 +67,7 @@ impl Def {
                 receiver.trailing_trivia.format(o);
                 o.indent();
                 o.break_line(ctx);
+                o.put_indent_if_needed();
                 o.push_str(&self.name);
                 if let Some(params) = &self.parameters {
                     params.format(o, ctx);
@@ -92,6 +94,7 @@ impl Def {
                     o.break_line(ctx);
                     body.leading_trivia
                         .format(o, ctx, EmptyLineHandling::trim());
+                    o.put_indent_if_needed();
                     body.format(o, ctx);
                     body.trailing_trivia.format(o);
                     o.dedent();
@@ -103,8 +106,10 @@ impl Def {
                 body,
             } => {
                 head_trailing.format(o);
+                o.put_indent_if_needed();
                 body.format(o, ctx, true);
                 o.break_line(ctx);
+                o.put_indent_if_needed();
                 o.push_str("end");
             }
         }
@@ -197,6 +202,7 @@ impl MethodParameters {
                             end: false,
                         },
                     );
+                    o.put_indent_if_needed();
                     n.format(o, ctx);
                     if i < last_idx {
                         o.push(',');
@@ -207,6 +213,7 @@ impl MethodParameters {
             o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, self.params.is_empty());
             o.dedent();
             o.break_line(ctx);
+            o.put_indent_if_needed();
             o.push(')');
         }
     }

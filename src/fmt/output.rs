@@ -103,25 +103,21 @@ impl Output {
     }
 
     pub(super) fn push(&mut self, c: char) {
-        if self.remaining_width == self.config.line_width {
-            self.put_indent();
-        }
         self.buffer.push(c);
         self.remaining_width = self.remaining_width.saturating_sub(1);
     }
 
     pub(super) fn push_str(&mut self, str: &str) {
-        if self.remaining_width == self.config.line_width {
-            self.put_indent();
-        }
-        self.push_str_without_indent(str);
-    }
-
-    pub(super) fn push_str_without_indent(&mut self, str: &str) {
         // XXX: When we push the content of a string, it could contain a line-break.
         // In that case, `remaining_width` could be wrong.
         self.buffer.push_str(str);
         self.remaining_width = self.remaining_width.saturating_sub(str.len());
+    }
+
+    pub(super) fn put_indent_if_needed(&mut self) {
+        if self.remaining_width == self.config.line_width {
+            self.put_indent();
+        }
     }
 
     pub(super) fn put_indent(&mut self) {

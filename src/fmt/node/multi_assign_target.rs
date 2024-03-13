@@ -82,6 +82,7 @@ impl MultiAssignTarget {
                         end: false,
                     },
                 );
+                o.put_indent_if_needed();
                 target.format(o, ctx);
                 if i < last_idx || self.with_implicit_rest {
                     o.push(',');
@@ -91,6 +92,7 @@ impl MultiAssignTarget {
             o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, false);
             o.dedent();
             o.break_line(ctx);
+            o.put_indent_if_needed();
             o.push(')');
         }
     }

@@ -46,6 +46,7 @@ impl If {
 
         for elsif in &self.elsifs {
             o.break_line(ctx);
+            o.put_indent_if_needed();
             o.push_str("elsif");
             elsif.format(o, ctx);
             if !elsif.body.shape.is_empty() {
@@ -58,6 +59,7 @@ impl If {
 
         if let Some(if_last) = &self.if_last {
             o.break_line(ctx);
+            o.put_indent_if_needed();
             o.push_str("else");
             if_last.keyword_trailing.format(o);
             if !if_last.body.shape.is_empty() {
@@ -69,6 +71,7 @@ impl If {
         }
 
         o.break_line(ctx);
+        o.put_indent_if_needed();
         o.push_str("end");
     }
 }
@@ -104,6 +107,7 @@ impl Conditional {
             self.predicate
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
+            o.put_indent_if_needed();
             self.predicate.format(o, ctx);
             self.predicate.trailing_trivia.format(o);
             o.dedent();

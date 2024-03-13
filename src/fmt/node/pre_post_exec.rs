@@ -43,9 +43,11 @@ impl PrePostExec {
                 o.indent();
                 o.break_line(ctx);
                 self.statements.format(o, ctx, true);
+                o.put_indent_if_needed();
                 o.dedent();
             }
             o.break_line(ctx);
+            o.put_indent_if_needed();
             o.push('}');
         }
     }

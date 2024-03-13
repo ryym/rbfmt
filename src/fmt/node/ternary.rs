@@ -57,6 +57,7 @@ impl Ternary {
             self.then
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
+            o.put_indent_if_needed();
             self.then.format(o, ctx);
             self.then.trailing_trivia.format(o);
             o.dedent();
@@ -72,6 +73,7 @@ impl Ternary {
             self.otherwise.trailing_trivia.format(o);
         } else {
             o.break_line(ctx);
+            o.put_indent_if_needed();
             o.push(':');
             if self.otherwise.shape.fits_in_one_line(o.remaining_width)
                 || self.otherwise.can_continue_line()
@@ -85,6 +87,7 @@ impl Ternary {
                 self.otherwise
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::trim());
+                o.put_indent_if_needed();
                 self.otherwise.format(o, ctx);
                 self.otherwise.trailing_trivia.format(o);
                 o.dedent();

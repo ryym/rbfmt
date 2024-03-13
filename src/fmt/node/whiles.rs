@@ -30,6 +30,7 @@ impl While {
             o.dedent();
         }
         o.break_line(ctx);
+        o.put_indent_if_needed();
         o.push_str("end");
     }
 }

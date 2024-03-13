@@ -113,6 +113,7 @@ impl Arguments {
                             end: false,
                         },
                     );
+                    o.put_indent_if_needed();
                     arg.format(o, ctx);
                     if i < last_idx || self.last_comma_allowed {
                         o.push(',');
@@ -124,6 +125,7 @@ impl Arguments {
             o.dedent();
             o.break_line(ctx);
             if let Some(closing) = &self.closing {
+                o.put_indent_if_needed();
                 o.push_str(closing);
             }
         } else if !self.nodes.is_empty() {
@@ -154,6 +156,7 @@ impl Arguments {
                                 end: false,
                             },
                         );
+                        o.put_indent_if_needed();
                         arg.format(o, ctx);
                         if i < last_idx {
                             o.push(',');

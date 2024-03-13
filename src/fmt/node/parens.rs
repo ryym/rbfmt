@@ -37,6 +37,7 @@ impl Parens {
                 o.dedent();
                 if self.closing_break_allowed {
                     o.break_line(ctx);
+                    o.put_indent_if_needed();
                 }
             }
             o.push(')');

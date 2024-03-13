@@ -53,6 +53,7 @@ impl RangeLike {
                 right
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::trim());
+                o.put_indent_if_needed();
                 right.format(o, ctx);
                 o.dedent();
             }

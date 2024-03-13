@@ -32,6 +32,7 @@ impl SingletonClass {
             self.expression
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::none());
+            o.put_indent_if_needed();
             self.expression.format(o, ctx);
             self.expression.trailing_trivia.format(o);
             o.dedent();
@@ -39,6 +40,7 @@ impl SingletonClass {
         }
         self.body.format(o, ctx, true);
         o.break_line(ctx);
+        o.put_indent_if_needed();
         o.push_str("end");
     }
 }

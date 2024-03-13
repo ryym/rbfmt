@@ -55,8 +55,11 @@ impl VirtualEnd {
                 }
                 LineTrivia::Comment(comment) => {
                     match &comment {
-                        Comment::Oneline(comment) => o.push_str(comment),
-                        Comment::Block(comment) => o.push_str_without_indent(comment),
+                        Comment::Oneline(comment) => {
+                            o.put_indent_if_needed();
+                            o.push_str(comment);
+                        }
+                        Comment::Block(comment) => o.push_str(comment),
                     }
                     if i < last_idx {
                         o.break_line(ctx);

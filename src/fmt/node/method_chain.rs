@@ -175,6 +175,7 @@ impl MethodChain {
                 if let Some(call_op) = &call.operator {
                     o.break_line(ctx);
                     call.leading_trivia.format(o, ctx, EmptyLineHandling::Skip);
+                    o.put_indent_if_needed();
                     o.push_str(call_op);
                 }
                 o.push_str(&call.name);

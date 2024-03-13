@@ -29,6 +29,7 @@ impl For {
             self.index
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
+            o.put_indent_if_needed();
             self.index.format(o, ctx);
             o.dedent();
         }
@@ -44,6 +45,7 @@ impl For {
             collection
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
+            o.put_indent_if_needed();
             collection.format(o, ctx);
             collection.trailing_trivia.format(o);
             o.dedent();

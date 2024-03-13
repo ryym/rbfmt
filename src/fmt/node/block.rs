@@ -88,6 +88,7 @@ impl Block {
                 } else {
                     o.indent();
                     o.break_line(ctx);
+                    o.put_indent_if_needed();
                     params.format(o, ctx);
                     o.dedent();
                 }
@@ -96,6 +97,7 @@ impl Block {
                 self.body.format(o, ctx, true);
             }
             o.break_line(ctx);
+            o.put_indent_if_needed();
             o.push_str(&self.closing);
         }
     }
@@ -197,6 +199,7 @@ impl BlockParameters {
                             end: false,
                         },
                     );
+                    o.put_indent_if_needed();
                     n.format(o, ctx);
                     if i < last_idx {
                         o.push(',');
@@ -206,11 +209,13 @@ impl BlockParameters {
             }
             if !self.locals.is_empty() {
                 o.break_line(ctx);
+                o.put_indent_if_needed();
                 o.push(';');
                 let last_idx = self.locals.len() - 1;
                 for (i, n) in self.locals.iter().enumerate() {
                     o.break_line(ctx);
                     n.leading_trivia.format(o, ctx, EmptyLineHandling::trim());
+                    o.put_indent_if_needed();
                     n.format(o, ctx);
                     if i < last_idx {
                         o.push(',');
@@ -221,6 +226,7 @@ impl BlockParameters {
             o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, self.params.is_empty());
             o.dedent();
             o.break_line(ctx);
+            o.put_indent_if_needed();
             o.push_str(&self.closing);
             self.closing_trailing.format(o);
         }
@@ -282,10 +288,12 @@ impl BlockBody {
         }
         for rescue in &self.rescues {
             o.break_line(ctx);
+            o.put_indent_if_needed();
             rescue.format(o, ctx);
         }
         if let Some(rescue_else) = &self.rescue_else {
             o.break_line(ctx);
+            o.put_indent_if_needed();
             o.push_str("else");
             rescue_else.keyword_trailing.format(o);
             if !rescue_else.body.shape().is_empty() {
@@ -297,6 +305,7 @@ impl BlockBody {
         }
         if let Some(ensure) = &self.ensure {
             o.break_line(ctx);
+            o.put_indent_if_needed();
             o.push_str("ensure");
             ensure.keyword_trailing.format(o);
             if !ensure.body.shape().is_empty() {
@@ -373,6 +382,7 @@ impl Rescue {
                         exception
                             .leading_trivia
                             .format(o, ctx, EmptyLineHandling::none());
+                        o.put_indent_if_needed();
                         exception.format(o, ctx);
                         if i < last_idx {
                             o.push(',');
@@ -396,6 +406,7 @@ impl Rescue {
                 reference
                     .leading_trivia
                     .format(o, ctx, EmptyLineHandling::trim());
+                o.put_indent_if_needed();
                 reference.format(o, ctx);
                 reference.trailing_trivia.format(o);
                 o.dedent();

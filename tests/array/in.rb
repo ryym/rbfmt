@@ -62,3 +62,8 @@ c =
   nil, # nil
   :case2 # wierd case2
 
+if true
+  if true
+    [aaaaaaaaaaaaaa('bbbbbbb', '', { 'ccccccccccccc' => 'dddddd', 'eeeeeeeeeeeee' => 'fffffffffff' })]
+  end
+end

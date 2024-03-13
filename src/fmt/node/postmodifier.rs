@@ -39,6 +39,7 @@ impl Postmodifier {
             cond.predicate
                 .leading_trivia
                 .format(o, ctx, EmptyLineHandling::trim());
+            o.put_indent_if_needed();
             cond.predicate.format(o, ctx);
             cond.predicate.trailing_trivia.format(o);
             o.dedent();

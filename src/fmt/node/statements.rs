@@ -65,6 +65,7 @@ impl Statements {
                     end: false,
                 },
             );
+            o.put_indent_if_needed();
             n.format(o, ctx);
             n.trailing_trivia.format(o);
         }

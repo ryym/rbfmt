@@ -43,6 +43,7 @@ impl ConstantPath {
                 o.indent();
                 o.break_line(ctx);
                 leading.format(o, ctx, EmptyLineHandling::trim());
+                o.put_indent_if_needed();
                 o.push_str(path);
                 o.dedent();
             }
