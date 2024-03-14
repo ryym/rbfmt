@@ -275,7 +275,6 @@ impl<'src> super::Parser<'src> {
     fn parse_arguments<'a>(
         &mut self,
         args_iter: Option<impl Iterator<Item = prism::Node<'a>>>,
-        // XXX: こっちが Node を受け取っちゃうのもありかも
         block_arg: Option<prism::BlockArgumentNode>,
         opening_loc: Option<prism::Location>,
         closing_loc: Option<prism::Location>,
