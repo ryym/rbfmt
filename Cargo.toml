@@ -6,7 +6,7 @@ keywords = ["ruby", "formatter"]
 license = "MIT"
 name = "rbfmt"
 repository = "https://github.com/ryym/rbfmt"
-version = "0.0.1"
+version = "0.0.2"
 
 [dependencies]
 getopts = "0.2.21"

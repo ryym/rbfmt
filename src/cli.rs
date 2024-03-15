@@ -7,7 +7,7 @@ use std::{
 
 use crate::config;
 
-const VERSION: &str = "0.0.1";
+const VERSION: &str = "0.0.2";
 
 #[derive(Debug)]
 enum Action {
