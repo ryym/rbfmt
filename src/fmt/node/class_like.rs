@@ -10,7 +10,7 @@ use super::{BlockBody, Node};
 #[derive(Debug)]
 pub(crate) struct ClassLike {
     pub keyword: String,
-    pub name: String,
+    pub name: Box<Node>,
     pub superclass: Option<Box<Node>>,
     pub head_trailing: TrailingTrivia,
     pub body: BlockBody,
@@ -24,7 +24,7 @@ impl ClassLike {
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         o.push_str(&self.keyword);
         o.push(' ');
-        o.push_str(&self.name);
+        self.name.format(o, ctx);
         if let Some(superclass) = &self.superclass {
             o.push_str(" <");
             if superclass.shape.fits_in_one_line(o.remaining_width)

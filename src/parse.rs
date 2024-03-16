@@ -547,7 +547,7 @@ impl Parser<'_> {
                 let node = node.as_class_node().unwrap();
                 self.parse_class_like(
                     "class",
-                    node.constant_path().location(),
+                    node.constant_path(),
                     node.superclass(),
                     node.body(),
                     node.end_keyword_loc(),
@@ -557,7 +557,7 @@ impl Parser<'_> {
                 let node = node.as_module_node().unwrap();
                 self.parse_class_like(
                     "module",
-                    node.constant_path().location(),
+                    node.constant_path(),
                     None,
                     node.body(),
                     node.end_keyword_loc(),

@@ -6,13 +6,13 @@ impl<'src> super::Parser<'src> {
     pub(super) fn parse_class_like(
         &mut self,
         keyword: &str,
-        name_loc: prism::Location,
+        name: prism::Node,
         superclass: Option<prism::Node>,
         body: Option<prism::Node>,
         end_loc: prism::Location,
     ) -> fmt::Node {
-        let leading = self.take_leading_trivia(name_loc.start_offset());
-        let name = Self::source_lossy_at(&name_loc);
+        let leading = self.take_leading_trivia(name.location().start_offset());
+        let name = self.parse(name, None);
 
         let body_start = body.as_ref().and_then(|b| match b {
             prism::Node::BeginNode { .. } => {
@@ -32,7 +32,7 @@ impl<'src> super::Parser<'src> {
         let body = self.parse_block_body(body, end_loc.start_offset());
         let class = fmt::ClassLike {
             keyword: keyword.to_string(),
-            name,
+            name: Box::new(name),
             superclass: superclass.map(Box::new),
             head_trailing,
             body,

@@ -7,6 +7,21 @@ end
 class Foo::Bar::Baz
 end
 
+class Foo::
+  # 0
+  Bar::
+  # 1
+  # 2
+  Baz # 3
+  # 4
+end
+
+class Foo::
+  # 0
+  Bar < Baz # 1
+  # 2
+end
+
 class Foo
   class Bar
     def bar
