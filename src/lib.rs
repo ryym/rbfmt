@@ -11,7 +11,7 @@ mod parse;
 mod test;
 
 pub fn run() -> Result<(), Box<dyn Error>> {
-    crate::cli::run(
+    cli::run(
         &mut std::io::stdin(),
         &mut std::io::stdout(),
         std::env::args().skip(1),
