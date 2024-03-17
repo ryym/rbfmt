@@ -127,13 +127,21 @@ class MeaningCodeGenerator
     when "Option<Node<'pr>>"
       %Q{self.opt_field("#{name}", node.#{name}());}
     when "Location<'pr>"
-      if %w[content_loc value_loc].include?(name)
+      case name
+      when 'content_loc', 'value_loc'
         %Q{self.string_content(node.#{name}());}
+      when 'message_loc'
+        %Q{self.message_loc_field(Some(node.#{name}()));}
       else
         %Q{self.opt_loc_field("#{name}", Some(node.#{name}()));}
       end
     when "Option<Location<'pr>>"
-      %Q{self.opt_loc_field("#{name}", node.#{name}());}
+      case name
+      when 'message_loc'
+        %Q{self.message_loc_field(node.#{name}());}
+      else
+        %Q{self.opt_loc_field("#{name}", node.#{name}());}
+      end
     when /^([a-zA-Z]+)Node<'pr>$/
       %Q{self.node_field("#{name}", node.#{name}().as_node());}
     when /^Option<([a-zA-Z]+)Node<'pr>>$/

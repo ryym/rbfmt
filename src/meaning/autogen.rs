@@ -144,7 +144,7 @@ impl super::Meaning {
                 self.start_node("CallAndWriteNode");
                 self.opt_field("receiver", node.receiver());
                 self.opt_loc_field("call_operator_loc", node.call_operator_loc());
-                self.opt_loc_field("message_loc", node.message_loc());
+                self.message_loc_field(node.message_loc());
                 self.opt_loc_field("operator_loc", Some(node.operator_loc()));
                 self.node_field("value", node.value());
                 self.end_node();
@@ -155,7 +155,7 @@ impl super::Meaning {
                 self.start_node("CallNode");
                 self.opt_field("receiver", node.receiver());
                 self.opt_loc_field("call_operator_loc", node.call_operator_loc());
-                self.opt_loc_field("message_loc", node.message_loc());
+                self.message_loc_field(node.message_loc());
                 self.opt_field("arguments", node.arguments().map(|n| n.as_node()));
                 self.opt_field("block", node.block());
                 self.end_node();
@@ -166,7 +166,7 @@ impl super::Meaning {
                 self.start_node("CallOperatorWriteNode");
                 self.opt_field("receiver", node.receiver());
                 self.opt_loc_field("call_operator_loc", node.call_operator_loc());
-                self.opt_loc_field("message_loc", node.message_loc());
+                self.message_loc_field(node.message_loc());
                 self.opt_loc_field("operator_loc", Some(node.operator_loc()));
                 self.node_field("value", node.value());
                 self.end_node();
@@ -177,7 +177,7 @@ impl super::Meaning {
                 self.start_node("CallOrWriteNode");
                 self.opt_field("receiver", node.receiver());
                 self.opt_loc_field("call_operator_loc", node.call_operator_loc());
-                self.opt_loc_field("message_loc", node.message_loc());
+                self.message_loc_field(node.message_loc());
                 self.opt_loc_field("operator_loc", Some(node.operator_loc()));
                 self.node_field("value", node.value());
                 self.end_node();
@@ -188,7 +188,7 @@ impl super::Meaning {
                 self.start_node("CallTargetNode");
                 self.node_field("receiver", node.receiver());
                 self.opt_loc_field("call_operator_loc", Some(node.call_operator_loc()));
-                self.opt_loc_field("message_loc", Some(node.message_loc()));
+                self.message_loc_field(Some(node.message_loc()));
                 self.end_node();
             }
 
