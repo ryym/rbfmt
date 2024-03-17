@@ -40,9 +40,9 @@ impl std::fmt::Display for ParseError {
 }
 impl std::error::Error for ParseError {}
 
-pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Result<ParserResult, ParseError> {
-    let result = prism::parse(&source);
-
+pub(crate) fn parse_from_prism_result(
+    result: prism::ParseResult,
+) -> Result<ParserResult, ParseError> {
     let messages = result
         .errors()
         .map(|e| {
@@ -60,7 +60,7 @@ pub(crate) fn parse_into_fmt_node(source: Vec<u8>) -> Result<ParserResult, Parse
     }
 
     let comments = result.comments().peekable();
-    let mut parser = Parser::new(&source, comments);
+    let mut parser = Parser::new(result.source(), comments);
     let fmt_node = parser.parse_from_prism_node(result.node());
     // dbg!(&fmt_node);
     // dbg!(&parser.heredoc_map);

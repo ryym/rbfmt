@@ -44,7 +44,7 @@ fn compare_files(dir_path: PathBuf) {
     let want = fs::read_to_string(&output_path).unwrap();
     let config = crate::config::FormatConfig::default();
     match crate::format_source(input, config) {
-        Ok(got) => assert_eq!(want, got, "{:?}", &input_path),
+        Ok(got) => assert_eq!(want, got.code, "{:?}", &input_path),
         Err(err) => unreachable!("test file could not be formatted: {:?}", err),
     }
 }
