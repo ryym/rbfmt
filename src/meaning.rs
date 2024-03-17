@@ -46,6 +46,14 @@ impl Meaning {
         self.u8_bytes(node.location().as_slice().to_vec());
     }
 
+    fn numbered_parameters_node(&mut self, name: &str) {
+        self.break_line();
+        self.put_indent();
+        self.buffer.push('[');
+        self.buffer.push_str(name);
+        self.buffer.push(']');
+    }
+
     fn start_field(&mut self, name: impl ToString) {
         self.break_line();
         self.put_indent();

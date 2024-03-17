@@ -99,11 +99,19 @@ class MeaningCodeGenerator
   def build_pattern_match_branch(impl, functions)
     fields = functions.map { build_field_line(_1) }
     if fields.empty?
-      <<~RUST
-        prism::Node::#{impl[:name]} { .. } => {
-            self.atom_node("#{impl[:name]}", node);
-        }
-      RUST
+      if impl[:name] == 'NumberedParametersNode'
+        <<~RUST
+          prism::Node::#{impl[:name]} { .. } => {
+              self.numbered_parameters_node("#{impl[:name]}");
+          }
+        RUST
+      else
+        <<~RUST
+          prism::Node::#{impl[:name]} { .. } => {
+              self.atom_node("#{impl[:name]}", node);
+          }
+        RUST
+      end
     else
       snaked_name = to_snake(impl[:name])
       <<~RUST

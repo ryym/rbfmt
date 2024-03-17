@@ -879,7 +879,7 @@ impl super::Meaning {
             }
 
             prism::Node::NumberedParametersNode { .. } => {
-                self.atom_node("NumberedParametersNode", node);
+                self.numbered_parameters_node("NumberedParametersNode");
             }
 
             prism::Node::NumberedReferenceReadNode { .. } => {
