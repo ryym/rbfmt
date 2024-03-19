@@ -11,6 +11,12 @@ end
 
 a&.b.c&.d
 
+a.b(1).c[2] {}.d
+
+foo # a
+  .bar # b
+  .baz
+
 # for now disallow empty lines within method chain
 foo(1) #bbb
   # bar

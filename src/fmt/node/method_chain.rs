@@ -309,6 +309,7 @@ impl MessageCall {
         arguments: Option<Arguments>,
         block: Option<Block>,
     ) -> Self {
+        let operator = operator.map(|s| if &s == "::" { ".".to_string() } else { s });
         let operator_len = operator.as_ref().map_or(0, |s| s.len());
         let msg_shape = Shape::inline(name.len() + operator_len);
         let mut shape = leading_trivia.shape().add(&msg_shape);
