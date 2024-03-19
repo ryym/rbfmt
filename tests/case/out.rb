@@ -49,7 +49,7 @@ when a, # 0
   :when1
 when d, e, f # g
 when [
-    a, # a
+    a # a
   ],
     b
   :when2

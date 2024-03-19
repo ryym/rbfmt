@@ -12,15 +12,15 @@ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ? bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
 a ?
   [
-    b, # b
+    b # b
   ]
 : [
-  c, # c
+  c # c
 ]
 
 foo(
   a ? b : c, # d
-  z, # z
+  z # z
 )
 
 pred1 ? pred2 ? then2 : else2 : else1

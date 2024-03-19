@@ -28,7 +28,7 @@ foo(
 )
 
 foo(
-  1,
+  1
   # aa,
 )
 
@@ -38,13 +38,13 @@ foo(
   1, # cc
 
   # dd
-  2,
+  2
   # ee
 )
 
 foo(
   1, # 1
-  2,
+  2
 ).bar
 
 foo bar, baz # foo
@@ -139,22 +139,35 @@ end
 ) # 4
 
 foo(
+  a(b) # c
+)
+foo(
+  a b # c
+)
+foo(
+  a + b # c
+)
+foo(
+  not(a) # c
+)
+
+foo(
   aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
   bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
-  ccccccccccccccc,
+  ccccccccccccccc
 )
 
 foo(bar, {
   a: 1,
-  b: 2,
+  b: 2
 })
 foo(
   bar,
   {
     a: 1,
-    b: 2,
+    b: 2
   },
-  :baz,
+  :baz
 )
 
 foo(bar, -> {})
@@ -174,19 +187,19 @@ foo(
   aaa
     # bbb
     .bbb
-    .ccc,
+    .ccc
 )
 
 foo(aaaaaaaaaa, [
   aaa.bbb.ccc, # ddd
-  123,
+  123
 ])
 foo(
   bar ? baz
   : [
     aaa.bbb.ccc, # ddd
-    123,
-  ],
+    123
+  ]
 )
 
 render json: { messages: [aaaaaaaaa], extra: { bbbbbbbbbbbbb: cccccccccccccccccc } },
@@ -194,21 +207,21 @@ render json: { messages: [aaaaaaaaa], extra: { bbbbbbbbbbbbb: cccccccccccccccccc
 
 render json: {
   messages: [aaaaaaaaa],
-  extra: { bbbbbbbbbbbbb: cccccccccccccccccc },
+  extra: { bbbbbbbbbbbbb: cccccccccccccccccc }
 }, status: :dddddddddddddddd
 
 enum foo_bar_baz: {
   aaaa: 0,
   bbbb: 1,
-  cccc: 2,
+  cccc: 2
 }, _prefix: true
 enum(
   foo_bar_baz: {
     aaaa: 0,
     bbbb: 1,
-    cccc: 2,
+    cccc: 2
   },
-  _prefix: true,
+  _prefix: true
 )
 
 validate :foo_bar_baz, if: -> {
@@ -225,13 +238,13 @@ validate :foo_bar_baz,
 
 validates :foo_bar_baz, exclusion: {
   in: %w(aaaaa bbbbb ccccc ddddd),
-  message: "%{value} is reserved.",
+  message: "%{value} is reserved."
 }
 
 if true
   if true
     aaaaaa.bbbbbbbbbbbbbbb.find_by(ccccccc_id: dddddddddddddd.ccccccc_id).try(
-      :eeeeeeeeeeeeeeeeeeeee,
+      :eeeeeeeeeeeeeeeeeeeee
     )
   end
 end
@@ -239,16 +252,16 @@ end
 aaaaaaaa || Bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.new(cccc, dddddddd)
 
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa if foo(
-  :bbbbbbbbbbbbbbbbbbbbbbbbbbbbb,
+  :bbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ).bar
 
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa unless bbbbbbbbbbbbbbbbbbbb[
-  :cccccccccc,
+  :cccccccccc
 ].nil?
 
 Aaaaaa.hoge.cccc(
   dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-  eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
+  eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee
 ).foo.bar
 
 Aaaaaa.hoge.cccc(
@@ -256,16 +269,16 @@ Aaaaaa.hoge.cccc(
     .hoge
     .cccc(
       dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
+      eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee
     )
     .cccc(
       dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
+      eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee
     )
     .foo
     .bar,
   dddddddddddddddd: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-  eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee,
+  eeeeee: eeeeeeeeeeeeeeeeeeeeeeeeee
 ).foo.bar
 
 Aaaaaa
@@ -298,7 +311,7 @@ if true
     .order(bbbb_date_cccc: :desc)
     .take
   Aaaa.own(bbbbbb_id).where(Aaaa.arel_table[:bbbb_date].lt(bbbb_date)).order(
-    bbbb_date_cccc_cccc: :desc,
+    bbbb_date_cccc_cccc: :desc
   ).take
 
   foooo
@@ -310,7 +323,7 @@ if true
     bb,
     cc,
     dd,
-    ee,
+    ee
   )
 
   attributes
@@ -320,7 +333,7 @@ if true
     .merge(eeeeeeeeeeeeeeeee: prev_eeeeeeeeeeeeeeeee)
 
   aaaaaaaaaaaaaaaa.bbbbbbbbbbbbbbb.find_by(ccccccc_id: dddddddddddddd.ccccccc_id).try(
-    :eeeeeeeeeeeeeeeeeeeee,
+    :eeeeeeeeeeeeeeeeeeeee
   )
 end
 

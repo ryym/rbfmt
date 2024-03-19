@@ -26,7 +26,7 @@ a << b ^ c == d * e > f
 # We can call operator methods with normal form:
 a.==(b)
 a.!=(
-  b, # b
+  b # b
 )
 a.===(b) # b
 a.=~(b)
@@ -50,29 +50,29 @@ a.>=(b)
 
 1 +
   [
-    1, # a
+    1 # a
     # b
   ] +
   3
 
 [
-  1, # 1
+  1 # 1
 ] == nil
 
 [
-  1, # 1
+  1 # 1
 ] +
   [
-    2, # 2
+    2 # 2
   ] +
   [
-    3, # 3
+    3 # 3
   ]
 
 [
   # 0
   1 + 2, # 3
-  nil,
+  nil
 ]
 
 a && b

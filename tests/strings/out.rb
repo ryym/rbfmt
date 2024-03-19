@@ -65,14 +65,14 @@ foo(
   "a
   b
   c",
-  2,
+  2
 )
 
 foo(
   1,
   "#{d}
   e",
-  2,
+  2
 )
 
 # % literal that uses \n as a delimiter.
@@ -109,6 +109,6 @@ abc#{1 + 1}
   # foo
   fooooooooooooooooooooooooooooooooooooooooooooooooooooo(
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,
-    bbbbbbbbbbbbbbbbbbbbbbbbb,
+    bbbbbbbbbbbbbbbbbbbbbbbbb
   )
 }bb"

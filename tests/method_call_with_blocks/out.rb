@@ -85,7 +85,7 @@ foo.flat_map(&:get_some_value_of_foo).filter(&:really_foo?).sum { |value|
 
 foo(
   # 1
-  a,
+  a
 ) do
   b
 end

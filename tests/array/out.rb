@@ -5,14 +5,14 @@
 [
   # 1
   [1, 2, [3, [], 4, [5]]],
-  6, # 6
+  6 # 6
 ]
 
 [1, 2, 3] # 4
 
 [
   # 1
-  *a, # 2
+  *a # 2
 ]
 
 [
@@ -51,7 +51,7 @@ a = [
   2,
   # 3
   4, # 4
-  5,
+  5
 ]
 
 b =
@@ -63,7 +63,7 @@ c =
   [
     :case1,
     nil, # nil
-    :case2,
+    :case2
   ] # wierd case2
 
 if true
@@ -71,8 +71,8 @@ if true
     [
       aaaaaaaaaaaaaa('bbbbbbb', '', {
         'ccccccccccccc' => 'dddddd',
-        'eeeeeeeeeeeee' => 'fffffffffff',
-      }),
+        'eeeeeeeeeeeee' => 'fffffffffff'
+      })
     ]
   end
 end

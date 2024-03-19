@@ -38,7 +38,7 @@ end
 
 # 0
 [
-  a, # 1
+  a # 1
 ] in
   # 2
   # 3
@@ -91,7 +91,7 @@ xs =>
 xs => [
   a, # a
   b, # b
-  c,
+  c
 ] # c
 # d
 
@@ -147,7 +147,7 @@ hash =>
     a:
       # 4
       # 5
-      :b, # 6
+      :b # 6
     # 7
   } # 8
 # 9
@@ -192,7 +192,7 @@ hash => {
     # 1
     baz, # 2
   # 3
-  c: [d],
+  c: [d]
 }
 
 ## Alternation patterns
@@ -228,9 +228,9 @@ in {
     a: {
       x: Integer => y,
       b: {
-        c: [^d, e],
-      },
-    },
+        c: [^d, e]
+      }
+    }
   }
   3
 in ^(aa.bb(1).cc[2]&.dd) | nil | true | false
@@ -251,12 +251,12 @@ in [:a] if a
   aa
 in {
     a: Integer,
-    b: String => s,
+    b: String => s
   }
   bb
 in {
     a: Integer,
-    b: { c: c, d: d, ** },
+    b: { c: c, d: d, ** }
   } if foo(v).bar?
   cc
 end

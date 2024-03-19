@@ -90,7 +90,7 @@ impl ArrayPattern {
                 );
                 o.put_indent_if_needed();
                 element.format(o, ctx);
-                if i < last_idx || self.last_comma_allowed {
+                if i < last_idx {
                     o.push(',');
                 }
                 element.trailing_trivia.format(o);

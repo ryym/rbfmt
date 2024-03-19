@@ -52,7 +52,7 @@ a while
   b
 a while foo [
   1, # 1
-  2, # 2
+  2 # 2
 ]
 begin
   foo
@@ -93,7 +93,7 @@ a until
   b
 a until foo [
   1, # 1
-  2, # 2
+  2 # 2
 ]
 begin
   foo

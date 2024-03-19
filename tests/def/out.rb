@@ -82,7 +82,7 @@ def optionals(
     1,
     2,
     # 3
-    3,
+    3
   ),
   # c
   c = d = e,
@@ -101,7 +101,7 @@ def optional_keywords(
   d: foo(
     1,
     2, # 2
-    3,
+    3
   ),
   e: :e,
   f: [1, 2, 3]
@@ -320,12 +320,12 @@ def foo(a) =
 def foo(b) = [
   1,
   2, # 2
-  3,
+  3
 ]
 
 def foo(c) = foo.bar(
   # a
-  a,
+  a
 )
 
 def (a).foo = 1 # 1

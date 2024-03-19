@@ -220,7 +220,7 @@ foo(
     b
   B
   c,
-  d, # d
+  d # d
 )
 
 <<~H1
@@ -367,7 +367,7 @@ hashes <<
     c: <<~C,
       3
     C
-    d: 4,
+    d: 4
   }
 
 Foo.new(<<-RUBY, 3.3)
@@ -381,7 +381,7 @@ Foo.new(
 
       def valid_code; end
   RUBY
-  3.3, # foo
+  3.3 # foo
 )
 
 "123#{

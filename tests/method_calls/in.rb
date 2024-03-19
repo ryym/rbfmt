@@ -137,6 +137,19 @@ end
   # 3
 ) # 4
 
+foo(
+  a(b) # c
+)
+foo(
+  a b # c
+)
+foo(
+  a + b # c
+)
+foo(
+  not(a) # c
+)
+
 foo(aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb, ccccccccccccccc)
 
 foo(bar, {

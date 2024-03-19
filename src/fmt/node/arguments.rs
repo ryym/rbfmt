@@ -115,7 +115,7 @@ impl Arguments {
                     );
                     o.put_indent_if_needed();
                     arg.format(o, ctx);
-                    if i < last_idx || self.last_comma_allowed {
+                    if i < last_idx {
                         o.push(',');
                     }
                     arg.trailing_trivia.format(o);

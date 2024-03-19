@@ -77,7 +77,7 @@ foo[1] &&= 1
 foo(bar).baz[true, nil] ||= a.b
 foo[
   # a
-  1,
+  1
   # b
 ] += 3
 
@@ -107,7 +107,7 @@ a(1, 2).b, (c().d, e) = xs
 
 (
   a.b(
-    1, # 1
+    1 # 1
   ).c,
   d,
 ) = xs
@@ -120,7 +120,7 @@ a[1], b[2, c.d, e], foo.bar = xs
     2,
     # c
     c.d,
-    e,
+    e
   ],
   foo.bar
 ) = xs
@@ -143,5 +143,5 @@ foo = [
   b =
     # 2
     2,
-  c,
+  c
 ]

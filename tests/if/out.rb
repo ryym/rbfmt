@@ -100,7 +100,7 @@ if foo
 end
 
 if foo(
-    1, # 2
+    1 # 2
   ).bar
   foo
 end

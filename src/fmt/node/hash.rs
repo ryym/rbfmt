@@ -65,20 +65,25 @@ impl Hash {
         } else {
             o.push_str(&self.opening);
             o.indent();
-            for (i, element) in self.elements.iter().enumerate() {
-                o.break_line(ctx);
-                element.leading_trivia.format(
-                    o,
-                    ctx,
-                    EmptyLineHandling::Trim {
-                        start: i == 0,
-                        end: false,
-                    },
-                );
-                o.put_indent_if_needed();
-                element.format(o, ctx);
-                o.push(',');
-                element.trailing_trivia.format(o);
+            if !self.elements.is_empty() {
+                let last_idx = self.elements.len() - 1;
+                for (i, element) in self.elements.iter().enumerate() {
+                    o.break_line(ctx);
+                    element.leading_trivia.format(
+                        o,
+                        ctx,
+                        EmptyLineHandling::Trim {
+                            start: i == 0,
+                            end: false,
+                        },
+                    );
+                    o.put_indent_if_needed();
+                    element.format(o, ctx);
+                    if i < last_idx {
+                        o.push(',');
+                    }
+                    element.trailing_trivia.format(o);
+                }
             }
             o.write_trivia_at_virtual_end(ctx, &self.virtual_end, true, self.elements.is_empty());
             o.dedent();
