@@ -100,6 +100,22 @@ impl Meaning {
         self.end_field();
     }
 
+    fn call_operator_loc_field(&mut self, loc: Option<prism::Location>) {
+        self.start_field("call_operator_loc");
+        if let Some(loc) = loc {
+            let mut bytes = loc.as_slice();
+            if matches!(bytes, [b':', b':']) {
+                bytes = &[b'.'];
+            }
+            self.break_line();
+            self.put_indent();
+            self.u8_bytes(bytes.to_vec());
+        } else {
+            self.none_value();
+        }
+        self.end_field();
+    }
+
     fn message_loc_field(&mut self, loc: Option<prism::Location>) {
         self.start_field("message_loc");
         if let Some(loc) = loc {

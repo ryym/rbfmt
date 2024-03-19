@@ -143,7 +143,7 @@ impl super::Meaning {
                 let node = node.as_call_and_write_node().unwrap();
                 self.start_node("CallAndWriteNode");
                 self.opt_field("receiver", node.receiver());
-                self.opt_loc_field("call_operator_loc", node.call_operator_loc());
+                self.call_operator_loc_field(node.call_operator_loc());
                 self.message_loc_field(node.message_loc());
                 self.opt_loc_field("operator_loc", Some(node.operator_loc()));
                 self.node_field("value", node.value());
@@ -154,7 +154,7 @@ impl super::Meaning {
                 let node = node.as_call_node().unwrap();
                 self.start_node("CallNode");
                 self.opt_field("receiver", node.receiver());
-                self.opt_loc_field("call_operator_loc", node.call_operator_loc());
+                self.call_operator_loc_field(node.call_operator_loc());
                 self.message_loc_field(node.message_loc());
                 self.opt_field("arguments", node.arguments().map(|n| n.as_node()));
                 self.opt_field("block", node.block());
@@ -165,7 +165,7 @@ impl super::Meaning {
                 let node = node.as_call_operator_write_node().unwrap();
                 self.start_node("CallOperatorWriteNode");
                 self.opt_field("receiver", node.receiver());
-                self.opt_loc_field("call_operator_loc", node.call_operator_loc());
+                self.call_operator_loc_field(node.call_operator_loc());
                 self.message_loc_field(node.message_loc());
                 self.opt_loc_field("operator_loc", Some(node.operator_loc()));
                 self.node_field("value", node.value());
@@ -176,7 +176,7 @@ impl super::Meaning {
                 let node = node.as_call_or_write_node().unwrap();
                 self.start_node("CallOrWriteNode");
                 self.opt_field("receiver", node.receiver());
-                self.opt_loc_field("call_operator_loc", node.call_operator_loc());
+                self.call_operator_loc_field(node.call_operator_loc());
                 self.message_loc_field(node.message_loc());
                 self.opt_loc_field("operator_loc", Some(node.operator_loc()));
                 self.node_field("value", node.value());
@@ -595,7 +595,7 @@ impl super::Meaning {
                 let node = node.as_index_and_write_node().unwrap();
                 self.start_node("IndexAndWriteNode");
                 self.opt_field("receiver", node.receiver());
-                self.opt_loc_field("call_operator_loc", node.call_operator_loc());
+                self.call_operator_loc_field(node.call_operator_loc());
                 self.opt_field("arguments", node.arguments().map(|n| n.as_node()));
                 self.opt_field("block", node.block());
                 self.opt_loc_field("operator_loc", Some(node.operator_loc()));
@@ -607,7 +607,7 @@ impl super::Meaning {
                 let node = node.as_index_operator_write_node().unwrap();
                 self.start_node("IndexOperatorWriteNode");
                 self.opt_field("receiver", node.receiver());
-                self.opt_loc_field("call_operator_loc", node.call_operator_loc());
+                self.call_operator_loc_field(node.call_operator_loc());
                 self.opt_field("arguments", node.arguments().map(|n| n.as_node()));
                 self.opt_field("block", node.block());
                 self.opt_loc_field("operator_loc", Some(node.operator_loc()));
@@ -619,7 +619,7 @@ impl super::Meaning {
                 let node = node.as_index_or_write_node().unwrap();
                 self.start_node("IndexOrWriteNode");
                 self.opt_field("receiver", node.receiver());
-                self.opt_loc_field("call_operator_loc", node.call_operator_loc());
+                self.call_operator_loc_field(node.call_operator_loc());
                 self.opt_field("arguments", node.arguments().map(|n| n.as_node()));
                 self.opt_field("block", node.block());
                 self.opt_loc_field("operator_loc", Some(node.operator_loc()));

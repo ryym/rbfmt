@@ -145,6 +145,8 @@ class MeaningCodeGenerator
       end
     when "Option<Location<'pr>>"
       case name
+      when 'call_operator_loc'
+        %Q{self.call_operator_loc_field(node.#{name}());}
       when 'message_loc'
         %Q{self.message_loc_field(node.#{name}());}
       else
