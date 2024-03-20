@@ -118,23 +118,23 @@ impl Meaning {
 
     fn message_loc_field(&mut self, loc: Option<prism::Location>) {
         self.start_field("message_loc");
-        if let Some(loc) = loc {
+        let bytes = if let Some(loc) = loc {
             let slice = loc.as_slice();
             let len = slice.len();
-            let bytes = if len > 2 && slice[0] == b'[' && slice[len - 1] == b']' {
+            if len > 2 && slice[0] == b'[' && slice[len - 1] == b']' {
                 // Prism parses index accesses in a call like 'foo[1]' as a message '[1]' as is,
                 // so its message_loc can contain spaces, line breaks, comments, etc.
                 // We want to ignore such details so treat index accesses as '[]'.
-                vec![b'[', b']']
+                "[]".as_bytes()
             } else {
-                slice.to_vec()
-            };
-            self.break_line();
-            self.put_indent();
-            self.u8_bytes(bytes);
+                slice
+            }
         } else {
-            self.none_value();
-        }
+            "call".as_bytes()
+        };
+        self.break_line();
+        self.put_indent();
+        self.u8_bytes(bytes.to_vec());
         self.end_field();
     }
 
