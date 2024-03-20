@@ -133,6 +133,8 @@ hash in {}
 hash => { a:, b: { c: } }
 hash in a:, b: { c: }
 hash => { a: 1, b: [c, *], d: }
+hash => Foo[ a: 1, b: Bar[ b: 2 ] ]
+hash => Foo[ bar: :baz ]
 hash in { a:, **b }
 hash => { a:, ** }
 hash in { ** }

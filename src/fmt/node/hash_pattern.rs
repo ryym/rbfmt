@@ -67,6 +67,9 @@ impl HashPattern {
     }
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
+        if let Some(constant) = &self.constant {
+            constant.format(o, ctx);
+        }
         if self.hash_shape.fits_in_one_line(o.remaining_width) {
             if let Some(opening) = &self.opening {
                 o.push_str(opening);
