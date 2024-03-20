@@ -555,7 +555,6 @@ impl super::Meaning {
                 self.start_node("IfNode");
                 self.opt_loc_field("if_keyword_loc", node.if_keyword_loc());
                 self.node_field("predicate", node.predicate());
-                self.opt_loc_field("then_keyword_loc", node.then_keyword_loc());
                 self.opt_field("statements", node.statements().map(|n| n.as_node()));
                 self.opt_field("consequent", node.consequent());
                 self.opt_loc_field("end_keyword_loc", node.end_keyword_loc());
@@ -1133,7 +1132,6 @@ impl super::Meaning {
                 self.start_node("UnlessNode");
                 self.opt_loc_field("keyword_loc", Some(node.keyword_loc()));
                 self.node_field("predicate", node.predicate());
-                self.opt_loc_field("then_keyword_loc", node.then_keyword_loc());
                 self.opt_field("statements", node.statements().map(|n| n.as_node()));
                 self.opt_field("consequent", node.consequent().map(|n| n.as_node()));
                 self.opt_loc_field("end_keyword_loc", node.end_keyword_loc());

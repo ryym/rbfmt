@@ -139,6 +139,11 @@ class MeaningCodeGenerator
       when 'lparen_loc', 'rparen_loc'
         return nil
       end
+    when 'IfNode', 'UnlessNode'
+      case name
+      when 'then_keyword_loc'
+        return nil
+      end
     end
 
     case fn[:return_type]
