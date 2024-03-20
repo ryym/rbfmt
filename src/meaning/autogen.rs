@@ -386,8 +386,6 @@ impl super::Meaning {
                 self.opt_field("body", node.body());
                 self.opt_loc_field("def_keyword_loc", Some(node.def_keyword_loc()));
                 self.opt_loc_field("operator_loc", node.operator_loc());
-                self.opt_loc_field("lparen_loc", node.lparen_loc());
-                self.opt_loc_field("rparen_loc", node.rparen_loc());
                 self.opt_loc_field("equal_loc", node.equal_loc());
                 self.opt_loc_field("end_keyword_loc", node.end_keyword_loc());
                 self.end_node();
