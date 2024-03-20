@@ -471,7 +471,6 @@ impl super::Meaning {
                 self.opt_field("statements", node.statements().map(|n| n.as_node()));
                 self.opt_loc_field("for_keyword_loc", Some(node.for_keyword_loc()));
                 self.opt_loc_field("in_keyword_loc", Some(node.in_keyword_loc()));
-                self.opt_loc_field("do_keyword_loc", node.do_keyword_loc());
                 self.opt_loc_field("end_keyword_loc", Some(node.end_keyword_loc()));
                 self.end_node();
             }

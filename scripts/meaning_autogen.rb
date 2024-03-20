@@ -97,7 +97,7 @@ class MeaningCodeGenerator
   end
 
   def build_pattern_match_branch(impl, functions)
-    fields = functions.map { build_field_line(_1) }
+    fields = functions.filter_map { build_field_line(impl, _1) }
     if fields.empty?
       if impl[:name] == 'NumberedParametersNode'
         <<~RUST
@@ -125,8 +125,17 @@ class MeaningCodeGenerator
     end
   end
 
-  def build_field_line(fn)
+  def build_field_line(impl, fn)
     name = fn[:name]
+
+    case impl[:name]
+    when 'ForNode'
+      case name
+      when 'do_keyword_loc'
+        return nil
+      end
+    end
+
     case fn[:return_type]
     when "Node<'pr>"
       %Q{self.node_field("#{name}", node.#{name}());}
