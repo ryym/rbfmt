@@ -850,8 +850,6 @@ impl super::Meaning {
                 self.list_field("lefts", node.lefts());
                 self.opt_field("rest", node.rest());
                 self.list_field("rights", node.rights());
-                self.opt_loc_field("lparen_loc", node.lparen_loc());
-                self.opt_loc_field("rparen_loc", node.rparen_loc());
                 self.opt_loc_field("operator_loc", Some(node.operator_loc()));
                 self.node_field("value", node.value());
                 self.end_node();

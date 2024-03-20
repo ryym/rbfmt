@@ -134,6 +134,11 @@ class MeaningCodeGenerator
       when 'do_keyword_loc'
         return nil
       end
+    when 'MultiWriteNode'
+      case name
+      when 'lparen_loc', 'rparen_loc'
+        return nil
+      end
     end
 
     case fn[:return_type]
