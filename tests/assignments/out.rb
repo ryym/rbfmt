@@ -81,6 +81,12 @@ foo[
   # b
 ] += 3
 
+a[b, *c, **d, &e] = 1
+a[b, *c, **d, &e] += 1
+a[b, *c, **d, &e] ||= 1
+a[b, *c, **d, &e] &&= 1
+x, a[b, *c, **d, &e], y = values
+
 a, b, c = xs
 a, b, c, = xs
 ys = xs

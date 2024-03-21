@@ -629,7 +629,7 @@ impl<'src> CallRoot for prism::IndexAndWriteNode<'src> {
         Some(self.closing_loc())
     }
     fn block(&self) -> Option<prism::Node> {
-        None
+        self.block()
     }
 }
 
@@ -659,7 +659,7 @@ impl<'src> CallRoot for prism::IndexOrWriteNode<'src> {
         Some(self.closing_loc())
     }
     fn block(&self) -> Option<prism::Node> {
-        None
+        self.block()
     }
 }
 
@@ -689,7 +689,7 @@ impl<'src> CallRoot for prism::IndexOperatorWriteNode<'src> {
         Some(self.closing_loc())
     }
     fn block(&self) -> Option<prism::Node> {
-        None
+        self.block()
     }
 }
 
@@ -719,7 +719,7 @@ impl<'src> CallRoot for prism::IndexTargetNode<'src> {
         Some(self.closing_loc())
     }
     fn block(&self) -> Option<prism::Node> {
-        None
+        self.block()
     }
 }
 
