@@ -10,21 +10,22 @@ use super::{BlockBody, Node, Statements, VirtualEnd};
 #[derive(Debug)]
 pub(crate) struct Def {
     pub shape: Shape,
-    pub receiver: Option<Box<Node>>,
+    pub receiver: Option<(Box<Node>, String)>,
     pub name: String,
     pub parameters: Option<MethodParameters>,
     pub body: DefBody,
 }
 
 impl Def {
-    pub(crate) fn new(receiver: Option<Node>, name: String) -> Self {
+    pub(crate) fn new(receiver: Option<(Node, String)>, name: String) -> Self {
         let mut shape = Shape::inline("def ".len() + name.len());
-        if let Some(receiver) = &receiver {
+        if let Some((receiver, operator)) = &receiver {
             shape.insert(&receiver.shape);
+            shape.insert(&Shape::inline(operator.len()));
         }
         Self {
             shape,
-            receiver: receiver.map(Box::new),
+            receiver: receiver.map(|(r, op)| (Box::new(r), op)),
             name,
             parameters: None,
             body: DefBody::Block {
@@ -46,7 +47,7 @@ impl Def {
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         o.push_str("def");
-        if let Some(receiver) = &self.receiver {
+        if let Some((receiver, operator)) = &self.receiver {
             if receiver.shape.fits_in_one_line(o.remaining_width) || receiver.can_continue_line() {
                 o.push(' ');
                 receiver.format(o, ctx);
@@ -57,7 +58,7 @@ impl Def {
                 o.put_indent_if_needed();
                 receiver.format(o, ctx);
             }
-            o.push('.');
+            o.push_str(&operator);
             if receiver.trailing_trivia.is_none() {
                 o.push_str(&self.name);
                 if let Some(params) = &self.parameters {

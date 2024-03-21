@@ -15,7 +15,14 @@ impl<'src> super::Parser<'src> {
         let leading = self.take_leading_trivia(leading_end);
 
         let name_end = name_loc.end_offset();
-        let receiver = receiver.map(|r| self.parse(r, Some(name_end)));
+        let receiver = match (receiver, node.operator_loc()) {
+            (Some(receiver), Some(operator_loc)) => {
+                let receiver = self.parse(receiver, Some(name_end));
+                let operator = Self::source_lossy_at(&operator_loc);
+                Some((receiver, operator))
+            }
+            _ => None,
+        };
         let name = Self::source_lossy_at(&node.name_loc());
         let mut def = fmt::Def::new(receiver, name);
 

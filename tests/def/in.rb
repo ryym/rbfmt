@@ -24,6 +24,9 @@ end
 def foo.bar
 end
 
+def a::b
+end
+
 def foo(a, b)
 end
 
