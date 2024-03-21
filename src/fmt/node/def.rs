@@ -58,7 +58,7 @@ impl Def {
                 o.put_indent_if_needed();
                 receiver.format(o, ctx);
             }
-            o.push_str(&operator);
+            o.push_str(operator);
             if receiver.trailing_trivia.is_none() {
                 o.push_str(&self.name);
                 if let Some(params) = &self.parameters {
