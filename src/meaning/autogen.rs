@@ -697,7 +697,7 @@ impl super::Meaning {
             prism::Node::InterpolatedStringNode { .. } => {
                 let node = node.as_interpolated_string_node().unwrap();
                 self.start_node("InterpolatedStringNode");
-                self.list_field("parts", node.parts());
+                self.interpolated_string_or_heredoc(node.opening_loc(), node.parts());
                 self.end_node();
             }
 
@@ -711,7 +711,7 @@ impl super::Meaning {
             prism::Node::InterpolatedXStringNode { .. } => {
                 let node = node.as_interpolated_x_string_node().unwrap();
                 self.start_node("InterpolatedXStringNode");
-                self.list_field("parts", node.parts());
+                self.interpolated_string_or_heredoc(Some(node.opening_loc()), node.parts());
                 self.end_node();
             }
 
@@ -786,7 +786,7 @@ impl super::Meaning {
             prism::Node::MatchLastLineNode { .. } => {
                 let node = node.as_match_last_line_node().unwrap();
                 self.start_node("MatchLastLineNode");
-                self.string_content(node.content_loc());
+                self.string_content(node.content_loc().as_slice().to_vec());
                 self.end_node();
             }
 
@@ -990,7 +990,7 @@ impl super::Meaning {
             prism::Node::RegularExpressionNode { .. } => {
                 let node = node.as_regular_expression_node().unwrap();
                 self.start_node("RegularExpressionNode");
-                self.string_content(node.content_loc());
+                self.string_content(node.content_loc().as_slice().to_vec());
                 self.end_node();
             }
 
@@ -1091,7 +1091,7 @@ impl super::Meaning {
             prism::Node::StringNode { .. } => {
                 let node = node.as_string_node().unwrap();
                 self.start_node("StringNode");
-                self.string_content(node.content_loc());
+                self.string_or_heredoc(node.opening_loc(), node.content_loc());
                 self.end_node();
             }
 
@@ -1166,7 +1166,7 @@ impl super::Meaning {
             prism::Node::XStringNode { .. } => {
                 let node = node.as_x_string_node().unwrap();
                 self.start_node("XStringNode");
-                self.string_content(node.content_loc());
+                self.string_or_heredoc(Some(node.opening_loc()), node.content_loc());
                 self.end_node();
             }
 

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 mod autogen;
 
 pub fn extract(node: &prism::Node) -> String {
@@ -153,17 +155,11 @@ impl Meaning {
         }
     }
 
-    fn string_content(&mut self, loc: prism::Location) {
-        let value = loc.as_slice().to_vec();
-        if value.iter().any(|b| *b == b'\n') {
-            self.break_line();
-            self.buffer.push_str("---\n");
-            self.u8_bytes(value);
-            self.buffer.push_str("\n---");
-        } else {
-            self.buffer.push(' ');
-            self.u8_bytes(value);
-        }
+    fn string_content(&mut self, value: Vec<u8>) {
+        self.break_line();
+        self.buffer.push_str("---\n");
+        self.u8_bytes(value);
+        self.buffer.push_str("\n---");
     }
 
     fn none_value(&mut self) {
@@ -171,4 +167,114 @@ impl Meaning {
         self.put_indent();
         self.buffer.push_str("(none)");
     }
+
+    fn string_or_heredoc(
+        &mut self,
+        opening_loc: Option<prism::Location>,
+        content_loc: prism::Location,
+    ) {
+        let content = if is_squiggly_heredoc(&opening_loc) {
+            content_loc
+                .as_slice()
+                .iter()
+                .skip_while(|c| **c == b' ')
+                .copied()
+                .collect()
+        } else {
+            content_loc.as_slice().to_vec()
+        };
+        self.string_content(content);
+    }
+
+    fn interpolated_string_or_heredoc(
+        &mut self,
+        opening_loc: Option<prism::Location>,
+        node_parts: prism::NodeList,
+    ) {
+        let parts = node_parts.iter().collect();
+        let heredoc_info = if is_squiggly_heredoc(&opening_loc) {
+            calc_squiggly_heredoc_indent(&parts)
+        } else {
+            None
+        };
+        if let Some((indent_to_remove, line_starts)) = heredoc_info {
+            for (i, part) in parts.into_iter().enumerate() {
+                self.start_field(i);
+                match part {
+                    prism::Node::StringNode { .. } => {
+                        let node = part.as_string_node().unwrap();
+                        let content = node.content_loc().as_slice();
+                        let content = if line_starts.contains(&i) {
+                            content
+                                .iter()
+                                .enumerate()
+                                .skip_while(|(i, c)| *i < indent_to_remove && **c == b' ')
+                                .map(|(_, c)| *c)
+                                .collect()
+                        } else {
+                            content.to_vec()
+                        };
+                        self.start_node("StringNode");
+                        self.string_content(content);
+                        self.end_node();
+                    }
+                    _ => self.node(&part),
+                }
+                self.end_field();
+            }
+        } else {
+            self.list_field("parts", node_parts);
+        }
+    }
+}
+
+fn is_squiggly_heredoc(opening_loc: &Option<prism::Location>) -> bool {
+    if let Some(loc) = opening_loc {
+        loc.as_slice().starts_with(b"<<~")
+    } else {
+        false
+    }
+}
+
+fn calc_squiggly_heredoc_indent(parts: &Vec<prism::Node>) -> Option<(usize, HashSet<usize>)> {
+    if parts.is_empty() {
+        return None;
+    }
+    let mut is_line_start = true;
+    let mut line_starts = HashSet::new();
+    let mut min_indent = usize::MAX;
+    for (i, part) in parts.iter().enumerate() {
+        if let Some(str) = part.as_string_node() {
+            let content = str.content_loc().as_slice();
+            if is_line_start {
+                line_starts.insert(i);
+                let mut indent = 0;
+                let mut is_empty_line = false;
+                for ch in content {
+                    match *ch {
+                        b'\t' => return None,
+                        b' ' => indent += 1,
+                        b'\n' => {
+                            is_empty_line = true;
+                            break;
+                        }
+                        _ => break,
+                    }
+                }
+                if !is_empty_line && indent < min_indent {
+                    min_indent = indent;
+                }
+            } else {
+                is_line_start = content.ends_with(b"\n");
+            }
+        } else {
+            is_line_start = false;
+        }
+    }
+    let indent_to_remove = if min_indent == usize::MAX {
+        0
+    } else {
+        min_indent
+    };
+    Some((indent_to_remove, line_starts))
 }

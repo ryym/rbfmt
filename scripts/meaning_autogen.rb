@@ -114,14 +114,53 @@ class MeaningCodeGenerator
       end
     else
       snaked_name = to_snake(impl[:name])
-      <<~RUST
-        prism::Node::#{impl[:name]} { .. } => {
-            let node = node.as_#{snaked_name}().unwrap();
-            self.start_node("#{impl[:name]}");
-            #{fields.join("\n    ")}
-            self.end_node();
-        }
-      RUST
+      case impl[:name]
+      when 'StringNode'
+        <<~RUST
+          prism::Node::#{impl[:name]} { .. } => {
+              let node = node.as_#{snaked_name}().unwrap();
+              self.start_node("#{impl[:name]}");
+              self.string_or_heredoc(node.opening_loc(), node.content_loc());
+              self.end_node();
+          }
+        RUST
+      when 'XStringNode'
+        <<~RUST
+          prism::Node::#{impl[:name]} { .. } => {
+              let node = node.as_#{snaked_name}().unwrap();
+              self.start_node("#{impl[:name]}");
+              self.string_or_heredoc(Some(node.opening_loc()), node.content_loc());
+              self.end_node();
+          }
+        RUST
+      when 'InterpolatedStringNode'
+        <<~RUST
+          prism::Node::#{impl[:name]} { .. } => {
+              let node = node.as_#{snaked_name}().unwrap();
+              self.start_node("#{impl[:name]}");
+              self.interpolated_string_or_heredoc(node.opening_loc(), node.parts());
+              self.end_node();
+          }
+        RUST
+      when 'InterpolatedXStringNode'
+        <<~RUST
+          prism::Node::#{impl[:name]} { .. } => {
+              let node = node.as_#{snaked_name}().unwrap();
+              self.start_node("#{impl[:name]}");
+              self.interpolated_string_or_heredoc(Some(node.opening_loc()), node.parts());
+              self.end_node();
+          }
+        RUST
+      else
+        <<~RUST
+          prism::Node::#{impl[:name]} { .. } => {
+              let node = node.as_#{snaked_name}().unwrap();
+              self.start_node("#{impl[:name]}");
+              #{fields.join("\n    ")}
+              self.end_node();
+          }
+        RUST
+      end
     end
   end
 
@@ -161,7 +200,7 @@ class MeaningCodeGenerator
     when "Location<'pr>"
       case name
       when 'content_loc', 'value_loc'
-        %Q{self.string_content(node.#{name}());}
+        %Q{self.string_content(node.#{name}().as_slice().to_vec());}
       when 'message_loc'
         %Q{self.message_loc_field(Some(node.#{name}()));}
       else
