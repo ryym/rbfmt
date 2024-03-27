@@ -41,7 +41,7 @@ impl<'src> super::Parser<'src> {
     pub(super) fn parse_assoc_splat(&mut self, node: prism::AssocSplatNode) -> fmt::Node {
         let operator = Self::source_lossy_at(&node.operator_loc());
         let value = node.value().map(|v| self.parse(v, None));
-        let splat = fmt::Prefix::new(operator, value);
+        let splat = fmt::Prefix::new(operator, value, false);
         fmt::Node::new(fmt::Kind::Prefix(splat))
     }
 }

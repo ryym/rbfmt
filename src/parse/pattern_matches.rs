@@ -251,14 +251,14 @@ impl<'src> super::Parser<'src> {
         parens.closing_break_allowed = false;
 
         let node = fmt::Node::new(fmt::Kind::Parens(parens));
-        let prefix = fmt::Prefix::new(operator, Some(node));
+        let prefix = fmt::Prefix::new(operator, Some(node), false);
         fmt::Node::new(fmt::Kind::Prefix(prefix))
     }
 
     pub(super) fn parse_pinned_variable(&mut self, node: prism::PinnedVariableNode) -> fmt::Node {
         let operator = Self::source_lossy_at(&node.operator_loc());
         let variable = self.parse(node.variable(), None);
-        let prefix = fmt::Prefix::new(operator, Some(variable));
+        let prefix = fmt::Prefix::new(operator, Some(variable), false);
         fmt::Node::new(fmt::Kind::Prefix(prefix))
     }
 

@@ -121,7 +121,7 @@ impl<'src> super::Parser<'src> {
     pub(super) fn parse_block_arg(&mut self, node: prism::BlockArgumentNode) -> fmt::Node {
         let operator = Self::source_lossy_at(&node.operator_loc());
         let expr = node.expression().map(|expr| self.parse(expr, None));
-        let prefix = fmt::Prefix::new(operator, expr);
+        let prefix = fmt::Prefix::new(operator, expr, false);
         fmt::Node::new(fmt::Kind::Prefix(prefix))
     }
 

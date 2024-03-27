@@ -141,8 +141,20 @@ impl<'src> super::Parser<'src> {
         let receiver = call
             .receiver()
             .expect("prefix operation must have receiver");
+
+        // Avoid accidental construction of number literals such as '- 1' -> '-1'.
+        //   - '- 1' ... A method call of 'Integer#-@'.
+        //   - '-1' ... A number literal without method call.
+        let need_separation = (operator == "+" || operator == "-")
+            && receiver
+                .location()
+                .as_slice()
+                .first()
+                .map_or(false, |c| c.is_ascii_digit());
+
         let receiver = self.parse(receiver, None);
-        let prefix = fmt::Prefix::new(operator, Some(receiver));
+        let prefix = fmt::Prefix::new(operator, Some(receiver), need_separation);
+
         fmt::Node::new(fmt::Kind::Prefix(prefix))
     }
 
