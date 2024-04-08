@@ -1,14 +1,46 @@
 # frozen_string_literal: true
 
+# A Ruby script to generate Rust code for code meaning check.
+# You need to run `cargo build` before running this script.
+# Usage: ruby scripts/meaning_autogen.rb
+
 class Main
   def run
-    prism_source_path = './target/debug/build/ruby-prism-e22c044bec47bbd1/out/bindings.rs'
-    code_gen = MeaningCodeGenerator.new
+    prism_source_path = find_built_ruby_prism_binding_file
+    code_gen = MeaningCodeGenerator.new(output_path: 'src/meaning/autogen.rs')
     code_gen.run(prism_source_path)
+  end
+
+  def find_built_ruby_prism_binding_file
+    debug_build_path = 'target/debug/build'
+    if !File.directory?(debug_build_path)
+      raise 'Run `cargo build` first'
+    end
+
+    paths = Dir.entries(debug_build_path)
+    ruby_prism_dirs = paths.select do |path|
+      File.directory?("#{debug_build_path}/#{path}") && path =~ /\Aruby-prism-[a-z0-9]+\z/
+    end
+    bindings_files = ruby_prism_dirs.filter_map do |dir|
+      path = "#{debug_build_path}/#{dir}/out/bindings.rs"
+      File.exists?(path) ? path : nil
+    end
+    if bindings_files.empty?
+      raise 'ruby-prism bindings file not found'
+    end
+
+    latest_file = bindings_files.inject do |a, b|
+      File.stat(a).mtime < File.stat(b).mtime ? b : a
+    end
+    latest_file
   end
 end
 
 class MeaningCodeGenerator
+  def initialize(output_path:)
+    @output_path = output_path
+  end
+
   def run(src_file_path)
     lines = File.read(src_file_path).chomp.lines.map(&:chomp)
 
@@ -31,9 +63,8 @@ class MeaningCodeGenerator
       }
     RUST
 
-    autogen_path = 'src/meaning/autogen.rs'
-    File.write(autogen_path, autogen_source)
-    system("rustfmt #{autogen_path}", exception: true)
+    File.write(@output_path, autogen_source)
+    system("rustfmt #{@output_path}", exception: true)
   end
 
   private
