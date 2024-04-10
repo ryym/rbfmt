@@ -48,12 +48,36 @@ impl Meaning {
         self.u8_bytes(node.location().as_slice().to_vec());
     }
 
-    fn numbered_parameters_node(&mut self, name: &str) {
+    fn numbered_parameters_node(&mut self, name: &str, _: prism::NumberedParametersNode) {
         self.break_line();
         self.put_indent();
         self.buffer.push('[');
         self.buffer.push_str(name);
         self.buffer.push(']');
+    }
+
+    fn string_node(&mut self, name: &str, node: prism::StringNode) {
+        self.start_node(name);
+        self.string_or_heredoc(node.opening_loc(), node.content_loc());
+        self.end_node();
+    }
+
+    fn x_string_node(&mut self, name: &str, node: prism::XStringNode) {
+        self.start_node(name);
+        self.string_or_heredoc(Some(node.opening_loc()), node.content_loc());
+        self.end_node();
+    }
+
+    fn interpolated_string_node(&mut self, name: &str, node: prism::InterpolatedStringNode) {
+        self.start_node(name);
+        self.interpolated_string_or_heredoc(node.opening_loc(), node.parts());
+        self.end_node();
+    }
+
+    fn interpolated_x_string_node(&mut self, name: &str, node: prism::InterpolatedXStringNode) {
+        self.start_node(name);
+        self.interpolated_string_or_heredoc(Some(node.opening_loc()), node.parts());
+        self.end_node();
     }
 
     fn start_field(&mut self, name: impl ToString) {

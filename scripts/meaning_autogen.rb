@@ -129,57 +129,20 @@ class MeaningCodeGenerator
 
   def build_pattern_match_branch(impl, functions)
     fields = functions.filter_map { build_field_line(impl, _1) }
-    if fields.empty?
-      if impl[:name] == 'NumberedParametersNode'
-        <<~RUST
-          prism::Node::#{impl[:name]} { .. } => {
-              self.numbered_parameters_node("#{impl[:name]}");
-          }
-        RUST
-      else
+    snaked_name = to_snake(impl[:name])
+    case impl[:name]
+    when 'StringNode', 'XStringNode', 'InterpolatedStringNode', 'InterpolatedXStringNode', 'NumberedParametersNode'
+      <<~RUST
+        prism::Node::#{impl[:name]} { .. } => {
+            let node = node.as_#{snaked_name}().unwrap();
+            self.#{snaked_name}("#{impl[:name]}", node);
+        }
+      RUST
+    else
+      if fields.empty?
         <<~RUST
           prism::Node::#{impl[:name]} { .. } => {
               self.atom_node("#{impl[:name]}", node);
-          }
-        RUST
-      end
-    else
-      snaked_name = to_snake(impl[:name])
-      case impl[:name]
-      when 'StringNode'
-        <<~RUST
-          prism::Node::#{impl[:name]} { .. } => {
-              let node = node.as_#{snaked_name}().unwrap();
-              self.start_node("#{impl[:name]}");
-              self.string_or_heredoc(node.opening_loc(), node.content_loc());
-              self.end_node();
-          }
-        RUST
-      when 'XStringNode'
-        <<~RUST
-          prism::Node::#{impl[:name]} { .. } => {
-              let node = node.as_#{snaked_name}().unwrap();
-              self.start_node("#{impl[:name]}");
-              self.string_or_heredoc(Some(node.opening_loc()), node.content_loc());
-              self.end_node();
-          }
-        RUST
-      when 'InterpolatedStringNode'
-        <<~RUST
-          prism::Node::#{impl[:name]} { .. } => {
-              let node = node.as_#{snaked_name}().unwrap();
-              self.start_node("#{impl[:name]}");
-              self.interpolated_string_or_heredoc(node.opening_loc(), node.parts());
-              self.end_node();
-          }
-        RUST
-      when 'InterpolatedXStringNode'
-        <<~RUST
-          prism::Node::#{impl[:name]} { .. } => {
-              let node = node.as_#{snaked_name}().unwrap();
-              self.start_node("#{impl[:name]}");
-              self.interpolated_string_or_heredoc(Some(node.opening_loc()), node.parts());
-              self.end_node();
           }
         RUST
       else

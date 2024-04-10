@@ -696,9 +696,7 @@ impl super::Meaning {
 
             prism::Node::InterpolatedStringNode { .. } => {
                 let node = node.as_interpolated_string_node().unwrap();
-                self.start_node("InterpolatedStringNode");
-                self.interpolated_string_or_heredoc(node.opening_loc(), node.parts());
-                self.end_node();
+                self.interpolated_string_node("InterpolatedStringNode", node);
             }
 
             prism::Node::InterpolatedSymbolNode { .. } => {
@@ -710,9 +708,7 @@ impl super::Meaning {
 
             prism::Node::InterpolatedXStringNode { .. } => {
                 let node = node.as_interpolated_x_string_node().unwrap();
-                self.start_node("InterpolatedXStringNode");
-                self.interpolated_string_or_heredoc(Some(node.opening_loc()), node.parts());
-                self.end_node();
+                self.interpolated_x_string_node("InterpolatedXStringNode", node);
             }
 
             prism::Node::KeywordHashNode { .. } => {
@@ -873,7 +869,8 @@ impl super::Meaning {
             }
 
             prism::Node::NumberedParametersNode { .. } => {
-                self.numbered_parameters_node("NumberedParametersNode");
+                let node = node.as_numbered_parameters_node().unwrap();
+                self.numbered_parameters_node("NumberedParametersNode", node);
             }
 
             prism::Node::NumberedReferenceReadNode { .. } => {
@@ -1090,9 +1087,7 @@ impl super::Meaning {
 
             prism::Node::StringNode { .. } => {
                 let node = node.as_string_node().unwrap();
-                self.start_node("StringNode");
-                self.string_or_heredoc(node.opening_loc(), node.content_loc());
-                self.end_node();
+                self.string_node("StringNode", node);
             }
 
             prism::Node::SuperNode { .. } => {
@@ -1165,9 +1160,7 @@ impl super::Meaning {
 
             prism::Node::XStringNode { .. } => {
                 let node = node.as_x_string_node().unwrap();
-                self.start_node("XStringNode");
-                self.string_or_heredoc(Some(node.opening_loc()), node.content_loc());
-                self.end_node();
+                self.x_string_node("XStringNode", node);
             }
 
             prism::Node::YieldNode { .. } => {
