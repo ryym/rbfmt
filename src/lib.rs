@@ -29,22 +29,33 @@ pub fn format_source(
     config: FormatConfig,
 ) -> Result<FormatResult, parse::ParseError> {
     let prism_result = prism::parse(&source);
-    let meaning_before = meaning::extract(&prism_result.node());
 
+    if cfg!(feature = "safety") {
+        let meaning_before = meaning::extract(&prism_result.node());
+        let code = parse_and_format(config, prism_result)?;
+        let meaning_after = meaning::extract(&prism::parse(code.as_bytes()).node());
+        let meaning_diff = if meaning_before == meaning_after {
+            None
+        } else {
+            Some((meaning_before, meaning_after))
+        };
+        Ok(FormatResult { code, meaning_diff })
+    } else {
+        let code = parse_and_format(config, prism_result)?;
+        Ok(FormatResult {
+            code,
+            meaning_diff: None,
+        })
+    }
+}
+
+fn parse_and_format(
+    config: FormatConfig,
+    prism_result: prism::ParseResult,
+) -> Result<String, parse::ParseError> {
     let result = parse::parse_from_prism_result(prism_result)?;
     let formatted = fmt::format(config, result.node, result.heredoc_map);
-
-    let meaning_after = meaning::extract(&prism::parse(formatted.as_bytes()).node());
-    let meaning_diff = if meaning_before == meaning_after {
-        None
-    } else {
-        Some((meaning_before, meaning_after))
-    };
-
-    Ok(FormatResult {
-        code: formatted,
-        meaning_diff,
-    })
+    Ok(formatted)
 }
 
 pub fn print_meaning(target_path: &String) -> Result<(), Box<dyn Error>> {

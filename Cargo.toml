@@ -10,6 +10,10 @@ version = "0.0.2"
 
 default-run = "rbfmt"
 
+[features]
+default = []
+safety = []
+
 [dependencies]
 getopts = "0.2.21"
 prism = { version = "0.24.0", package = "ruby-prism" }
