@@ -165,6 +165,13 @@ fn parse_args(args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Result<Actio
         return Ok(Action::Print(usage));
     }
 
+    #[cfg(feature = "safety")]
+    if matches.opt_present("__print-meaning") {
+        let target = matches.free.iter().next().unwrap();
+        let result = crate::extract_meaning(target)?;
+        return Ok(Action::Print(result));
+    }
+
     let write_to_file = matches.opt_present("w");
     let target = if matches.free.iter().any(|s| s == "-") {
         FormatTarget::Stdin
@@ -186,6 +193,14 @@ fn build_options() -> getopts::Options {
     o.optflag("h", "help", "Print this help message");
     o.optflag("w", "write", "Write output to files instead of STDOUT");
     o.optflag("v", "version", "Print version");
+
+    #[cfg(feature = "safety")]
+    o.optflag(
+        "",
+        "__print-meaning",
+        "[experimental] print meaning of code",
+    );
+
     o
 }
 

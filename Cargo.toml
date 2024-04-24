@@ -8,8 +8,6 @@ name = "rbfmt"
 repository = "https://github.com/ryym/rbfmt"
 version = "0.0.2"
 
-default-run = "rbfmt"
-
 [features]
 default = []
 safety = []
