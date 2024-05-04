@@ -583,7 +583,6 @@ impl super::Meaning {
                 self.node_field("pattern", node.pattern());
                 self.opt_field("statements", node.statements().map(|n| n.as_node()));
                 self.opt_loc_field("in_loc", Some(node.in_loc()));
-                self.opt_loc_field("then_loc", node.then_loc());
                 self.end_node();
             }
 

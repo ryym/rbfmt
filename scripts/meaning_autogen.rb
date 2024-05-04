@@ -182,6 +182,11 @@ class MeaningCodeGenerator
       when 'then_keyword_loc'
         return nil
       end
+    when 'InNode'
+      case name
+      when 'then_loc'
+        return nil
+      end
     end
 
     case fn[:return_type]
