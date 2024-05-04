@@ -65,7 +65,12 @@ fn run_format(
             let cwd = std::env::current_dir()?;
             let config = config::config_of_dir(&cwd)?;
             let result = crate::format_source(source, config.format)?;
-            write!(w, "{}", result)?;
+            write!(w, "{}", result.code)?;
+            if let Some(diff) = result.meaning_diff {
+                std::fs::write("stdin.rbfmt-before", diff.0)?;
+                std::fs::write("stdin.rbfmt-after", diff.1)?;
+                eprintln!("WARNING: code meaning changes detected");
+            }
             Ok(())
         }
         FormatTarget::Files { ref paths } => {
@@ -77,13 +82,19 @@ fn run_format(
                 let result = crate::format_source(source, config.format);
                 match result {
                     Ok(result) => {
+                        if let Some(diff) = result.meaning_diff {
+                            let path = path.as_os_str().to_string_lossy();
+                            std::fs::write(format!("{path}.rbfmt-before"), diff.0)?;
+                            std::fs::write(format!("{path}.rbfmt-after"), diff.1)?;
+                            eprintln!("WARNING: code meaning changes detected: {path}");
+                        }
                         if request.write_to_file {
-                            std::fs::write(&path, result)?;
+                            std::fs::write(&path, result.code)?;
                         } else {
                             if need_file_separator {
                                 writeln!(w, "\n------ {:?} -----", &path)?;
                             }
-                            write!(w, "{}", result)?;
+                            write!(w, "{}", result.code)?;
                         }
                     }
                     Err(err) => {
@@ -154,6 +165,13 @@ fn parse_args(args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Result<Actio
         return Ok(Action::Print(usage));
     }
 
+    #[cfg(feature = "safety")]
+    if matches.opt_present("__print-meaning") {
+        let target = matches.free.iter().next().unwrap();
+        let result = crate::extract_meaning(target)?;
+        return Ok(Action::Print(result));
+    }
+
     let write_to_file = matches.opt_present("w");
     let target = if matches.free.iter().any(|s| s == "-") {
         FormatTarget::Stdin
@@ -175,6 +193,14 @@ fn build_options() -> getopts::Options {
     o.optflag("h", "help", "Print this help message");
     o.optflag("w", "write", "Write output to files instead of STDOUT");
     o.optflag("v", "version", "Print version");
+
+    #[cfg(feature = "safety")]
+    o.optflag(
+        "",
+        "__print-meaning",
+        "[experimental] print meaning of code",
+    );
+
     o
 }
 

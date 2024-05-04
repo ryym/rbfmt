@@ -8,6 +8,10 @@ name = "rbfmt"
 repository = "https://github.com/ryym/rbfmt"
 version = "0.0.2"
 
+[features]
+default = []
+safety = []
+
 [dependencies]
 getopts = "0.2.21"
 prism = { version = "0.24.0", package = "ruby-prism" }
