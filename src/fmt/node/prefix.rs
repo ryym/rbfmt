@@ -30,6 +30,10 @@ impl Prefix {
         }
     }
 
+    pub(crate) fn is_anonymous_splat(&self) -> bool {
+        (self.operator == "*" || self.operator == "**") && self.expression.is_none()
+    }
+
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         o.push_str(&self.operator);
         if let Some(expr) = &self.expression {

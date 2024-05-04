@@ -4,7 +4,7 @@ use crate::fmt::{
     trivia::EmptyLineHandling,
 };
 
-use super::{Node, VirtualEnd};
+use super::{Kind, Node, VirtualEnd};
 
 #[derive(Debug)]
 pub(crate) struct ArrayPattern {
@@ -18,19 +18,12 @@ pub(crate) struct ArrayPattern {
 }
 
 impl ArrayPattern {
-    pub(crate) fn new(
-        constant: Option<Node>,
-        opening: Option<String>,
-        closing: Option<String>,
-    ) -> Self {
-        let opening_len = opening.as_ref().map_or(0, |s| s.len());
-        let closing_len = closing.as_ref().map_or(0, |s| s.len());
-        let array_shape = Shape::inline(opening_len + closing_len);
+    pub(crate) fn new(constant: Option<Node>) -> Self {
         Self {
-            array_shape,
+            array_shape: Shape::inline(0),
             constant: constant.map(Box::new),
-            opening,
-            closing,
+            opening: None,
+            closing: None,
             elements: vec![],
             virtual_end: None,
             last_comma_allowed: true,
@@ -55,6 +48,34 @@ impl ArrayPattern {
             self.array_shape.insert(&end.shape);
         }
         self.virtual_end = end;
+    }
+
+    pub(crate) fn finish_with(&mut self, mut opening: Option<String>, mut closing: Option<String>) {
+        if closing.is_none() && self.should_close_pattern_to_ensure_valid_syntax() {
+            opening = Some("[".to_string());
+            closing = Some("]".to_string());
+        }
+        if let (Some(opening), Some(closing)) = (&opening, &closing) {
+            let mut array_shape = Shape::inline(opening.len() + closing.len());
+            array_shape.insert(&self.array_shape);
+            self.array_shape = array_shape;
+        }
+        self.opening = opening;
+        self.closing = closing;
+    }
+
+    fn should_close_pattern_to_ensure_valid_syntax(&self) -> bool {
+        if let Some(last) = self.elements.last() {
+            match &last.kind {
+                //  `a in b,` -> `a in [b,]`
+                Kind::Atom(atom) => atom.is_implicit_value(),
+                //  `a in b,*` -> `a in [b,*]`
+                Kind::Prefix(prefix) => prefix.is_anonymous_splat(),
+                _ => false,
+            }
+        } else {
+            false
+        }
     }
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {

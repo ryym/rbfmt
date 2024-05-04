@@ -116,6 +116,13 @@ xs => # 0
   *d # 8
 # 9
 
+# Wrap by brackets automatically to avoid syntax error after stripping semicolons.
+xs => *,a,*;
+case xs
+in *,1=>a,*;
+  nil
+end
+
 ## Hash patterns
 
 hash in {}
