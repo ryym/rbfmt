@@ -4,7 +4,7 @@ use crate::fmt::{
     trivia::EmptyLineHandling,
 };
 
-use super::{Node, VirtualEnd};
+use super::{Kind, Node, VirtualEnd};
 
 #[derive(Debug)]
 pub(crate) struct HashPattern {
@@ -18,24 +18,17 @@ pub(crate) struct HashPattern {
 }
 
 impl HashPattern {
-    pub(crate) fn new(
-        constant: Option<Node>,
-        opening: Option<String>,
-        closing: Option<String>,
-        should_be_inline: bool,
-    ) -> Self {
+    pub(crate) fn new(constant: Option<Node>, should_be_inline: bool) -> Self {
         let hash_shape = if should_be_inline {
-            let opening_len = opening.as_ref().map_or(0, |s| s.len());
-            let closing_len = closing.as_ref().map_or(0, |s| s.len());
-            Shape::inline(opening_len + closing_len)
+            Shape::inline(0)
         } else {
             Shape::Multilines
         };
         Self {
             constant: constant.map(Box::new),
             hash_shape,
-            opening,
-            closing,
+            opening: None,
+            closing: None,
             elements: vec![],
             virtual_end: None,
             last_comma_allowed: true,
@@ -64,6 +57,35 @@ impl HashPattern {
             self.hash_shape.insert(&end.shape);
         }
         self.virtual_end = end;
+    }
+
+    pub(crate) fn finish_with(&mut self, mut opening: Option<String>, mut closing: Option<String>) {
+        if closing.is_none() && self.should_close_pattern_to_ensure_valid_syntax() {
+            opening = Some("{".to_string());
+            closing = Some("}".to_string());
+        }
+        if let (Some(opening), Some(closing)) = (&opening, &closing) {
+            let spaces_len = 2;
+            let mut hash_shape = Shape::inline(opening.len() + closing.len() + spaces_len);
+            hash_shape.insert(&self.hash_shape);
+            self.hash_shape = hash_shape;
+        }
+        self.opening = opening;
+        self.closing = closing;
+    }
+
+    fn should_close_pattern_to_ensure_valid_syntax(&self) -> bool {
+        if let Some(last) = self.elements.last() {
+            match &last.kind {
+                //  `a in b:` -> `a in { b: }`
+                Kind::Assoc(assoc) => assoc.has_implicit_value(),
+                //  `a in **` -> `a in { ** }`
+                Kind::Prefix(prefix) => prefix.is_anonymous_splat(),
+                _ => false,
+            }
+        } else {
+            false
+        }
     }
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {

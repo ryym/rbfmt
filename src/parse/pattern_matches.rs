@@ -185,8 +185,6 @@ impl<'src> super::Parser<'src> {
         let constant = node.constant().map(|c| self.parse(c, None));
         let opening_loc = node.opening_loc();
         let closing_loc = node.closing_loc();
-        let opening = opening_loc.as_ref().map(Self::source_lossy_at);
-        let closing = closing_loc.as_ref().map(Self::source_lossy_at);
         let should_be_inline = match (opening_loc.as_ref(), node.elements().iter().next()) {
             (Some(opening_loc), Some(first_element)) => !self.does_line_break_exist_in(
                 opening_loc.start_offset(),
@@ -194,7 +192,7 @@ impl<'src> super::Parser<'src> {
             ),
             _ => true,
         };
-        let mut hash = fmt::HashPattern::new(constant, opening, closing, should_be_inline);
+        let mut hash = fmt::HashPattern::new(constant, should_be_inline);
 
         let rest = node.rest();
         let closing_start = closing_loc.as_ref().map(|c| c.start_offset());
@@ -220,6 +218,10 @@ impl<'src> super::Parser<'src> {
 
         let end = self.take_end_trivia_as_virtual_end(closing_start);
         hash.set_virtual_end(end);
+
+        let opening = opening_loc.as_ref().map(Self::source_lossy_at);
+        let closing = closing_loc.as_ref().map(Self::source_lossy_at);
+        hash.finish_with(opening, closing);
 
         fmt::Node::new(fmt::Kind::HashPattern(hash))
     }

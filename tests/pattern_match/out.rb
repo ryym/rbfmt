@@ -171,6 +171,14 @@ hash =>
   } # 4
 # 5
 
+# Wrap by braces automatically to avoid syntax error after stripping semicolons.
+xs => { a: }
+xs => { a:, ** }
+case xs
+in { ** }
+  nil
+end
+
 ## Pinned expressions / variables
 
 v => ^(1 + 2)

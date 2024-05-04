@@ -4,7 +4,7 @@ use crate::fmt::{
     trivia::EmptyLineHandling,
 };
 
-use super::Node;
+use super::{Kind, Node};
 
 #[derive(Debug)]
 pub(crate) struct Assoc {
@@ -27,6 +27,14 @@ impl Assoc {
             key: Box::new(key),
             value: Box::new(value),
             operator,
+        }
+    }
+
+    pub(crate) fn has_implicit_value(&self) -> bool {
+        if let Kind::Atom(atom) = &self.value.kind {
+            atom.is_implicit_value()
+        } else {
+            false
         }
     }
 
