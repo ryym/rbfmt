@@ -22,28 +22,13 @@ mod strings;
 mod symbols;
 mod trivia;
 
-use crate::fmt;
+use crate::{error::AppError, fmt};
 use log::debug;
 use std::{collections::HashMap, iter::Peekable};
 
-#[derive(Debug)]
-pub struct ParseError {
-    messages: Vec<String>,
-}
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "parse error:")?;
-        for message in self.messages.iter() {
-            writeln!(f, "{message}")?;
-        }
-        Ok(())
-    }
-}
-impl std::error::Error for ParseError {}
-
 pub(crate) fn parse_from_prism_result(
     result: prism::ParseResult,
-) -> Result<ParserResult, ParseError> {
+) -> Result<ParserResult, AppError> {
     let messages = result
         .errors()
         .map(|e| {
@@ -57,7 +42,7 @@ pub(crate) fn parse_from_prism_result(
         })
         .collect::<Vec<_>>();
     if !messages.is_empty() {
-        return Err(ParseError { messages });
+        return Err(AppError::ParseFailed(messages));
     }
 
     let comments = result.comments().peekable();

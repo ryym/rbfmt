@@ -1,9 +1,11 @@
 use std::error::Error;
 
 use config::FormatConfig;
+use error::AppError;
 
 mod cli;
 mod config;
+mod error;
 mod fmt;
 mod meaning;
 mod parse;
@@ -24,10 +26,7 @@ pub struct FormatResult {
     meaning_diff: Option<(String, String)>,
 }
 
-pub fn format_source(
-    source: Vec<u8>,
-    config: FormatConfig,
-) -> Result<FormatResult, parse::ParseError> {
+pub fn format_source(source: Vec<u8>, config: FormatConfig) -> Result<FormatResult, AppError> {
     let prism_result = prism::parse(&source);
 
     if cfg!(feature = "safety") {
@@ -52,7 +51,7 @@ pub fn format_source(
 fn parse_and_format(
     config: FormatConfig,
     prism_result: prism::ParseResult,
-) -> Result<String, parse::ParseError> {
+) -> Result<String, AppError> {
     let result = parse::parse_from_prism_result(prism_result)?;
     let formatted = fmt::format(config, result.node, result.heredoc_map);
     Ok(formatted)

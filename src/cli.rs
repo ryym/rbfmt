@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::config;
+use crate::{config, error::AppError};
 
 const VERSION: &str = "0.0.2";
 
@@ -22,21 +22,10 @@ struct FormatRequest {
 }
 
 #[derive(Debug)]
-struct SomeError(String);
-
-#[derive(Debug)]
 enum FormatTarget {
     Files { paths: Vec<String> },
     Stdin,
 }
-
-impl std::fmt::Display for SomeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.0)?;
-        Ok(())
-    }
-}
-impl std::error::Error for SomeError {}
 
 pub fn run(
     r: &mut impl Read,
@@ -127,7 +116,7 @@ fn append_paths_recursively(
             return Ok(());
         } else {
             let message = format!("file not exist: {}", path.as_os_str().to_string_lossy());
-            return Err(Box::new(SomeError(message)));
+            return Err(Box::new(AppError::Misc(message)));
         }
     }
     if path.is_file() {
