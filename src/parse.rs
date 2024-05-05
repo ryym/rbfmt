@@ -23,6 +23,7 @@ mod symbols;
 mod trivia;
 
 use crate::fmt;
+use log::debug;
 use std::{collections::HashMap, iter::Peekable};
 
 #[derive(Debug)]
@@ -62,8 +63,8 @@ pub(crate) fn parse_from_prism_result(
     let comments = result.comments().peekable();
     let mut parser = Parser::new(result.source(), comments);
     let fmt_node = parser.parse_from_prism_node(result.node());
-    // dbg!(&fmt_node);
-    // dbg!(&parser.heredoc_map);
+    debug!("fmt node: {:#?}", &fmt_node);
+    debug!("heredoc map: {:#?}", &parser.heredoc_map);
     Ok(ParserResult {
         node: fmt_node,
         heredoc_map: parser.heredoc_map,
