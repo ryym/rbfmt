@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use config::FormatConfig;
 use error::AppError;
 
@@ -13,7 +11,7 @@ mod parse;
 #[cfg(test)]
 mod test;
 
-pub fn run() -> Result<(), Box<dyn Error>> {
+pub fn run() -> Result<(), anyhow::Error> {
     cli::run(
         &mut std::io::stdin(),
         &mut std::io::stdout(),
@@ -57,7 +55,7 @@ fn parse_and_format(
     Ok(formatted)
 }
 
-pub fn extract_meaning(target_path: &String) -> Result<String, Box<dyn Error>> {
+pub fn extract_meaning(target_path: &String) -> Result<String, anyhow::Error> {
     let source = std::fs::read_to_string(target_path)?;
     let prism_result = prism::parse(source.as_bytes());
     let meaning = meaning::extract(&prism_result.node());

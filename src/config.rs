@@ -1,9 +1,11 @@
 use std::{
-    error::Error,
     fs::File,
     io::BufReader,
+    os::unix::prelude::OsStrExt,
     path::{Path, PathBuf},
 };
+
+use anyhow::Context;
 
 #[derive(Debug, Default, serde::Deserialize)]
 pub struct Config {
@@ -21,18 +23,21 @@ impl Default for FormatConfig {
     }
 }
 
-pub fn config_of_path(file_path: &Path) -> Result<Config, Box<dyn Error>> {
+pub fn config_of_path(file_path: &Path) -> Result<Config, anyhow::Error> {
     match file_path.parent() {
         Some(dir_path) => config_of_dir(dir_path),
         None => Ok(Config::default()),
     }
 }
 
-pub fn config_of_dir(dir_path: &Path) -> Result<Config, Box<dyn Error>> {
+pub fn config_of_dir(dir_path: &Path) -> Result<Config, anyhow::Error> {
     let config_path = find_config_file_path(dir_path);
     let config = match config_path {
         Some(config_path) => {
-            let config_file = File::open(config_path)?;
+            let config_file = File::open(&config_path).with_context(|| {
+                let path = String::from_utf8_lossy(config_path.as_os_str().as_bytes());
+                format!("failed to open config file: {path}")
+            })?;
             let reader = BufReader::new(config_file);
             serde_yaml::from_reader(reader)?
         }

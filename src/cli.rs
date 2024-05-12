@@ -1,9 +1,11 @@
 use std::{
-    error::Error,
     ffi::OsStr,
     io::{Read, Write},
+    os::unix::prelude::OsStrExt,
     path::PathBuf,
 };
+
+use anyhow::Context;
 
 use crate::{config, error::AppError};
 
@@ -31,7 +33,7 @@ pub fn run(
     r: &mut impl Read,
     w: &mut impl Write,
     args: impl IntoIterator<Item = impl AsRef<OsStr>>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), anyhow::Error> {
     let action = parse_args(args)?;
     match action {
         Action::Print(message) => {
@@ -46,11 +48,12 @@ fn run_format(
     r: &mut impl Read,
     w: &mut impl Write,
     request: FormatRequest,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), anyhow::Error> {
     match request.target {
         FormatTarget::Stdin => {
             let mut source = Vec::new();
-            r.read_to_end(&mut source)?;
+            r.read_to_end(&mut source)
+                .context("failed to read source")?;
             let cwd = std::env::current_dir()?;
             let config = config::config_of_dir(&cwd)?;
             let result = crate::format_source(source, config.format)?;
@@ -63,10 +66,14 @@ fn run_format(
             Ok(())
         }
         FormatTarget::Files { ref paths } => {
-            let target_paths = flatten_target_paths(paths)?;
+            let target_paths =
+                flatten_target_paths(paths).context("failed to collect target file paths")?;
             let need_file_separator = paths.len() > 1;
             for path in target_paths {
-                let source = std::fs::read(&path)?;
+                let source = std::fs::read(&path).with_context(|| {
+                    let path = String::from_utf8_lossy(path.as_os_str().as_bytes());
+                    format!("failed to read target file: {path}")
+                })?;
                 let config = config::config_of_path(&path)?;
                 let result = crate::format_source(source, config.format);
                 match result {
@@ -97,7 +104,7 @@ fn run_format(
     }
 }
 
-fn flatten_target_paths(target_paths: &Vec<String>) -> Result<Vec<PathBuf>, Box<dyn Error>> {
+fn flatten_target_paths(target_paths: &Vec<String>) -> Result<Vec<PathBuf>, anyhow::Error> {
     let mut paths = vec![];
     for path in target_paths {
         let path = PathBuf::from(path);
@@ -110,13 +117,13 @@ fn append_paths_recursively(
     path: PathBuf,
     paths: &mut Vec<PathBuf>,
     ignore_non_existiing_path: bool,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), anyhow::Error> {
     if !path.exists() {
         if ignore_non_existiing_path {
             return Ok(());
         } else {
             let message = format!("file not exist: {}", path.as_os_str().to_string_lossy());
-            return Err(Box::new(AppError::Misc(message)));
+            return Err(AppError::Misc(message).into());
         }
     }
     if path.is_file() {
@@ -140,7 +147,7 @@ To configure formatting, put .rbfmt.yml file.
 ref: https://github.com/ryym/rbfmt
 ";
 
-fn parse_args(args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Result<Action, Box<dyn Error>> {
+fn parse_args(args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Result<Action, anyhow::Error> {
     let args = args.into_iter();
     let options = build_options();
 
