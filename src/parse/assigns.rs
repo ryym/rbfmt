@@ -23,7 +23,7 @@ impl<'src> super::Parser<'src> {
         operator_loc: prism::Location,
         value: prism::Node,
     ) -> fmt::Node {
-        let target = self.parse_constant_path(const_path.parent(), const_path.child());
+        let target = self.parse_constant_path(const_path.parent(), const_path.name_loc());
         let operator = Self::source_lossy_at(&operator_loc);
         let value = self.parse(value, None);
         let assign = fmt::Assign::new(target, operator, value);

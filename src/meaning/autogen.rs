@@ -167,7 +167,7 @@ impl super::Meaning {
                 self.opt_field("receiver", node.receiver());
                 self.call_operator_loc_field(node.call_operator_loc());
                 self.message_loc_field(node.message_loc());
-                self.opt_loc_field("operator_loc", Some(node.operator_loc()));
+                self.opt_loc_field("binary_operator_loc", Some(node.binary_operator_loc()));
                 self.node_field("value", node.value());
                 self.end_node();
             }
@@ -248,7 +248,7 @@ impl super::Meaning {
                 let node = node.as_class_variable_operator_write_node().unwrap();
                 self.start_node("ClassVariableOperatorWriteNode");
                 self.opt_loc_field("name_loc", Some(node.name_loc()));
-                self.opt_loc_field("operator_loc", Some(node.operator_loc()));
+                self.opt_loc_field("binary_operator_loc", Some(node.binary_operator_loc()));
                 self.node_field("value", node.value());
                 self.end_node();
             }
@@ -275,7 +275,7 @@ impl super::Meaning {
                 self.start_node("ClassVariableWriteNode");
                 self.opt_loc_field("name_loc", Some(node.name_loc()));
                 self.node_field("value", node.value());
-                self.opt_loc_field("operator_loc", node.operator_loc());
+                self.opt_loc_field("operator_loc", Some(node.operator_loc()));
                 self.end_node();
             }
 
@@ -292,7 +292,7 @@ impl super::Meaning {
                 let node = node.as_constant_operator_write_node().unwrap();
                 self.start_node("ConstantOperatorWriteNode");
                 self.opt_loc_field("name_loc", Some(node.name_loc()));
-                self.opt_loc_field("operator_loc", Some(node.operator_loc()));
+                self.opt_loc_field("binary_operator_loc", Some(node.binary_operator_loc()));
                 self.node_field("value", node.value());
                 self.end_node();
             }
@@ -319,8 +319,8 @@ impl super::Meaning {
                 let node = node.as_constant_path_node().unwrap();
                 self.start_node("ConstantPathNode");
                 self.opt_field("parent", node.parent());
-                self.node_field("child", node.child());
                 self.opt_loc_field("delimiter_loc", Some(node.delimiter_loc()));
+                self.opt_loc_field("name_loc", Some(node.name_loc()));
                 self.end_node();
             }
 
@@ -328,7 +328,7 @@ impl super::Meaning {
                 let node = node.as_constant_path_operator_write_node().unwrap();
                 self.start_node("ConstantPathOperatorWriteNode");
                 self.node_field("target", node.target().as_node());
-                self.opt_loc_field("operator_loc", Some(node.operator_loc()));
+                self.opt_loc_field("binary_operator_loc", Some(node.binary_operator_loc()));
                 self.node_field("value", node.value());
                 self.end_node();
             }
@@ -346,8 +346,8 @@ impl super::Meaning {
                 let node = node.as_constant_path_target_node().unwrap();
                 self.start_node("ConstantPathTargetNode");
                 self.opt_field("parent", node.parent());
-                self.node_field("child", node.child());
                 self.opt_loc_field("delimiter_loc", Some(node.delimiter_loc()));
+                self.opt_loc_field("name_loc", Some(node.name_loc()));
                 self.end_node();
             }
 
@@ -501,7 +501,7 @@ impl super::Meaning {
                 let node = node.as_global_variable_operator_write_node().unwrap();
                 self.start_node("GlobalVariableOperatorWriteNode");
                 self.opt_loc_field("name_loc", Some(node.name_loc()));
-                self.opt_loc_field("operator_loc", Some(node.operator_loc()));
+                self.opt_loc_field("binary_operator_loc", Some(node.binary_operator_loc()));
                 self.node_field("value", node.value());
                 self.end_node();
             }
@@ -605,7 +605,7 @@ impl super::Meaning {
                 self.call_operator_loc_field(node.call_operator_loc());
                 self.opt_field("arguments", node.arguments().map(|n| n.as_node()));
                 self.opt_field("block", node.block());
-                self.opt_loc_field("operator_loc", Some(node.operator_loc()));
+                self.opt_loc_field("binary_operator_loc", Some(node.binary_operator_loc()));
                 self.node_field("value", node.value());
                 self.end_node();
             }
@@ -644,7 +644,7 @@ impl super::Meaning {
                 let node = node.as_instance_variable_operator_write_node().unwrap();
                 self.start_node("InstanceVariableOperatorWriteNode");
                 self.opt_loc_field("name_loc", Some(node.name_loc()));
-                self.opt_loc_field("operator_loc", Some(node.operator_loc()));
+                self.opt_loc_field("binary_operator_loc", Some(node.binary_operator_loc()));
                 self.node_field("value", node.value());
                 self.end_node();
             }
@@ -710,6 +710,10 @@ impl super::Meaning {
                 self.interpolated_x_string_node("InterpolatedXStringNode", node);
             }
 
+            prism::Node::ItParametersNode { .. } => {
+                self.atom_node("ItParametersNode", node);
+            }
+
             prism::Node::KeywordHashNode { .. } => {
                 let node = node.as_keyword_hash_node().unwrap();
                 self.start_node("KeywordHashNode");
@@ -747,7 +751,7 @@ impl super::Meaning {
                 let node = node.as_local_variable_operator_write_node().unwrap();
                 self.start_node("LocalVariableOperatorWriteNode");
                 self.opt_loc_field("name_loc", Some(node.name_loc()));
-                self.opt_loc_field("operator_loc", Some(node.operator_loc()));
+                self.opt_loc_field("binary_operator_loc", Some(node.binary_operator_loc()));
                 self.node_field("value", node.value());
                 self.end_node();
             }
@@ -1044,6 +1048,13 @@ impl super::Meaning {
 
             prism::Node::SelfNode { .. } => {
                 self.atom_node("SelfNode", node);
+            }
+
+            prism::Node::ShareableConstantNode { .. } => {
+                let node = node.as_shareable_constant_node().unwrap();
+                self.start_node("ShareableConstantNode");
+                self.node_field("write", node.write());
+                self.end_node();
             }
 
             prism::Node::SingletonClassNode { .. } => {

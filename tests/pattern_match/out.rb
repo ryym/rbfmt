@@ -217,8 +217,7 @@ hash => {
 v => a | b
 v => a | b | c | d | e
 
-# Prism's bug? This is a valid syntax but the patterns before the parentheses are ignored.
-v => b | c | d
+v => a | (b | c) | d
 
 v => [a, :b] | c, d | [*, e, *] | { f: Integer | Nil, g:, ** } | ^(h.i(j)) | ^@k | [String] => l
 

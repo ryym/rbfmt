@@ -151,7 +151,7 @@ impl Parser<'_> {
 
             prism::Node::ConstantPathNode { .. } => {
                 let node = node.as_constant_path_node().unwrap();
-                self.parse_constant_path(node.parent(), node.child())
+                self.parse_constant_path(node.parent(), node.name_loc())
             }
 
             prism::Node::StringNode { .. } => {
@@ -304,7 +304,11 @@ impl Parser<'_> {
             }
             prism::Node::LocalVariableOperatorWriteNode { .. } => {
                 let node = node.as_local_variable_operator_write_node().unwrap();
-                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
+                self.parse_variable_assign(
+                    node.name_loc(),
+                    node.binary_operator_loc(),
+                    node.value(),
+                )
             }
 
             prism::Node::InstanceVariableWriteNode { .. } => {
@@ -321,17 +325,16 @@ impl Parser<'_> {
             }
             prism::Node::InstanceVariableOperatorWriteNode { .. } => {
                 let node = node.as_instance_variable_operator_write_node().unwrap();
-                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
+                self.parse_variable_assign(
+                    node.name_loc(),
+                    node.binary_operator_loc(),
+                    node.value(),
+                )
             }
 
             prism::Node::ClassVariableWriteNode { .. } => {
                 let node = node.as_class_variable_write_node().unwrap();
-                self.parse_variable_assign(
-                    node.name_loc(),
-                    // XXX: When does the operator becomes None?
-                    node.operator_loc().expect("must have operator"),
-                    node.value(),
-                )
+                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
             }
             prism::Node::ClassVariableAndWriteNode { .. } => {
                 let node = node.as_class_variable_and_write_node().unwrap();
@@ -343,7 +346,11 @@ impl Parser<'_> {
             }
             prism::Node::ClassVariableOperatorWriteNode { .. } => {
                 let node = node.as_class_variable_operator_write_node().unwrap();
-                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
+                self.parse_variable_assign(
+                    node.name_loc(),
+                    node.binary_operator_loc(),
+                    node.value(),
+                )
             }
 
             prism::Node::GlobalVariableWriteNode { .. } => {
@@ -360,7 +367,11 @@ impl Parser<'_> {
             }
             prism::Node::GlobalVariableOperatorWriteNode { .. } => {
                 let node = node.as_global_variable_operator_write_node().unwrap();
-                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
+                self.parse_variable_assign(
+                    node.name_loc(),
+                    node.binary_operator_loc(),
+                    node.value(),
+                )
             }
 
             prism::Node::ConstantWriteNode { .. } => {
@@ -377,7 +388,11 @@ impl Parser<'_> {
             }
             prism::Node::ConstantOperatorWriteNode { .. } => {
                 let node = node.as_constant_operator_write_node().unwrap();
-                self.parse_variable_assign(node.name_loc(), node.operator_loc(), node.value())
+                self.parse_variable_assign(
+                    node.name_loc(),
+                    node.binary_operator_loc(),
+                    node.value(),
+                )
             }
 
             prism::Node::ConstantPathWriteNode { .. } => {
@@ -394,7 +409,11 @@ impl Parser<'_> {
             }
             prism::Node::ConstantPathOperatorWriteNode { .. } => {
                 let node = node.as_constant_path_operator_write_node().unwrap();
-                self.parse_constant_path_assign(node.target(), node.operator_loc(), node.value())
+                self.parse_constant_path_assign(
+                    node.target(),
+                    node.binary_operator_loc(),
+                    node.value(),
+                )
             }
 
             prism::Node::CallAndWriteNode { .. } => {
@@ -407,7 +426,7 @@ impl Parser<'_> {
             }
             prism::Node::CallOperatorWriteNode { .. } => {
                 let node = node.as_call_operator_write_node().unwrap();
-                self.parse_call_assign(&node, node.operator_loc(), node.value())
+                self.parse_call_assign(&node, node.binary_operator_loc(), node.value())
             }
 
             prism::Node::IndexAndWriteNode { .. } => {
@@ -420,7 +439,7 @@ impl Parser<'_> {
             }
             prism::Node::IndexOperatorWriteNode { .. } => {
                 let node = node.as_index_operator_write_node().unwrap();
-                self.parse_call_assign(&node, node.operator_loc(), node.value())
+                self.parse_call_assign(&node, node.binary_operator_loc(), node.value())
             }
 
             prism::Node::LocalVariableTargetNode { .. } => self.parse_as_atom(node),
@@ -430,7 +449,7 @@ impl Parser<'_> {
             prism::Node::ConstantTargetNode { .. } => self.parse_as_atom(node),
             prism::Node::ConstantPathTargetNode { .. } => {
                 let node = node.as_constant_path_target_node().unwrap();
-                self.parse_constant_path(node.parent(), node.child())
+                self.parse_constant_path(node.parent(), node.name_loc())
             }
             prism::Node::CallTargetNode { .. } => {
                 let node = node.as_call_target_node().unwrap();

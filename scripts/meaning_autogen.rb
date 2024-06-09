@@ -177,7 +177,7 @@ class MeaningCodeGenerator
       when 'lparen_loc', 'rparen_loc'
         return nil
       end
-    when 'IfNode', 'UnlessNode'
+    when 'IfNode', 'UnlessNode', 'WhenNode'
       case name
       when 'then_keyword_loc'
         return nil
@@ -185,6 +185,11 @@ class MeaningCodeGenerator
     when 'InNode'
       case name
       when 'then_loc'
+        return nil
+      end
+    when 'FloatNode', 'IntegerNode'
+      case name
+      when 'value'
         return nil
       end
     end
