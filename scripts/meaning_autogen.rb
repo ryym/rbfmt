@@ -219,7 +219,7 @@ class MeaningCodeGenerator
     when /^Option<([a-zA-Z]+)Node<'pr>>$/
       %Q{self.opt_field("#{name}", node.#{name}().map(|n| n.as_node()));}
     else
-      raise "unexpected return_type: #{fn}"
+      raise "unexpected return_type: #{impl[:name]} #{fn}"
     end
   end
 
