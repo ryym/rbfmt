@@ -102,6 +102,12 @@ end
 
 foo { |a, b| a(b).c } # trailing
 
+foo { |a|
+}
+
+foo { |(a)|
+}
+
 [[1, 2]].collect { |x,| x }
 foo do |a, b,|
 end
