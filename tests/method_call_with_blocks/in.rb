@@ -192,6 +192,8 @@ foo do
   _1.foo(_2)
 end
 
+foo { it }
+
 foo do # 0.5
   1
 rescue # 1.5

@@ -397,6 +397,7 @@ impl<'src> super::Parser<'src> {
                     method_block.set_parameters(params);
                 }
                 prism::Node::NumberedParametersNode { .. } => {}
+                prism::Node::ItParametersNode { .. } => {}
                 _ => panic!("unexpected node for call block params: {:?}", node),
             }
         }
