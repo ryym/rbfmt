@@ -131,7 +131,12 @@ class MeaningCodeGenerator
     fields = functions.filter_map { build_field_line(impl, _1) }
     snaked_name = to_snake(impl[:name])
     case impl[:name]
-    when 'StringNode', 'XStringNode', 'InterpolatedStringNode', 'InterpolatedXStringNode', 'NumberedParametersNode'
+    when 'StringNode',
+        'XStringNode',
+        'InterpolatedStringNode',
+        'InterpolatedXStringNode',
+        'NumberedParametersNode',
+        'ItParametersNode'
       <<~RUST
         prism::Node::#{impl[:name]} { .. } => {
             let node = node.as_#{snaked_name}().unwrap();

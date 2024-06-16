@@ -711,7 +711,8 @@ impl super::Meaning {
             }
 
             prism::Node::ItParametersNode { .. } => {
-                self.atom_node("ItParametersNode", node);
+                let node = node.as_it_parameters_node().unwrap();
+                self.it_parameters_node("ItParametersNode", node);
             }
 
             prism::Node::KeywordHashNode { .. } => {

@@ -56,6 +56,14 @@ impl Meaning {
         self.buffer.push(']');
     }
 
+    fn it_parameters_node(&mut self, name: &str, _: prism::ItParametersNode) {
+        self.break_line();
+        self.put_indent();
+        self.buffer.push('[');
+        self.buffer.push_str(name);
+        self.buffer.push(']');
+    }
+
     fn string_node(&mut self, name: &str, node: prism::StringNode) {
         self.start_node(name);
         self.string_or_heredoc(node.opening_loc(), node.content_loc());
