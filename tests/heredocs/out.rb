@@ -360,15 +360,14 @@ C
 hashes << { a: 1, b: 2, c: <<~C, d: 4 }
   3
 C
-hashes <<
-  {
-    a: 1,
-    b: 2,
-    c: <<~C,
-      3
-    C
-    d: 4
-  }
+hashes << {
+  a: 1,
+  b: 2,
+  c: <<~C,
+    3
+  C
+  d: 4
+}
 
 Foo.new(<<-RUBY, 3.3)
       # frozen_string_literal: true

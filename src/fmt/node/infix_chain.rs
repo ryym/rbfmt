@@ -1,6 +1,6 @@
 use crate::fmt::{
     output::{FormatContext, Output},
-    shape::Shape,
+    shape::{ConcatStyle, Shape},
     trivia::EmptyLineHandling,
 };
 
@@ -39,11 +39,15 @@ impl InfixChain {
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext) {
         self.left.format(o, ctx);
-        if self.rights_shape.fits_in_one_line(o.remaining_width) {
+        if self.should_put_rights_next_to_operator(o) {
             for right in &self.rights {
                 o.push(' ');
                 o.push_str(&right.operator);
                 o.push(' ');
+                right
+                    .value
+                    .leading_trivia
+                    .format(o, ctx, EmptyLineHandling::none());
                 right.value.format(o, ctx);
             }
         } else {
@@ -61,6 +65,20 @@ impl InfixChain {
                 o.dedent();
             }
         }
+    }
+
+    fn should_put_rights_next_to_operator(&self, o: &Output) -> bool {
+        if self.rights_shape.fits_in_inline(o.remaining_width) {
+            return true;
+        }
+        if self.rights.len() == 1 {
+            if let ConcatStyle::Horizontal { min_first_line_len } =
+                self.rights[0].value.concat_style()
+            {
+                return min_first_line_len <= o.remaining_width;
+            }
+        }
+        false
     }
 }
 
