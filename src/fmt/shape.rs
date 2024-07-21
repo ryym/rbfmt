@@ -37,12 +37,12 @@ impl Shape {
         }
     }
 
-    pub(crate) fn argument_style(&self) -> ArgumentStyle {
+    pub(crate) fn concat_style(&self) -> ConcatStyle {
         match self {
-            Self::Inline { len } => ArgumentStyle::Horizontal {
+            Self::Inline { len } => ConcatStyle::Horizontal {
                 min_first_line_len: *len,
             },
-            _ => ArgumentStyle::Vertical,
+            _ => ConcatStyle::Vertical,
         }
     }
 
@@ -82,12 +82,12 @@ impl Shape {
 }
 
 #[derive(Debug)]
-pub(crate) enum ArgumentStyle {
+pub(crate) enum ConcatStyle {
     Vertical,
     Horizontal { min_first_line_len: usize },
 }
 
-impl ArgumentStyle {
+impl ConcatStyle {
     pub(crate) fn add(&self, other: Self) -> Self {
         match (self, other) {
             (

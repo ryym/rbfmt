@@ -1,6 +1,6 @@
 use crate::fmt::{
     output::{DraftResult, FormatContext, Output},
-    shape::{ArgumentStyle, Shape},
+    shape::{ConcatStyle, Shape},
     trivia::EmptyLineHandling,
 };
 
@@ -66,14 +66,14 @@ impl Arguments {
                 if matches!(arg.shape, Shape::LineEnd { .. }) {
                     return DraftResult::Rollback;
                 }
-                match arg.argument_style() {
-                    ArgumentStyle::Vertical => match arg.shape {
+                match arg.concat_style() {
+                    ConcatStyle::Vertical => match arg.shape {
                         Shape::Inline { len } if len <= d.remaining_width => {
                             arg.format(d, ctx);
                         }
                         _ => return DraftResult::Rollback,
                     },
-                    ArgumentStyle::Horizontal { min_first_line_len } => {
+                    ConcatStyle::Horizontal { min_first_line_len } => {
                         if d.remaining_width < min_first_line_len {
                             return DraftResult::Rollback;
                         }

@@ -50,7 +50,7 @@ pub(crate) use self::{
 
 use super::{
     output::{FormatContext, Output},
-    shape::{ArgumentStyle, Shape},
+    shape::{ConcatStyle, Shape},
     LeadingTrivia, TrailingTrivia,
 };
 
@@ -100,11 +100,11 @@ impl Node {
         self.leading_trivia.shape().is_empty() && self.kind.can_continue_line()
     }
 
-    pub(crate) fn argument_style(&self) -> ArgumentStyle {
+    pub(crate) fn concat_style(&self) -> ConcatStyle {
         if self.leading_trivia.is_empty() {
-            self.kind.argument_style()
+            self.kind.concat_style()
         } else {
-            ArgumentStyle::Vertical
+            ConcatStyle::Vertical
         }
     }
 }
@@ -244,14 +244,14 @@ impl Kind {
         }
     }
 
-    pub(crate) fn argument_style(&self) -> ArgumentStyle {
+    pub(crate) fn concat_style(&self) -> ConcatStyle {
         match self {
-            Self::Atom(atom) => ArgumentStyle::Horizontal {
+            Self::Atom(atom) => ConcatStyle::Horizontal {
                 min_first_line_len: atom.0.len(),
             },
-            Self::StringLike(str) => str.shape.argument_style(),
-            Self::HeredocOpening(opening) => opening.shape.argument_style(),
-            Self::Parens(_) => ArgumentStyle::Horizontal {
+            Self::StringLike(str) => str.shape.concat_style(),
+            Self::HeredocOpening(opening) => opening.shape.concat_style(),
+            Self::Parens(_) => ConcatStyle::Horizontal {
                 min_first_line_len: "(".len(),
             },
             Self::Lambda(lambda) => {
@@ -260,44 +260,44 @@ impl Kind {
                 } else {
                     "-> {".len()
                 };
-                ArgumentStyle::Horizontal {
+                ConcatStyle::Horizontal {
                     min_first_line_len: min_len,
                 }
             }
             Self::Prefix(prefix) => {
                 let expr_style = prefix.expression.as_ref().map_or(
-                    ArgumentStyle::Horizontal {
+                    ConcatStyle::Horizontal {
                         min_first_line_len: 0,
                     },
-                    |e| e.argument_style(),
+                    |e| e.concat_style(),
                 );
-                ArgumentStyle::Horizontal {
+                ConcatStyle::Horizontal {
                     min_first_line_len: prefix.operator.len(),
                 }
                 .add(expr_style)
             }
             Self::Array(array) => match &array.opening {
-                Some(opening) => ArgumentStyle::Horizontal {
+                Some(opening) => ConcatStyle::Horizontal {
                     min_first_line_len: opening.len(),
                 },
                 None => array
                     .elements
                     .first()
                     .expect("non-brackets array must have elements")
-                    .argument_style(),
+                    .concat_style(),
             },
-            Self::Hash(hash) => ArgumentStyle::Horizontal {
+            Self::Hash(hash) => ConcatStyle::Horizontal {
                 min_first_line_len: hash.opening.len(),
             },
-            Self::Assoc(assoc) => match assoc.value.argument_style() {
-                ArgumentStyle::Vertical => ArgumentStyle::Vertical,
-                ArgumentStyle::Horizontal {
+            Self::Assoc(assoc) => match assoc.value.concat_style() {
+                ConcatStyle::Vertical => ConcatStyle::Vertical,
+                ConcatStyle::Horizontal {
                     min_first_line_len: value_len,
-                } => assoc.key.argument_style().add(ArgumentStyle::Horizontal {
+                } => assoc.key.concat_style().add(ConcatStyle::Horizontal {
                     min_first_line_len: ": ".len() + value_len,
                 }),
             },
-            _ => ArgumentStyle::Vertical,
+            _ => ConcatStyle::Vertical,
         }
     }
 }
