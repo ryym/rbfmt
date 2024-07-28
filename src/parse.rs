@@ -149,6 +149,7 @@ impl Parser<'_> {
             prism::Node::SourceFileNode { .. } => self.parse_as_atom(node),
             prism::Node::SourceLineNode { .. } => self.parse_as_atom(node),
             prism::Node::SourceEncodingNode { .. } => self.parse_as_atom(node),
+            prism::Node::ItLocalVariableReadNode { .. } => self.parse_as_atom(node),
 
             prism::Node::ConstantPathNode { .. } => {
                 let node = node.as_constant_path_node().unwrap();
