@@ -209,7 +209,7 @@ fn inspect_body_indent(parts: &Vec<HeredocPart>) -> Option<SquigglyHeredocBodyIn
 // return None if
 //   - the value is not a line, that is, it does not end with a line break
 //   - the value is a line but contains non-space characters
-fn prefix_spaces_of_empty_line(value: &Vec<u8>) -> Option<usize> {
+fn prefix_spaces_of_empty_line(value: &[u8]) -> Option<usize> {
     if value.is_empty() {
         return Some(0);
     }

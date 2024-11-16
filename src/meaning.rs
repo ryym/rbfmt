@@ -223,7 +223,7 @@ impl Meaning {
         opening_loc: Option<prism::Location>,
         node_parts: prism::NodeList,
     ) {
-        let parts = node_parts.iter().collect();
+        let parts = node_parts.iter().collect::<Vec<_>>();
         let heredoc_info = if is_squiggly_heredoc(&opening_loc) {
             calc_squiggly_heredoc_indent(&parts)
         } else {
@@ -268,7 +268,7 @@ fn is_squiggly_heredoc(opening_loc: &Option<prism::Location>) -> bool {
     }
 }
 
-fn calc_squiggly_heredoc_indent(parts: &Vec<prism::Node>) -> Option<(usize, HashSet<usize>)> {
+fn calc_squiggly_heredoc_indent(parts: &[prism::Node]) -> Option<(usize, HashSet<usize>)> {
     if parts.is_empty() {
         return None;
     }
