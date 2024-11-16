@@ -235,7 +235,7 @@ impl Kind {
                 if statements.nodes.len() > 1 {
                     return false;
                 }
-                match statements.nodes.get(0) {
+                match statements.nodes.first() {
                     Some(node) => node.can_continue_line(),
                     None => statements.virtual_end.is_none(),
                 }

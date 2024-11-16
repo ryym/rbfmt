@@ -48,7 +48,7 @@ impl Statements {
 
     pub(crate) fn format(&self, o: &mut Output, ctx: &FormatContext, block_always: bool) {
         if self.shape.is_inline() && !block_always {
-            if let Some(node) = self.nodes.get(0) {
+            if let Some(node) = self.nodes.first() {
                 node.format(o, ctx);
             }
             return;
