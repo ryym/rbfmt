@@ -197,6 +197,11 @@ class MeaningCodeGenerator
       when 'value'
         return nil
       end
+    when 'RationalNode'
+      case name
+      when 'numerator', 'denominator'
+        return nil
+      end
     end
 
     case fn[:return_type]

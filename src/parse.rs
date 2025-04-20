@@ -142,6 +142,7 @@ impl Parser<'_> {
             prism::Node::NumberedReferenceReadNode { .. } => self.parse_as_atom(node),
             prism::Node::ConstantReadNode { .. } => self.parse_as_atom(node),
             prism::Node::BlockLocalVariableNode { .. } => self.parse_as_atom(node),
+            prism::Node::ItLocalVariableReadNode { .. } => self.parse_as_atom(node),
             prism::Node::ForwardingArgumentsNode { .. } => self.parse_as_atom(node),
             prism::Node::RedoNode { .. } => self.parse_as_atom(node),
             prism::Node::RetryNode { .. } => self.parse_as_atom(node),

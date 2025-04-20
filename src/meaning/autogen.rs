@@ -710,6 +710,10 @@ impl super::Meaning {
                 self.interpolated_x_string_node("InterpolatedXStringNode", node);
             }
 
+            prism::Node::ItLocalVariableReadNode { .. } => {
+                self.atom_node("ItLocalVariableReadNode", node);
+            }
+
             prism::Node::ItParametersNode { .. } => {
                 let node = node.as_it_parameters_node().unwrap();
                 self.it_parameters_node("ItParametersNode", node);
@@ -978,10 +982,7 @@ impl super::Meaning {
             }
 
             prism::Node::RationalNode { .. } => {
-                let node = node.as_rational_node().unwrap();
-                self.start_node("RationalNode");
-                self.node_field("numeric", node.numeric());
-                self.end_node();
+                self.atom_node("RationalNode", node);
             }
 
             prism::Node::RedoNode { .. } => {
