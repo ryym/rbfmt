@@ -23,7 +23,7 @@ class Main
     end
     bindings_files = ruby_prism_dirs.filter_map do |dir|
       path = "#{debug_build_path}/#{dir}/out/bindings.rs"
-      File.exists?(path) ? path : nil
+      File.exist?(path) ? path : nil
     end
     if bindings_files.empty?
       raise 'ruby-prism bindings file not found'
